@@ -1,8 +1,14 @@
 use std::env;
+use gtk::prelude::*;
+use gtk::{glib, Application};
+
+const APP_ID: &str = "org.scq.Rusty_Password";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let length = &args[1];
+    let app = Application::builder().application_id(APP_ID).build();
+    app.run();
 
     use rand::Rng;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
