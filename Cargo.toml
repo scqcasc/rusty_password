@@ -2,6 +2,8 @@
 name = "rusty_password"
 version = "0.1.0"
 edition = "2021"
+authors = ["Sean Quaint <seanquaint@zohomail.com>"]
+description = "Generates strong passwords and adds them to the Gnome buffer."
 
 [dependencies]
 gtk = { version = "0.9.0", package = "gtk4", features = ["v4_14"] }
