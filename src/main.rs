@@ -1,6 +1,5 @@
-use std::env;
 use gtk::prelude::*;
-use gtk::{glib, Application};
+use gtk::{Application};
 use clap::Parser;
 
 const APP_ID: &str = "org.scq.Rusty_Password";
