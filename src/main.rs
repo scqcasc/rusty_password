@@ -11,6 +11,21 @@ struct Args{
     /// length of password to create
     #[arg(short, long, default_value_t = 15)]
     length: i32,
+    /// simplify possible characters
+    #[arg(short, long, default_value_t = false)]
+    simple: bool,
+}
+
+fn get_charset(simple: bool) -> String {
+    if simple {
+        return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+            abcdefghijklmnopqrstuvwxyz\
+            0123456789!+=&%#*");
+    } else {
+        return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+            abcdefghijklmnopqrstuvwxyz\
+            0123456789)(*&^%$#@!~{}[]+=");
+    }
 }
 
 fn main() { 
@@ -20,16 +35,17 @@ fn main() {
     app.run_with_args(&empty);
 
     use rand::Rng;
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-                            abcdefghijklmnopqrstuvwxyz\
-                            0123456789)(*&^%$#@!~{}[]+=";
+    
+    let binding = get_charset(args.simple);
+    let charset: &[u8] = binding.as_bytes();
+    
     let password_len = args.length;
     let mut rng = rand::thread_rng();
 
     let password: String = (0..password_len)
         .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
-            CHARSET[idx] as char
+            let idx = rng.gen_range(0..charset.len());
+            charset[idx] as char
         })
         .collect();
 
