@@ -1,6 +1,7 @@
 use gtk::prelude::*;
 use gtk::{Application};
 use clap::Parser;
+mod password;
 
 const APP_ID: &str = "org.scq.Rusty_Password";
 
@@ -14,40 +15,24 @@ struct Args{
     /// simplify possible characters
     #[arg(short, long, default_value_t = false)]
     simple: bool,
+
+    /// no GUI
+    #[arg(short, long, default_value_t = false)]
+    gui: bool,
 }
 
-fn get_charset(simple: bool) -> String {
-    if simple {
-        return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-            abcdefghijklmnopqrstuvwxyz\
-            0123456789!+=&%#*");
-    } else {
-        return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-            abcdefghijklmnopqrstuvwxyz\
-            0123456789)(*&^%$#@!~{}[]+=");
-    }
-}
+
 
 fn main() { 
-    let empty: Vec<String> = vec![];
     let args = Args::parse();
-    let app = Application::builder().application_id(APP_ID).build();
-    app.run_with_args(&empty);
-
-    use rand::Rng;
+    if args.gui {
+        let empty: Vec<String> = vec![];
+        let app = Application::builder().application_id(APP_ID).build();
+        app.run_with_args(&empty);
+        println!("run with gui")
+    }else{
+        let my_password = password::get_password(args.simple, args.length);
+        println!("{:?}", my_password);
+    }
     
-    let binding = get_charset(args.simple);
-    let charset: &[u8] = binding.as_bytes();
-    
-    let password_len = args.length;
-    let mut rng = rand::thread_rng();
-
-    let password: String = (0..password_len)
-        .map(|_| {
-            let idx = rng.gen_range(0..charset.len());
-            charset[idx] as char
-        })
-        .collect();
-
-    println!("{:?}", password);
 }
