@@ -144,14 +144,14 @@ impl GWCApp {
         file.set_submenu(Some(&menu));
         menu_bar.append(&file);
 
-        // Extras menu
-        let extras_menu = Menu::new();
-        let extras = MenuItem::with_label("Extras");
+        // Help menu
+        let help_menu = Menu::new();
+        let help = MenuItem::with_label("Help");
         let about = MenuItem::with_label("About");
 
-        extras_menu.append(&about);
-        extras.set_submenu(Some(&extras_menu));
-        menu_bar.append(&extras);
+        help_menu.append(&about);
+        help.set_submenu(Some(&help_menu));
+        menu_bar.append(&help);
 
         if let Some (ref label) = self.passwd_label {
             if let Some (ref win) = self.window {
