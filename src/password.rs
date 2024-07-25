@@ -4,11 +4,11 @@ fn get_charset(simple: bool) -> String {
     if simple {
         return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
             abcdefghijklmnopqrstuvwxyz\
-            0123456789!+=&%#*");
+            0123456789!+=%#*");
     } else {
         return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
             abcdefghijklmnopqrstuvwxyz\
-            0123456789)(*&^%$#@!~{}[]+=");
+            0123456789)(*^%$#@!~{}[]+=");
     }
 }
 

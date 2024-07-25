@@ -48,18 +48,21 @@ impl GWCApp {
         GWCApp { passwd_label: None, window: None }
     }
 
-    /// Responsible for initializing the application state, including the whole UI
-    pub fn init(&mut self) {
-        let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    
+    pub fn set_password(&self, password: &Label) {
         let pass_str: String = password::get_password(true, 15);
-        let password = Label::new(None);
         let pass_mu = format!("<span size='16pt'>{}</span>",&pass_str);
         password.set_selectable(true);
         password.set_focus_on_click(true);
         password.set_markup(pass_mu.as_str());
+    }
+
+    /// Responsible for initializing the application state, including the whole UI
+    pub fn init(&mut self) {
+        let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        let  password = Label::new(None);
         
-        
-        
+        self.set_password(&password);
         let win = Window::new(WindowType::Toplevel);
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
@@ -123,23 +126,33 @@ impl GWCApp {
 
     }
 
+
+
     /// Creates the application menus
     fn init_menus (&self) -> MenuBar {
         let menu = Menu::new();
         let menu_bar = MenuBar::new();
         let file = MenuItem::with_label("File");
-    
         let quit = MenuItem::with_label("Quit");
         let file_item = MenuItem::new();
         let file_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         let file_image = Image::from_icon_name(Some("document-open"), IconSize::Menu.into());
         let file_label = Label::new(Some("File"));
 
+        let new_passwd: MenuItem = MenuItem::new();
+        let new_passwd_label: Label = Label::new(Some("New Password"));
+        let pass_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+
+        pass_box.pack_start(&new_passwd_label, false, true, 0);
+        new_passwd.add(&pass_box);
+
+
         file_box.pack_start(&file_image, false, false, 0);
         file_box.pack_start(&file_label, true, true, 0);
         file_item.add(&file_box);
 
         menu.append(&file_item);
+        menu.append(&new_passwd);
         menu.append(&quit);
         file.set_submenu(Some(&menu));
         menu_bar.append(&file);
