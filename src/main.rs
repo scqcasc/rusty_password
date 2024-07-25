@@ -25,7 +25,7 @@ struct Args{
     #[arg(short, long, default_value_t = false)]
     simple: bool,
 
-    /// no GUI
+    /// Enable GUI
     #[arg(short, long, default_value_t = false)]
     gui: bool,
 }
