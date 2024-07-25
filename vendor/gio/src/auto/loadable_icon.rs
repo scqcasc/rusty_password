@@ -2,16 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::Icon;
-use crate::InputStream;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::pin::Pin;
-use std::ptr;
+use crate::{AsyncResult, Cancellable, Icon, InputStream};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GLoadableIcon")]
@@ -26,34 +19,13 @@ impl LoadableIcon {
     pub const NONE: Option<&'static LoadableIcon> = None;
 }
 
-pub trait LoadableIconExt: 'static {
-    #[doc(alias = "g_loadable_icon_load")]
-    fn load(
-        &self,
-        size: i32,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<(InputStream, glib::GString), glib::Error>;
-
-    #[doc(alias = "g_loadable_icon_load_async")]
-    fn load_async<P: FnOnce(Result<(InputStream, glib::GString), glib::Error>) + 'static>(
-        &self,
-        size: i32,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn load_future(
-        &self,
-        size: i32,
-    ) -> Pin<
-        Box_<
-            dyn std::future::Future<Output = Result<(InputStream, glib::GString), glib::Error>>
-                + 'static,
-        >,
-    >;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::LoadableIcon>> Sealed for T {}
 }
 
-impl<O: IsA<LoadableIcon>> LoadableIconExt for O {
+pub trait LoadableIconExt: IsA<LoadableIcon> + sealed::Sealed + 'static {
+    #[doc(alias = "g_loadable_icon_load")]
     fn load(
         &self,
         size: i32,
@@ -77,6 +49,7 @@ impl<O: IsA<LoadableIcon>> LoadableIconExt for O {
         }
     }
 
+    #[doc(alias = "g_loadable_icon_load_async")]
     fn load_async<P: FnOnce(Result<(InputStream, glib::GString), glib::Error>) + 'static>(
         &self,
         size: i32,
@@ -151,6 +124,8 @@ impl<O: IsA<LoadableIcon>> LoadableIconExt for O {
         ))
     }
 }
+
+impl<O: IsA<LoadableIcon>> LoadableIconExt for O {}
 
 impl fmt::Display for LoadableIcon {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

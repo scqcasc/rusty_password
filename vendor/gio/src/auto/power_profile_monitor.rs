@@ -3,14 +3,12 @@
 // DO NOT EDIT
 
 use crate::Initable;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GPowerProfileMonitor")]
@@ -31,18 +29,14 @@ impl PowerProfileMonitor {
     }
 }
 
-pub trait PowerProfileMonitorExt: 'static {
-    #[doc(alias = "g_power_profile_monitor_get_power_saver_enabled")]
-    #[doc(alias = "get_power_saver_enabled")]
-    fn is_power_saver_enabled(&self) -> bool;
-
-    #[cfg(any(feature = "v2_70", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_70")))]
-    #[doc(alias = "power-saver-enabled")]
-    fn connect_power_saver_enabled_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::PowerProfileMonitor>> Sealed for T {}
 }
 
-impl<O: IsA<PowerProfileMonitor>> PowerProfileMonitorExt for O {
+pub trait PowerProfileMonitorExt: IsA<PowerProfileMonitor> + sealed::Sealed + 'static {
+    #[doc(alias = "g_power_profile_monitor_get_power_saver_enabled")]
+    #[doc(alias = "get_power_saver_enabled")]
     fn is_power_saver_enabled(&self) -> bool {
         unsafe {
             from_glib(ffi::g_power_profile_monitor_get_power_saver_enabled(
@@ -51,8 +45,9 @@ impl<O: IsA<PowerProfileMonitor>> PowerProfileMonitorExt for O {
         }
     }
 
-    #[cfg(any(feature = "v2_70", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_70")))]
+    #[cfg(feature = "v2_70")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v2_70")))]
+    #[doc(alias = "power-saver-enabled")]
     fn connect_power_saver_enabled_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_power_saver_enabled_trampoline<
             P: IsA<PowerProfileMonitor>,
@@ -78,6 +73,8 @@ impl<O: IsA<PowerProfileMonitor>> PowerProfileMonitorExt for O {
         }
     }
 }
+
+impl<O: IsA<PowerProfileMonitor>> PowerProfileMonitorExt for O {}
 
 impl fmt::Display for PowerProfileMonitor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

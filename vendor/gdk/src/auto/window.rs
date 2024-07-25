@@ -2,47 +2,20 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-#[cfg(any(feature = "v3_24", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v3_24")))]
-use crate::AnchorHints;
-use crate::Cursor;
-use crate::Device;
-use crate::Display;
-use crate::DragProtocol;
-#[cfg(any(feature = "v3_22", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
-use crate::DrawingContext;
-use crate::Event;
-use crate::EventMask;
-use crate::FrameClock;
-use crate::FullscreenMode;
-use crate::GLContext;
-use crate::Geometry;
-#[cfg(any(feature = "v3_24", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v3_24")))]
-use crate::Gravity;
-use crate::InputSource;
-use crate::ModifierType;
-use crate::Rectangle;
-use crate::Screen;
-use crate::Visual;
-use crate::WMDecoration;
-use crate::WMFunction;
-use crate::WindowEdge;
-use crate::WindowHints;
-use crate::WindowState;
-use crate::WindowType;
-use crate::WindowTypeHint;
-use crate::RGBA;
-use glib::object::ObjectType as ObjectType_;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::mem::transmute;
-use std::ptr;
+#[cfg(feature = "v3_24")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v3_24")))]
+use crate::{AnchorHints, Gravity};
+use crate::{
+    Cursor, Device, Display, DragProtocol, DrawingContext, Event, EventMask, FrameClock,
+    FullscreenMode, GLContext, Geometry, InputSource, ModifierType, Rectangle, Screen, Visual,
+    WMDecoration, WMFunction, WindowEdge, WindowHints, WindowState, WindowType, WindowTypeHint,
+};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem, mem::transmute, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GdkWindow")]
@@ -55,7 +28,7 @@ glib::wrapper! {
 
 impl Window {
     //#[doc(alias = "gdk_window_add_filter")]
-    //pub fn add_filter(&self, function: /*Unimplemented*/Fn(/*Unimplemented*/XEvent, &Event) -> /*Ignored*/FilterReturn, data: /*Unimplemented*/Option<Fundamental: Pointer>) {
+    //pub fn add_filter(&self, function: /*Unimplemented*/Fn(/*Unimplemented*/XEvent, &Event) -> /*Ignored*/FilterReturn, data: /*Unimplemented*/Option<Basic: Pointer>) {
     //    unsafe { TODO: call ffi:gdk_window_add_filter() }
     //}
 
@@ -66,8 +39,6 @@ impl Window {
         }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gdk_window_begin_draw_frame")]
     pub fn begin_draw_frame(&self, region: &cairo::Region) -> Option<DrawingContext> {
         unsafe {
@@ -94,7 +65,7 @@ impl Window {
     #[doc(alias = "gdk_window_begin_move_drag_for_device")]
     pub fn begin_move_drag_for_device(
         &self,
-        device: &Device,
+        device: &impl IsA<Device>,
         button: i32,
         root_x: i32,
         root_y: i32,
@@ -103,28 +74,12 @@ impl Window {
         unsafe {
             ffi::gdk_window_begin_move_drag_for_device(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
                 button,
                 root_x,
                 root_y,
                 timestamp,
             );
-        }
-    }
-
-    #[cfg_attr(feature = "v3_22", deprecated = "Since 3.22")]
-    #[doc(alias = "gdk_window_begin_paint_rect")]
-    pub fn begin_paint_rect(&self, rectangle: &Rectangle) {
-        unsafe {
-            ffi::gdk_window_begin_paint_rect(self.to_glib_none().0, rectangle.to_glib_none().0);
-        }
-    }
-
-    #[cfg_attr(feature = "v3_22", deprecated = "Since 3.22")]
-    #[doc(alias = "gdk_window_begin_paint_region")]
-    pub fn begin_paint_region(&self, region: &cairo::Region) {
-        unsafe {
-            ffi::gdk_window_begin_paint_region(self.to_glib_none().0, region.to_glib_none().0);
         }
     }
 
@@ -153,7 +108,7 @@ impl Window {
     pub fn begin_resize_drag_for_device(
         &self,
         edge: WindowEdge,
-        device: &Device,
+        device: &impl IsA<Device>,
         button: i32,
         root_x: i32,
         root_y: i32,
@@ -163,7 +118,7 @@ impl Window {
             ffi::gdk_window_begin_resize_drag_for_device(
                 self.to_glib_none().0,
                 edge.into_glib(),
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
                 button,
                 root_x,
                 root_y,
@@ -184,9 +139,7 @@ impl Window {
                 x.as_mut_ptr(),
                 y.as_mut_ptr(),
             );
-            let x = x.assume_init();
-            let y = y.assume_init();
-            (x, y)
+            (x.assume_init(), y.assume_init())
         }
     }
 
@@ -202,9 +155,7 @@ impl Window {
                 parent_x.as_mut_ptr(),
                 parent_y.as_mut_ptr(),
             );
-            let parent_x = parent_x.assume_init();
-            let parent_y = parent_y.assume_init();
-            (parent_x, parent_y)
+            (parent_x.assume_init(), parent_y.assume_init())
         }
     }
 
@@ -242,8 +193,6 @@ impl Window {
         }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gdk_window_end_draw_frame")]
     pub fn end_draw_frame(&self, context: &DrawingContext) {
         unsafe {
@@ -316,7 +265,7 @@ impl Window {
 
     //#[doc(alias = "gdk_window_get_children_with_user_data")]
     //#[doc(alias = "get_children_with_user_data")]
-    //pub fn children_with_user_data(&self, user_data: /*Unimplemented*/Option<Fundamental: Pointer>) -> Vec<Window> {
+    //pub fn children_with_user_data(&self, user_data: /*Unimplemented*/Option<Basic: Pointer>) -> Vec<Window> {
     //    unsafe { TODO: call ffi:gdk_window_get_children_with_user_data() }
     //}
 
@@ -341,9 +290,8 @@ impl Window {
                 self.to_glib_none().0,
                 decorations.as_mut_ptr(),
             ));
-            let decorations = decorations.assume_init();
             if ret {
-                Some(from_glib(decorations))
+                Some(from_glib(decorations.assume_init()))
             } else {
                 None
             }
@@ -352,44 +300,49 @@ impl Window {
 
     #[doc(alias = "gdk_window_get_device_cursor")]
     #[doc(alias = "get_device_cursor")]
-    pub fn device_cursor(&self, device: &Device) -> Option<Cursor> {
+    pub fn device_cursor(&self, device: &impl IsA<Device>) -> Option<Cursor> {
         unsafe {
             from_glib_none(ffi::gdk_window_get_device_cursor(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
             ))
         }
     }
 
     #[doc(alias = "gdk_window_get_device_events")]
     #[doc(alias = "get_device_events")]
-    pub fn device_events(&self, device: &Device) -> EventMask {
+    pub fn device_events(&self, device: &impl IsA<Device>) -> EventMask {
         unsafe {
             from_glib(ffi::gdk_window_get_device_events(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
             ))
         }
     }
 
     #[doc(alias = "gdk_window_get_device_position")]
     #[doc(alias = "get_device_position")]
-    pub fn device_position(&self, device: &Device) -> (Option<Window>, i32, i32, ModifierType) {
+    pub fn device_position(
+        &self,
+        device: &impl IsA<Device>,
+    ) -> (Option<Window>, i32, i32, ModifierType) {
         unsafe {
             let mut x = mem::MaybeUninit::uninit();
             let mut y = mem::MaybeUninit::uninit();
             let mut mask = mem::MaybeUninit::uninit();
             let ret = from_glib_none(ffi::gdk_window_get_device_position(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
                 x.as_mut_ptr(),
                 y.as_mut_ptr(),
                 mask.as_mut_ptr(),
             ));
-            let x = x.assume_init();
-            let y = y.assume_init();
-            let mask = mask.assume_init();
-            (ret, x, y, from_glib(mask))
+            (
+                ret,
+                x.assume_init(),
+                y.assume_init(),
+                from_glib(mask.assume_init()),
+            )
         }
     }
 
@@ -397,7 +350,7 @@ impl Window {
     #[doc(alias = "get_device_position_double")]
     pub fn device_position_double(
         &self,
-        device: &Device,
+        device: &impl IsA<Device>,
     ) -> (Option<Window>, f64, f64, ModifierType) {
         unsafe {
             let mut x = mem::MaybeUninit::uninit();
@@ -405,15 +358,17 @@ impl Window {
             let mut mask = mem::MaybeUninit::uninit();
             let ret = from_glib_none(ffi::gdk_window_get_device_position_double(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
                 x.as_mut_ptr(),
                 y.as_mut_ptr(),
                 mask.as_mut_ptr(),
             ));
-            let x = x.assume_init();
-            let y = y.assume_init();
-            let mask = mask.assume_init();
-            (ret, x, y, from_glib(mask))
+            (
+                ret,
+                x.assume_init(),
+                y.assume_init(),
+                from_glib(mask.assume_init()),
+            )
         }
     }
 
@@ -509,11 +464,12 @@ impl Window {
                 width.as_mut_ptr(),
                 height.as_mut_ptr(),
             );
-            let x = x.assume_init();
-            let y = y.assume_init();
-            let width = width.assume_init();
-            let height = height.assume_init();
-            (x, y, width, height)
+            (
+                x.assume_init(),
+                y.assume_init(),
+                width.assume_init(),
+                height.assume_init(),
+            )
         }
     }
 
@@ -544,9 +500,7 @@ impl Window {
             let mut y = mem::MaybeUninit::uninit();
             let ret =
                 ffi::gdk_window_get_origin(self.to_glib_none().0, x.as_mut_ptr(), y.as_mut_ptr());
-            let x = x.assume_init();
-            let y = y.assume_init();
-            (ret, x, y)
+            (ret, x.assume_init(), y.assume_init())
         }
     }
 
@@ -570,9 +524,7 @@ impl Window {
             let mut x = mem::MaybeUninit::uninit();
             let mut y = mem::MaybeUninit::uninit();
             ffi::gdk_window_get_position(self.to_glib_none().0, x.as_mut_ptr(), y.as_mut_ptr());
-            let x = x.assume_init();
-            let y = y.assume_init();
-            (x, y)
+            (x.assume_init(), y.assume_init())
         }
     }
 
@@ -589,9 +541,7 @@ impl Window {
                 root_x.as_mut_ptr(),
                 root_y.as_mut_ptr(),
             );
-            let root_x = root_x.assume_init();
-            let root_y = root_y.assume_init();
-            (root_x, root_y)
+            (root_x.assume_init(), root_y.assume_init())
         }
     }
 
@@ -602,9 +552,7 @@ impl Window {
             let mut x = mem::MaybeUninit::uninit();
             let mut y = mem::MaybeUninit::uninit();
             ffi::gdk_window_get_root_origin(self.to_glib_none().0, x.as_mut_ptr(), y.as_mut_ptr());
-            let x = x.assume_init();
-            let y = y.assume_init();
-            (x, y)
+            (x.assume_init(), y.assume_init())
         }
     }
 
@@ -740,12 +688,12 @@ impl Window {
             let window = from_glib_borrow(window);
             let callback: *mut Option<&mut dyn (FnMut(&Window) -> bool)> =
                 user_data as *const _ as usize as *mut Option<&mut dyn (FnMut(&Window) -> bool)>;
-            let res = if let Some(ref mut callback) = *callback {
+            if let Some(ref mut callback) = *callback {
                 callback(&window)
             } else {
                 panic!("cannot get closure...")
-            };
-            res.into_glib()
+            }
+            .into_glib()
         }
         let child_func = if child_func_data.is_some() {
             Some(child_func_func as _)
@@ -870,8 +818,8 @@ impl Window {
         }
     }
 
-    #[cfg(any(feature = "v3_24", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_24")))]
+    #[cfg(feature = "v3_24")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v3_24")))]
     #[doc(alias = "gdk_window_move_to_rect")]
     pub fn move_to_rect(
         &self,
@@ -904,14 +852,6 @@ impl Window {
         }
     }
 
-    #[cfg_attr(feature = "v3_22", deprecated = "Since 3.22")]
-    #[doc(alias = "gdk_window_process_updates")]
-    pub fn process_updates(&self, update_children: bool) {
-        unsafe {
-            ffi::gdk_window_process_updates(self.to_glib_none().0, update_children.into_glib());
-        }
-    }
-
     #[doc(alias = "gdk_window_raise")]
     pub fn raise(&self) {
         unsafe {
@@ -927,7 +867,7 @@ impl Window {
     }
 
     //#[doc(alias = "gdk_window_remove_filter")]
-    //pub fn remove_filter(&self, function: /*Unimplemented*/Fn(/*Unimplemented*/XEvent, &Event) -> /*Ignored*/FilterReturn, data: /*Unimplemented*/Option<Fundamental: Pointer>) {
+    //pub fn remove_filter(&self, function: /*Unimplemented*/Fn(/*Unimplemented*/XEvent, &Event) -> /*Ignored*/FilterReturn, data: /*Unimplemented*/Option<Basic: Pointer>) {
     //    unsafe { TODO: call ffi:gdk_window_remove_filter() }
     //}
 
@@ -970,14 +910,6 @@ impl Window {
         }
     }
 
-    #[cfg_attr(feature = "v3_22", deprecated = "Since 3.22")]
-    #[doc(alias = "gdk_window_set_background_rgba")]
-    pub fn set_background_rgba(&self, rgba: &RGBA) {
-        unsafe {
-            ffi::gdk_window_set_background_rgba(self.to_glib_none().0, rgba.to_glib_none().0);
-        }
-    }
-
     #[doc(alias = "gdk_window_set_child_input_shapes")]
     pub fn set_child_input_shapes(&self) {
         unsafe {
@@ -1007,22 +939,22 @@ impl Window {
     }
 
     #[doc(alias = "gdk_window_set_device_cursor")]
-    pub fn set_device_cursor(&self, device: &Device, cursor: &Cursor) {
+    pub fn set_device_cursor(&self, device: &impl IsA<Device>, cursor: &Cursor) {
         unsafe {
             ffi::gdk_window_set_device_cursor(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
                 cursor.to_glib_none().0,
             );
         }
     }
 
     #[doc(alias = "gdk_window_set_device_events")]
-    pub fn set_device_events(&self, device: &Device, event_mask: EventMask) {
+    pub fn set_device_events(&self, device: &impl IsA<Device>, event_mask: EventMask) {
         unsafe {
             ffi::gdk_window_set_device_events(
                 self.to_glib_none().0,
-                device.to_glib_none().0,
+                device.as_ref().to_glib_none().0,
                 event_mask.into_glib(),
             );
         }
@@ -1099,7 +1031,7 @@ impl Window {
     }
 
     //#[doc(alias = "gdk_window_set_invalidate_handler")]
-    //pub fn set_invalidate_handler<P: Fn(&Window, &cairo::Region) + 'static>(&self, handler: P) {
+    //pub fn set_invalidate_handler<P: Fn(&Window) + 'static>(&self, handler: P) {
     //    unsafe { TODO: call ffi:gdk_window_set_invalidate_handler() }
     //}
 
@@ -1344,27 +1276,7 @@ impl Window {
                 new_width.as_mut_ptr(),
                 new_height.as_mut_ptr(),
             );
-            let new_width = new_width.assume_init();
-            let new_height = new_height.assume_init();
-            (new_width, new_height)
-        }
-    }
-
-    #[cfg_attr(feature = "v3_22", deprecated = "Since 3.22")]
-    #[doc(alias = "gdk_window_process_all_updates")]
-    pub fn process_all_updates() {
-        assert_initialized_main_thread!();
-        unsafe {
-            ffi::gdk_window_process_all_updates();
-        }
-    }
-
-    #[cfg_attr(feature = "v3_22", deprecated = "Since 3.22")]
-    #[doc(alias = "gdk_window_set_debug_updates")]
-    pub fn set_debug_updates(setting: bool) {
-        assert_initialized_main_thread!();
-        unsafe {
-            ffi::gdk_window_set_debug_updates(setting.into_glib());
+            (new_width.assume_init(), new_height.assume_init())
         }
     }
 
@@ -1403,8 +1315,6 @@ impl Window {
     //    Out offscreen_y: *.Double
     //}
 
-    //#[cfg(any(feature = "v3_22", feature = "dox"))]
-    //#[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     //#[doc(alias = "moved-to-rect")]
     //pub fn connect_moved_to_rect<Unsupported or ignored types>(&self, f: F) -> SignalHandlerId {
     //    Unimplemented flipped_rect: *.Pointer

@@ -3,9 +3,7 @@
 // DO NOT EDIT
 
 use glib::translate::*;
-use std::cmp;
-use std::fmt;
-use std::mem;
+use std::{cmp, fmt, mem};
 
 glib::wrapper! {
     #[derive(Debug, Hash)]
@@ -33,7 +31,7 @@ impl TreePath {
 
     //#[doc(alias = "gtk_tree_path_new_from_indices")]
     //#[doc(alias = "new_from_indices")]
-    //pub fn from_indices(first_index: i32, : /*Unknown conversion*//*Unimplemented*/Fundamental: VarArgs) -> TreePath {
+    //pub fn from_indices(first_index: i32, : /*Unknown conversion*//*Unimplemented*/Basic: VarArgs) -> TreePath {
     //    unsafe { TODO: call ffi:gtk_tree_path_new_from_indices() }
     //}
 
@@ -41,7 +39,7 @@ impl TreePath {
     #[doc(alias = "new_from_indicesv")]
     pub fn from_indicesv(indices: &[i32]) -> TreePath {
         assert_initialized_main_thread!();
-        let length = indices.len() as usize;
+        let length = indices.len() as _;
         unsafe {
             from_glib_full(ffi::gtk_tree_path_new_from_indicesv(
                 indices.to_glib_none().0,
@@ -92,7 +90,7 @@ impl TreePath {
                     self.to_glib_none_mut().0,
                     depth.as_mut_ptr(),
                 ),
-                depth.assume_init() as usize,
+                depth.assume_init() as _,
             );
             ret
         }

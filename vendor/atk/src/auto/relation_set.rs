@@ -2,11 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Object;
-use crate::Relation;
-use crate::RelationType;
-use glib::object::IsA;
-use glib::translate::*;
+use crate::{Object, Relation, RelationType};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -34,36 +31,13 @@ impl Default for RelationSet {
     }
 }
 
-pub trait RelationSetExt: 'static {
-    #[doc(alias = "atk_relation_set_add")]
-    fn add(&self, relation: &impl IsA<Relation>);
-
-    #[doc(alias = "atk_relation_set_add_relation_by_type")]
-    fn add_relation_by_type(&self, relationship: RelationType, target: &impl IsA<Object>);
-
-    #[doc(alias = "atk_relation_set_contains")]
-    fn contains(&self, relationship: RelationType) -> bool;
-
-    #[doc(alias = "atk_relation_set_contains_target")]
-    fn contains_target(&self, relationship: RelationType, target: &impl IsA<Object>) -> bool;
-
-    #[doc(alias = "atk_relation_set_get_n_relations")]
-    #[doc(alias = "get_n_relations")]
-    fn n_relations(&self) -> i32;
-
-    #[doc(alias = "atk_relation_set_get_relation")]
-    #[doc(alias = "get_relation")]
-    fn relation(&self, i: i32) -> Option<Relation>;
-
-    #[doc(alias = "atk_relation_set_get_relation_by_type")]
-    #[doc(alias = "get_relation_by_type")]
-    fn relation_by_type(&self, relationship: RelationType) -> Option<Relation>;
-
-    #[doc(alias = "atk_relation_set_remove")]
-    fn remove(&self, relation: &impl IsA<Relation>);
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::RelationSet>> Sealed for T {}
 }
 
-impl<O: IsA<RelationSet>> RelationSetExt for O {
+pub trait RelationSetExt: IsA<RelationSet> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_relation_set_add")]
     fn add(&self, relation: &impl IsA<Relation>) {
         unsafe {
             ffi::atk_relation_set_add(
@@ -73,6 +47,7 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 
+    #[doc(alias = "atk_relation_set_add_relation_by_type")]
     fn add_relation_by_type(&self, relationship: RelationType, target: &impl IsA<Object>) {
         unsafe {
             ffi::atk_relation_set_add_relation_by_type(
@@ -83,6 +58,7 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 
+    #[doc(alias = "atk_relation_set_contains")]
     fn contains(&self, relationship: RelationType) -> bool {
         unsafe {
             from_glib(ffi::atk_relation_set_contains(
@@ -92,6 +68,7 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 
+    #[doc(alias = "atk_relation_set_contains_target")]
     fn contains_target(&self, relationship: RelationType, target: &impl IsA<Object>) -> bool {
         unsafe {
             from_glib(ffi::atk_relation_set_contains_target(
@@ -102,10 +79,14 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 
+    #[doc(alias = "atk_relation_set_get_n_relations")]
+    #[doc(alias = "get_n_relations")]
     fn n_relations(&self) -> i32 {
         unsafe { ffi::atk_relation_set_get_n_relations(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_relation_set_get_relation")]
+    #[doc(alias = "get_relation")]
     fn relation(&self, i: i32) -> Option<Relation> {
         unsafe {
             from_glib_none(ffi::atk_relation_set_get_relation(
@@ -115,6 +96,8 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 
+    #[doc(alias = "atk_relation_set_get_relation_by_type")]
+    #[doc(alias = "get_relation_by_type")]
     fn relation_by_type(&self, relationship: RelationType) -> Option<Relation> {
         unsafe {
             from_glib_none(ffi::atk_relation_set_get_relation_by_type(
@@ -124,6 +107,7 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 
+    #[doc(alias = "atk_relation_set_remove")]
     fn remove(&self, relation: &impl IsA<Relation>) {
         unsafe {
             ffi::atk_relation_set_remove(
@@ -133,6 +117,8 @@ impl<O: IsA<RelationSet>> RelationSetExt for O {
         }
     }
 }
+
+impl<O: IsA<RelationSet>> RelationSetExt for O {}
 
 impl fmt::Display for RelationSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

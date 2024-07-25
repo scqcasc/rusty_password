@@ -1,24 +1,17 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::Converter;
-use crate::ConverterFlags;
-use crate::ConverterResult;
-use glib::object::IsA;
-use glib::translate::*;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 
-pub trait ConverterExtManual {
-    #[doc(alias = "g_converter_convert")]
-    fn convert<IN: AsRef<[u8]>, OUT: AsMut<[u8]>>(
-        &self,
-        inbuf: IN,
-        outbuf: OUT,
-        flags: ConverterFlags,
-    ) -> Result<(ConverterResult, usize, usize), glib::Error>;
+use glib::{prelude::*, translate::*};
+
+use crate::{Converter, ConverterFlags, ConverterResult};
+
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Converter>> Sealed for T {}
 }
 
-impl<O: IsA<Converter>> ConverterExtManual for O {
+pub trait ConverterExtManual: sealed::Sealed + IsA<Converter> + 'static {
     #[doc(alias = "g_converter_convert")]
     fn convert<IN: AsRef<[u8]>, OUT: AsMut<[u8]>>(
         &self,
@@ -63,3 +56,5 @@ impl<O: IsA<Converter>> ConverterExtManual for O {
         }
     }
 }
+
+impl<O: IsA<Converter>> ConverterExtManual for O {}

@@ -2,19 +2,19 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use bitflags::bitflags;
-use glib::translate::*;
+use glib::{bitflags::bitflags, translate::*};
 use std::fmt;
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     #[doc(alias = "GdkPixbufFormatFlags")]
     pub struct PixbufFormatFlags: u32 {
         #[doc(alias = "GDK_PIXBUF_FORMAT_WRITABLE")]
-        const WRITABLE = ffi::GDK_PIXBUF_FORMAT_WRITABLE as u32;
+        const WRITABLE = ffi::GDK_PIXBUF_FORMAT_WRITABLE as _;
         #[doc(alias = "GDK_PIXBUF_FORMAT_SCALABLE")]
-        const SCALABLE = ffi::GDK_PIXBUF_FORMAT_SCALABLE as u32;
+        const SCALABLE = ffi::GDK_PIXBUF_FORMAT_SCALABLE as _;
         #[doc(alias = "GDK_PIXBUF_FORMAT_THREADSAFE")]
-        const THREADSAFE = ffi::GDK_PIXBUF_FORMAT_THREADSAFE as u32;
+        const THREADSAFE = ffi::GDK_PIXBUF_FORMAT_THREADSAFE as _;
     }
 }
 
@@ -28,6 +28,7 @@ impl fmt::Display for PixbufFormatFlags {
 impl IntoGlib for PixbufFormatFlags {
     type GlibType = ffi::GdkPixbufFormatFlags;
 
+    #[inline]
     fn into_glib(self) -> ffi::GdkPixbufFormatFlags {
         self.bits()
     }
@@ -35,6 +36,7 @@ impl IntoGlib for PixbufFormatFlags {
 
 #[doc(hidden)]
 impl FromGlib<ffi::GdkPixbufFormatFlags> for PixbufFormatFlags {
+    #[inline]
     unsafe fn from_glib(value: ffi::GdkPixbufFormatFlags) -> Self {
         Self::from_bits_truncate(value)
     }

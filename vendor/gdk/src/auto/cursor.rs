@@ -2,11 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::CursorType;
-use crate::Display;
+use crate::{CursorType, Display};
 use glib::translate::*;
-use std::fmt;
-use std::mem;
+use std::{fmt, mem};
 
 glib::wrapper! {
     #[doc(alias = "GdkCursor")]
@@ -99,9 +97,7 @@ impl Cursor {
                 x_hot.as_mut_ptr(),
                 y_hot.as_mut_ptr(),
             ));
-            let x_hot = x_hot.assume_init();
-            let y_hot = y_hot.assume_init();
-            (ret, x_hot, y_hot)
+            (ret, x_hot.assume_init(), y_hot.assume_init())
         }
     }
 }

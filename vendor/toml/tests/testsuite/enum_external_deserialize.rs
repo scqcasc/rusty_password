@@ -1,7 +1,4 @@
 use serde::Deserialize;
-use snapbox::assert_data_eq;
-use snapbox::prelude::*;
-use snapbox::str;
 
 #[derive(Debug, Deserialize, PartialEq)]
 struct OuterStruct {
@@ -36,81 +33,63 @@ where
 #[test]
 fn invalid_variant_returns_error_with_good_message_string() {
     let error = value_from_str::<TheEnum>("\"NonExistent\"").unwrap_err();
-    assert_data_eq!(
+    snapbox::assert_eq(
+        r#"unknown variant `NonExistent`, expected one of `Plain`, `Tuple`, `NewType`, `Struct`
+"#,
         error.to_string(),
-        str![[r#"
-unknown variant `NonExistent`, expected one of `Plain`, `Tuple`, `NewType`, `Struct`
-
-"#]]
-        .raw()
     );
 
     let error = toml::from_str::<Val>("val = \"NonExistent\"").unwrap_err();
-    assert_data_eq!(
-        error.to_string(),
-        str![[r#"
-TOML parse error at line 1, column 7
+    snapbox::assert_eq(
+        r#"TOML parse error at line 1, column 7
   |
 1 | val = "NonExistent"
   |       ^^^^^^^^^^^^^
 unknown variant `NonExistent`, expected one of `Plain`, `Tuple`, `NewType`, `Struct`
-
-"#]]
-        .raw()
+"#,
+        error.to_string(),
     );
 }
 
 #[test]
 fn invalid_variant_returns_error_with_good_message_inline_table() {
     let error = value_from_str::<TheEnum>("{ NonExistent = {} }").unwrap_err();
-    assert_data_eq!(
+    snapbox::assert_eq(
+        r#"unknown variant `NonExistent`, expected one of `Plain`, `Tuple`, `NewType`, `Struct`
+"#,
         error.to_string(),
-        str![[r#"
-unknown variant `NonExistent`, expected one of `Plain`, `Tuple`, `NewType`, `Struct`
-
-"#]]
-        .raw()
     );
 
     let error = toml::from_str::<Val>("val = { NonExistent = {} }").unwrap_err();
-    assert_data_eq!(
-        error.to_string(),
-        str![[r#"
-TOML parse error at line 1, column 9
+    snapbox::assert_eq(
+        r#"TOML parse error at line 1, column 9
   |
 1 | val = { NonExistent = {} }
   |         ^^^^^^^^^^^
 unknown variant `NonExistent`, expected one of `Plain`, `Tuple`, `NewType`, `Struct`
-
-"#]]
-        .raw()
+"#,
+        error.to_string(),
     );
 }
 
 #[test]
 fn extra_field_returns_expected_empty_table_error() {
     let error = value_from_str::<TheEnum>("{ Plain = { extra_field = 404 } }").unwrap_err();
-    assert_data_eq!(
+    snapbox::assert_eq(
+        r#"expected empty table
+"#,
         error.to_string(),
-        str![[r#"
-expected empty table
-
-"#]]
-        .raw()
     );
 
     let error = toml::from_str::<Val>("val = { Plain = { extra_field = 404 } }").unwrap_err();
-    assert_data_eq!(
-        error.to_string(),
-        str![[r#"
-TOML parse error at line 1, column 17
+    snapbox::assert_eq(
+        r#"TOML parse error at line 1, column 17
   |
 1 | val = { Plain = { extra_field = 404 } }
   |                 ^^^^^^^^^^^^^^^^^^^^^
 expected empty table
-
-"#]]
-        .raw()
+"#,
+        error.to_string(),
     );
 }
 
@@ -118,29 +97,25 @@ expected empty table
 fn extra_field_returns_expected_empty_table_error_struct_variant() {
     let error = value_from_str::<TheEnum>("{ Struct = { value = 123, extra_0 = 0, extra_1 = 1 } }")
         .unwrap_err();
-    assert_data_eq!(
-        error.to_string(),
-        str![[r#"
-unexpected keys in table: extra_0, extra_1, available keys: value
 
-"#]]
-        .raw()
+    snapbox::assert_eq(
+        r#"unexpected keys in table: extra_0, extra_1, available keys: value
+"#,
+        error.to_string(),
     );
 
     let error =
         toml::from_str::<Val>("val = { Struct = { value = 123, extra_0 = 0, extra_1 = 1 } }")
             .unwrap_err();
-    assert_data_eq!(
-        error.to_string(),
-        str![[r#"
-TOML parse error at line 1, column 33
+
+    snapbox::assert_eq(
+        r#"TOML parse error at line 1, column 33
   |
 1 | val = { Struct = { value = 123, extra_0 = 0, extra_1 = 1 } }
   |                                 ^^^^^^^
 unexpected keys in table: extra_0, extra_1, available keys: value
-
-"#]]
-        .raw()
+"#,
+        error.to_string(),
     );
 }
 
@@ -214,12 +189,12 @@ mod enum_newtype {
     #[test]
     fn from_inline_table() {
         assert_eq!(
-            TheEnum::NewType("value".to_owned()),
+            TheEnum::NewType("value".to_string()),
             value_from_str(r#"{ NewType = "value" }"#).unwrap()
         );
         assert_eq!(
             Val {
-                val: TheEnum::NewType("value".to_owned()),
+                val: TheEnum::NewType("value".to_string()),
             },
             toml::from_str(r#"val = { NewType = "value" }"#).unwrap()
         );
@@ -228,12 +203,12 @@ mod enum_newtype {
     #[test]
     fn from_std_table() {
         assert_eq!(
-            TheEnum::NewType("value".to_owned()),
+            TheEnum::NewType("value".to_string()),
             toml::from_str(r#"NewType = "value""#).unwrap()
         );
         assert_eq!(
             Val {
-                val: TheEnum::NewType("value".to_owned()),
+                val: TheEnum::NewType("value".to_string()),
             },
             toml::from_str(
                 r#"[val]
@@ -308,7 +283,7 @@ mod enum_array {
                 enums: vec![
                     TheEnum::Plain,
                     TheEnum::Tuple(-123, true),
-                    TheEnum::NewType("value".to_owned()),
+                    TheEnum::NewType("value".to_string()),
                     TheEnum::Struct { value: -123 },
                 ]
             },
@@ -335,7 +310,7 @@ mod enum_array {
                 enums: vec![
                     TheEnum::Plain,
                     TheEnum::Tuple(-123, true),
-                    TheEnum::NewType("value".to_owned()),
+                    TheEnum::NewType("value".to_string()),
                     TheEnum::Struct { value: -123 },
                 ]
             },

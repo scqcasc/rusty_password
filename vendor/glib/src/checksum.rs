@@ -1,9 +1,10 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::translate::*;
-use crate::Checksum;
-use libc::size_t;
 use std::vec::Vec;
+
+use libc::size_t;
+
+use crate::{translate::*, Checksum};
 
 impl Checksum {
     #[doc(alias = "g_checksum_get_digest")]
@@ -12,7 +13,7 @@ impl Checksum {
         unsafe {
             //Don't forget update when `ChecksumType` contains type bigger that Sha512.
             let mut digest_len: size_t = 512 / 8;
-            let mut vec = Vec::with_capacity(digest_len as usize);
+            let mut vec = Vec::with_capacity(digest_len as _);
 
             ffi::g_checksum_get_digest(
                 mut_override(self.to_glib_none().0),

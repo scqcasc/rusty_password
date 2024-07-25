@@ -10,65 +10,66 @@ use crate::parser::numbers::{float, integer};
 use crate::parser::prelude::*;
 use crate::parser::strings::string;
 use crate::repr::{Formatted, Repr};
+use crate::value as v;
 use crate::RawString;
 use crate::Value;
 
 // val = string / boolean / array / inline-table / date-time / float / integer
-pub(crate) fn value<'i>(check: RecursionCheck) -> impl Parser<Input<'i>, Value, ContextError> {
+pub(crate) fn value<'i>(check: RecursionCheck) -> impl Parser<Input<'i>, v::Value, ContextError> {
     move |input: &mut Input<'i>| {
         dispatch!{peek(any);
             crate::parser::strings::QUOTATION_MARK |
             crate::parser::strings::APOSTROPHE => string.map(|s| {
-                Value::String(Formatted::new(
+                v::Value::String(Formatted::new(
                     s.into_owned()
                 ))
             }),
-            crate::parser::array::ARRAY_OPEN => array(check).map(Value::Array),
-            crate::parser::inline_table::INLINE_TABLE_OPEN => inline_table(check).map(Value::InlineTable),
+            crate::parser::array::ARRAY_OPEN => array(check).map(v::Value::Array),
+            crate::parser::inline_table::INLINE_TABLE_OPEN => inline_table(check).map(v::Value::InlineTable),
             // Date/number starts
             b'+' | b'-' | b'0'..=b'9' => {
                 // Uncommon enough not to be worth optimizing at this time
                 alt((
                     date_time
-                        .map(Value::from),
+                        .map(v::Value::from),
                     float
-                        .map(Value::from),
+                        .map(v::Value::from),
                     integer
-                        .map(Value::from),
+                        .map(v::Value::from),
                 ))
             },
             // Report as if they were numbers because its most likely a typo
             b'_' => {
                     integer
-                        .map(Value::from)
+                        .map(v::Value::from)
                 .context(StrContext::Expected(StrContextValue::Description("leading digit")))
             },
             // Report as if they were numbers because its most likely a typo
             b'.' =>  {
                     float
-                        .map(Value::from)
+                        .map(v::Value::from)
                 .context(StrContext::Expected(StrContextValue::Description("leading digit")))
             },
             b't' => {
-                crate::parser::numbers::true_.map(Value::from)
+                crate::parser::numbers::true_.map(v::Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
             b'f' => {
-                crate::parser::numbers::false_.map(Value::from)
+                crate::parser::numbers::false_.map(v::Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
             b'i' => {
-                crate::parser::numbers::inf.map(Value::from)
+                crate::parser::numbers::inf.map(v::Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
             b'n' => {
-                crate::parser::numbers::nan.map(Value::from)
+                crate::parser::numbers::nan.map(v::Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
@@ -120,8 +121,6 @@ fn apply_raw(mut val: Value, span: std::ops::Range<usize>) -> Result<Value, std:
 }
 
 #[cfg(test)]
-#[cfg(feature = "parse")]
-#[cfg(feature = "display")]
 mod test {
     use super::*;
 
@@ -132,7 +131,7 @@ mod test {
             "-239",
             "1e200",
             "9_224_617.445_991_228_313",
-            r"'''I [dw]on't need \d{2} apples'''",
+            r#"'''I [dw]on't need \d{2} apples'''"#,
             r#"'''
 The first newline is
 trimmed in raw strings.

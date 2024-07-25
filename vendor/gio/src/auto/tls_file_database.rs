@@ -3,17 +3,12 @@
 // DO NOT EDIT
 
 use crate::TlsDatabase;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
-use std::ptr;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GTlsFileDatabase")]
@@ -41,24 +36,21 @@ impl TlsFileDatabase {
     }
 }
 
-pub trait TlsFileDatabaseExt: 'static {
-    fn anchors(&self) -> Option<glib::GString>;
-
-    fn set_anchors(&self, anchors: Option<&str>);
-
-    #[doc(alias = "anchors")]
-    fn connect_anchors_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::TlsFileDatabase>> Sealed for T {}
 }
 
-impl<O: IsA<TlsFileDatabase>> TlsFileDatabaseExt for O {
+pub trait TlsFileDatabaseExt: IsA<TlsFileDatabase> + sealed::Sealed + 'static {
     fn anchors(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "anchors")
+        ObjectExt::property(self.as_ref(), "anchors")
     }
 
     fn set_anchors(&self, anchors: Option<&str>) {
-        glib::ObjectExt::set_property(self.as_ref(), "anchors", &anchors)
+        ObjectExt::set_property(self.as_ref(), "anchors", anchors)
     }
 
+    #[doc(alias = "anchors")]
     fn connect_anchors_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_anchors_trampoline<
             P: IsA<TlsFileDatabase>,
@@ -84,6 +76,8 @@ impl<O: IsA<TlsFileDatabase>> TlsFileDatabaseExt for O {
         }
     }
 }
+
+impl<O: IsA<TlsFileDatabase>> TlsFileDatabaseExt for O {}
 
 impl fmt::Display for TlsFileDatabase {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

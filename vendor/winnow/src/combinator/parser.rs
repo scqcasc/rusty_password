@@ -1,14 +1,11 @@
 use crate::combinator::trace;
 use crate::combinator::trace_result;
-use crate::combinator::DisplayDebug;
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::error::FromRecoverableError;
 use crate::error::{AddContext, ErrMode, ErrorKind, FromExternalError, ParserError};
 use crate::lib::std::borrow::Borrow;
 use crate::lib::std::ops::Range;
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::stream::Recover;
 use crate::stream::StreamIsPartial;
 use crate::stream::{Location, Stream};
@@ -135,7 +132,7 @@ where
         let start = input.checkpoint();
         let o = self.parser.parse_next(input)?;
         let res = (self.map)(o).map_err(|err| {
-            input.reset(&start);
+            input.reset(start);
             ErrMode::from_external_error(input, ErrorKind::Verify, err)
         });
         trace_result("verify", &res);
@@ -192,7 +189,7 @@ where
         let start = input.checkpoint();
         let o = self.parser.parse_next(input)?;
         let res = (self.map)(o).ok_or_else(|| {
-            input.reset(&start);
+            input.reset(start);
             ErrMode::from_error_kind(input, ErrorKind::Verify)
         });
         trace_result("verify", &res);
@@ -250,7 +247,7 @@ where
         let mut o = self.outer.parse_next(i)?;
         let _ = o.complete();
         let o2 = self.inner.parse_next(&mut o).map_err(|err| {
-            i.reset(&start);
+            i.reset(start);
             err
         })?;
         Ok(o2)
@@ -304,7 +301,7 @@ where
         let start = i.checkpoint();
         let o = self.p.parse_next(i)?;
         let res = o.parse_slice().ok_or_else(|| {
-            i.reset(&start);
+            i.reset(start);
             ErrMode::from_error_kind(i, ErrorKind::Verify)
         });
         trace_result("verify", &res);
@@ -450,7 +447,7 @@ where
         let start = input.checkpoint();
         let o = self.parser.parse_next(input)?;
         let res = (self.filter)(o.borrow()).then_some(o).ok_or_else(|| {
-            input.reset(&start);
+            input.reset(start);
             ErrMode::from_error_kind(input, ErrorKind::Verify)
         });
         trace_result("verify", &res);
@@ -619,7 +616,7 @@ where
         match (self.parser).parse_next(input) {
             Ok(_) => {
                 let offset = input.offset_from(&checkpoint);
-                input.reset(&checkpoint);
+                input.reset(checkpoint);
                 let recognized = input.next_slice(offset);
                 Ok(recognized)
             }
@@ -668,7 +665,7 @@ where
         match (self.parser).parse_next(input) {
             Ok(result) => {
                 let offset = input.offset_from(&checkpoint);
-                input.reset(&checkpoint);
+                input.reset(checkpoint);
                 let recognized = input.next_slice(offset);
                 Ok((result, recognized))
             }
@@ -898,12 +895,14 @@ where
 {
     #[inline]
     fn parse_next(&mut self, i: &mut I) -> PResult<O, E> {
-        let context = self.context.clone();
-        trace(DisplayDebug(self.context.clone()), move |i: &mut I| {
-            let start = i.checkpoint();
+        #[cfg(feature = "debug")]
+        let name = format!("context={:?}", self.context);
+        #[cfg(not(feature = "debug"))]
+        let name = "context";
+        trace(name, move |i: &mut I| {
             (self.parser)
                 .parse_next(i)
-                .map_err(|err| err.add_context(i, &start, context.clone()))
+                .map_err(|err| err.add_context(i, self.context.clone()))
         })
         .parse_next(i)
     }
@@ -912,7 +911,6 @@ where
 /// Implementation of [`Parser::retry_after`]
 #[cfg_attr(nightly, warn(rustdoc::missing_doc_code_examples))]
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 pub struct RetryAfter<P, R, I, O, E>
 where
     P: Parser<I, O, E>,
@@ -929,7 +927,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<P, R, I, O, E> RetryAfter<P, R, I, O, E>
 where
     P: Parser<I, O, E>,
@@ -951,7 +948,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<P, R, I, O, E> Parser<I, O, E> for RetryAfter<P, R, I, O, E>
 where
     P: Parser<I, O, E>,
@@ -971,7 +967,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 fn retry_after_inner<P, R, I, O, E>(parser: &mut P, recover: &mut R, i: &mut I) -> PResult<O, E>
 where
     P: Parser<I, O, E>,
@@ -1002,7 +997,7 @@ where
             }
         }
 
-        i.reset(&err_start);
+        i.reset(err_start.clone());
         err = err.map(|err| E::from_recoverable_error(&token_start, &err_start, i, err));
         return Err(err);
     }
@@ -1010,7 +1005,6 @@ where
 
 /// Implementation of [`Parser::resume_after`]
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 #[cfg_attr(nightly, warn(rustdoc::missing_doc_code_examples))]
 pub struct ResumeAfter<P, R, I, O, E>
 where
@@ -1028,7 +1022,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<P, R, I, O, E> ResumeAfter<P, R, I, O, E>
 where
     P: Parser<I, O, E>,
@@ -1050,7 +1043,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<P, R, I, O, E> Parser<I, Option<O>, E> for ResumeAfter<P, R, I, O, E>
 where
     P: Parser<I, O, E>,
@@ -1070,7 +1062,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 fn resume_after_inner<P, R, I, O, E>(
     parser: &mut P,
     recover: &mut R,
@@ -1100,7 +1091,7 @@ where
         }
     }
 
-    i.reset(&err_start);
+    i.reset(err_start.clone());
     err = err.map(|err| E::from_recoverable_error(&token_start, &err_start, i, err));
     Err(err)
 }

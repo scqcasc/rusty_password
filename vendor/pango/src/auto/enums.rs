@@ -2,13 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Language;
-use crate::Matrix;
-use glib::translate::*;
-use glib::value::FromValue;
-use glib::value::ToValue;
-use glib::StaticType;
-use glib::Type;
+use crate::{Language, Matrix};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
@@ -44,6 +39,7 @@ impl fmt::Display for Alignment {
 impl IntoGlib for Alignment {
     type GlibType = ffi::PangoAlignment;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoAlignment {
         match self {
             Self::Left => ffi::PANGO_ALIGN_LEFT,
@@ -56,6 +52,7 @@ impl IntoGlib for Alignment {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoAlignment> for Alignment {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoAlignment) -> Self {
         match value {
             ffi::PANGO_ALIGN_LEFT => Self::Left,
@@ -67,8 +64,20 @@ impl FromGlib<ffi::PangoAlignment> for Alignment {
 }
 
 impl StaticType for Alignment {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_alignment_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_alignment_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Alignment {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -76,15 +85,17 @@ impl glib::value::ValueType for Alignment {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Alignment {
+unsafe impl<'a> glib::value::FromValue<'a> for Alignment {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Alignment {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -93,8 +104,16 @@ impl ToValue for Alignment {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Alignment> for glib::Value {
+    #[inline]
+    fn from(v: Alignment) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -164,32 +183,32 @@ pub enum AttrType {
     Overline,
     #[doc(alias = "PANGO_ATTR_OVERLINE_COLOR")]
     OverlineColor,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_LINE_HEIGHT")]
     LineHeight,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_ABSOLUTE_LINE_HEIGHT")]
     AbsoluteLineHeight,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_TEXT_TRANSFORM")]
     TextTransform,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_WORD")]
     Word,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_SENTENCE")]
     Sentence,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_BASELINE_SHIFT")]
     BaselineShift,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_ATTR_FONT_SCALE")]
     FontScale,
     #[doc(hidden)]
@@ -241,19 +260,19 @@ impl fmt::Display for AttrType {
                 Self::InsertHyphens => "InsertHyphens",
                 Self::Overline => "Overline",
                 Self::OverlineColor => "OverlineColor",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::LineHeight => "LineHeight",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::AbsoluteLineHeight => "AbsoluteLineHeight",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::TextTransform => "TextTransform",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::Word => "Word",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::Sentence => "Sentence",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::BaselineShift => "BaselineShift",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::FontScale => "FontScale",
                 _ => "Unknown",
             }
@@ -298,19 +317,19 @@ impl IntoGlib for AttrType {
             Self::InsertHyphens => ffi::PANGO_ATTR_INSERT_HYPHENS,
             Self::Overline => ffi::PANGO_ATTR_OVERLINE,
             Self::OverlineColor => ffi::PANGO_ATTR_OVERLINE_COLOR,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::LineHeight => ffi::PANGO_ATTR_LINE_HEIGHT,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::AbsoluteLineHeight => ffi::PANGO_ATTR_ABSOLUTE_LINE_HEIGHT,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::TextTransform => ffi::PANGO_ATTR_TEXT_TRANSFORM,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::Word => ffi::PANGO_ATTR_WORD,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::Sentence => ffi::PANGO_ATTR_SENTENCE,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::BaselineShift => ffi::PANGO_ATTR_BASELINE_SHIFT,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::FontScale => ffi::PANGO_ATTR_FONT_SCALE,
             Self::__Unknown(value) => value,
         }
@@ -352,19 +371,19 @@ impl FromGlib<ffi::PangoAttrType> for AttrType {
             ffi::PANGO_ATTR_INSERT_HYPHENS => Self::InsertHyphens,
             ffi::PANGO_ATTR_OVERLINE => Self::Overline,
             ffi::PANGO_ATTR_OVERLINE_COLOR => Self::OverlineColor,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_LINE_HEIGHT => Self::LineHeight,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_ABSOLUTE_LINE_HEIGHT => Self::AbsoluteLineHeight,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_TEXT_TRANSFORM => Self::TextTransform,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_WORD => Self::Word,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_SENTENCE => Self::Sentence,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_BASELINE_SHIFT => Self::BaselineShift,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_ATTR_FONT_SCALE => Self::FontScale,
             value => Self::__Unknown(value),
         }
@@ -372,8 +391,20 @@ impl FromGlib<ffi::PangoAttrType> for AttrType {
 }
 
 impl StaticType for AttrType {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_attr_type_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_attr_type_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for AttrType {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -381,15 +412,17 @@ impl glib::value::ValueType for AttrType {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for AttrType {
+unsafe impl<'a> glib::value::FromValue<'a> for AttrType {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for AttrType {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -398,13 +431,21 @@ impl ToValue for AttrType {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+impl From<AttrType> for glib::Value {
+    #[inline]
+    fn from(v: AttrType) -> Self {
+        ToValue::to_value(&v)
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
 #[non_exhaustive]
 #[doc(alias = "PangoBaselineShift")]
@@ -419,8 +460,8 @@ pub enum BaselineShift {
     __Unknown(i32),
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl fmt::Display for BaselineShift {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -436,12 +477,13 @@ impl fmt::Display for BaselineShift {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[doc(hidden)]
 impl IntoGlib for BaselineShift {
     type GlibType = ffi::PangoBaselineShift;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoBaselineShift {
         match self {
             Self::None => ffi::PANGO_BASELINE_SHIFT_NONE,
@@ -452,10 +494,11 @@ impl IntoGlib for BaselineShift {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[doc(hidden)]
 impl FromGlib<ffi::PangoBaselineShift> for BaselineShift {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoBaselineShift) -> Self {
         match value {
             ffi::PANGO_BASELINE_SHIFT_NONE => Self::None,
@@ -466,33 +509,49 @@ impl FromGlib<ffi::PangoBaselineShift> for BaselineShift {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl StaticType for BaselineShift {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_baseline_shift_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_baseline_shift_get_type()) }
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+impl glib::HasParamSpec for BaselineShift {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl glib::value::ValueType for BaselineShift {
     type Type = Self;
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
-unsafe impl<'a> FromValue<'a> for BaselineShift {
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+unsafe impl<'a> glib::value::FromValue<'a> for BaselineShift {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl ToValue for BaselineShift {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -501,8 +560,18 @@ impl ToValue for BaselineShift {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+impl From<BaselineShift> for glib::Value {
+    #[inline]
+    fn from(v: BaselineShift) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -561,6 +630,7 @@ pub enum BidiType {
     __Unknown(i32),
 }
 
+#[allow(deprecated)]
 impl BidiType {
     #[doc(alias = "pango_bidi_type_for_unichar")]
     pub fn for_unichar(ch: char) -> BidiType {
@@ -568,6 +638,7 @@ impl BidiType {
     }
 }
 
+#[allow(deprecated)]
 impl fmt::Display for BidiType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -603,6 +674,7 @@ impl fmt::Display for BidiType {
     }
 }
 
+#[allow(deprecated)]
 #[doc(hidden)]
 impl IntoGlib for BidiType {
     type GlibType = ffi::PangoBidiType;
@@ -637,6 +709,7 @@ impl IntoGlib for BidiType {
     }
 }
 
+#[allow(deprecated)]
 #[doc(hidden)]
 impl FromGlib<ffi::PangoBidiType> for BidiType {
     unsafe fn from_glib(value: ffi::PangoBidiType) -> Self {
@@ -669,25 +742,44 @@ impl FromGlib<ffi::PangoBidiType> for BidiType {
     }
 }
 
+#[allow(deprecated)]
 impl StaticType for BidiType {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_bidi_type_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_bidi_type_get_type()) }
     }
 }
 
+#[allow(deprecated)]
+impl glib::HasParamSpec for BidiType {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
+    }
+}
+
+#[allow(deprecated)]
 impl glib::value::ValueType for BidiType {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for BidiType {
+#[allow(deprecated)]
+unsafe impl<'a> glib::value::FromValue<'a> for BidiType {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
+#[allow(deprecated)]
 impl ToValue for BidiType {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -696,8 +788,17 @@ impl ToValue for BidiType {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+#[allow(deprecated)]
+impl From<BidiType> for glib::Value {
+    #[inline]
+    fn from(v: BidiType) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -737,6 +838,7 @@ impl fmt::Display for CoverageLevel {
 impl IntoGlib for CoverageLevel {
     type GlibType = ffi::PangoCoverageLevel;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoCoverageLevel {
         match self {
             Self::None => ffi::PANGO_COVERAGE_NONE,
@@ -750,6 +852,7 @@ impl IntoGlib for CoverageLevel {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoCoverageLevel> for CoverageLevel {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoCoverageLevel) -> Self {
         match value {
             ffi::PANGO_COVERAGE_NONE => Self::None,
@@ -762,8 +865,20 @@ impl FromGlib<ffi::PangoCoverageLevel> for CoverageLevel {
 }
 
 impl StaticType for CoverageLevel {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_coverage_level_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_coverage_level_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for CoverageLevel {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -771,15 +886,17 @@ impl glib::value::ValueType for CoverageLevel {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for CoverageLevel {
+unsafe impl<'a> glib::value::FromValue<'a> for CoverageLevel {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for CoverageLevel {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -788,8 +905,16 @@ impl ToValue for CoverageLevel {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<CoverageLevel> for glib::Value {
+    #[inline]
+    fn from(v: CoverageLevel) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -838,6 +963,7 @@ impl fmt::Display for Direction {
 impl IntoGlib for Direction {
     type GlibType = ffi::PangoDirection;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoDirection {
         match self {
             Self::Ltr => ffi::PANGO_DIRECTION_LTR,
@@ -854,6 +980,7 @@ impl IntoGlib for Direction {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoDirection> for Direction {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoDirection) -> Self {
         match value {
             ffi::PANGO_DIRECTION_LTR => Self::Ltr,
@@ -869,8 +996,20 @@ impl FromGlib<ffi::PangoDirection> for Direction {
 }
 
 impl StaticType for Direction {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_direction_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_direction_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Direction {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -878,15 +1017,17 @@ impl glib::value::ValueType for Direction {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Direction {
+unsafe impl<'a> glib::value::FromValue<'a> for Direction {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Direction {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -895,8 +1036,16 @@ impl ToValue for Direction {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Direction> for glib::Value {
+    #[inline]
+    fn from(v: Direction) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -936,6 +1085,7 @@ impl fmt::Display for EllipsizeMode {
 impl IntoGlib for EllipsizeMode {
     type GlibType = ffi::PangoEllipsizeMode;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoEllipsizeMode {
         match self {
             Self::None => ffi::PANGO_ELLIPSIZE_NONE,
@@ -949,6 +1099,7 @@ impl IntoGlib for EllipsizeMode {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoEllipsizeMode> for EllipsizeMode {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoEllipsizeMode) -> Self {
         match value {
             ffi::PANGO_ELLIPSIZE_NONE => Self::None,
@@ -961,8 +1112,20 @@ impl FromGlib<ffi::PangoEllipsizeMode> for EllipsizeMode {
 }
 
 impl StaticType for EllipsizeMode {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_ellipsize_mode_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_ellipsize_mode_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for EllipsizeMode {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -970,15 +1133,17 @@ impl glib::value::ValueType for EllipsizeMode {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for EllipsizeMode {
+unsafe impl<'a> glib::value::FromValue<'a> for EllipsizeMode {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for EllipsizeMode {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -987,13 +1152,21 @@ impl ToValue for EllipsizeMode {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+impl From<EllipsizeMode> for glib::Value {
+    #[inline]
+    fn from(v: EllipsizeMode) -> Self {
+        ToValue::to_value(&v)
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
 #[non_exhaustive]
 #[doc(alias = "PangoFontScale")]
@@ -1010,8 +1183,8 @@ pub enum FontScale {
     __Unknown(i32),
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl fmt::Display for FontScale {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -1028,12 +1201,13 @@ impl fmt::Display for FontScale {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[doc(hidden)]
 impl IntoGlib for FontScale {
     type GlibType = ffi::PangoFontScale;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoFontScale {
         match self {
             Self::None => ffi::PANGO_FONT_SCALE_NONE,
@@ -1045,10 +1219,11 @@ impl IntoGlib for FontScale {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[doc(hidden)]
 impl FromGlib<ffi::PangoFontScale> for FontScale {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoFontScale) -> Self {
         match value {
             ffi::PANGO_FONT_SCALE_NONE => Self::None,
@@ -1060,33 +1235,49 @@ impl FromGlib<ffi::PangoFontScale> for FontScale {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl StaticType for FontScale {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_font_scale_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_font_scale_get_type()) }
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+impl glib::HasParamSpec for FontScale {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl glib::value::ValueType for FontScale {
     type Type = Self;
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
-unsafe impl<'a> FromValue<'a> for FontScale {
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+unsafe impl<'a> glib::value::FromValue<'a> for FontScale {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl ToValue for FontScale {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -1095,8 +1286,18 @@ impl ToValue for FontScale {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+impl From<FontScale> for glib::Value {
+    #[inline]
+    fn from(v: FontScale) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -1182,6 +1383,7 @@ impl fmt::Display for Gravity {
 impl IntoGlib for Gravity {
     type GlibType = ffi::PangoGravity;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoGravity {
         match self {
             Self::South => ffi::PANGO_GRAVITY_SOUTH,
@@ -1196,6 +1398,7 @@ impl IntoGlib for Gravity {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoGravity> for Gravity {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoGravity) -> Self {
         match value {
             ffi::PANGO_GRAVITY_SOUTH => Self::South,
@@ -1209,8 +1412,20 @@ impl FromGlib<ffi::PangoGravity> for Gravity {
 }
 
 impl StaticType for Gravity {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_gravity_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_gravity_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Gravity {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -1218,15 +1433,17 @@ impl glib::value::ValueType for Gravity {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Gravity {
+unsafe impl<'a> glib::value::FromValue<'a> for Gravity {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Gravity {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -1235,8 +1452,16 @@ impl ToValue for Gravity {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Gravity> for glib::Value {
+    #[inline]
+    fn from(v: Gravity) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -1273,6 +1498,7 @@ impl fmt::Display for GravityHint {
 impl IntoGlib for GravityHint {
     type GlibType = ffi::PangoGravityHint;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoGravityHint {
         match self {
             Self::Natural => ffi::PANGO_GRAVITY_HINT_NATURAL,
@@ -1285,6 +1511,7 @@ impl IntoGlib for GravityHint {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoGravityHint> for GravityHint {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoGravityHint) -> Self {
         match value {
             ffi::PANGO_GRAVITY_HINT_NATURAL => Self::Natural,
@@ -1296,8 +1523,20 @@ impl FromGlib<ffi::PangoGravityHint> for GravityHint {
 }
 
 impl StaticType for GravityHint {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_gravity_hint_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_gravity_hint_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for GravityHint {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -1305,15 +1544,17 @@ impl glib::value::ValueType for GravityHint {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for GravityHint {
+unsafe impl<'a> glib::value::FromValue<'a> for GravityHint {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for GravityHint {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -1322,13 +1563,21 @@ impl ToValue for GravityHint {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+impl From<GravityHint> for glib::Value {
+    #[inline]
+    fn from(v: GravityHint) -> Self {
+        ToValue::to_value(&v)
+    }
+}
+
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
 #[non_exhaustive]
 #[doc(alias = "PangoOverline")]
@@ -1341,8 +1590,8 @@ pub enum Overline {
     __Unknown(i32),
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 impl fmt::Display for Overline {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -1357,12 +1606,13 @@ impl fmt::Display for Overline {
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 #[doc(hidden)]
 impl IntoGlib for Overline {
     type GlibType = ffi::PangoOverline;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoOverline {
         match self {
             Self::None => ffi::PANGO_OVERLINE_NONE,
@@ -1372,10 +1622,11 @@ impl IntoGlib for Overline {
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 #[doc(hidden)]
 impl FromGlib<ffi::PangoOverline> for Overline {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoOverline) -> Self {
         match value {
             ffi::PANGO_OVERLINE_NONE => Self::None,
@@ -1385,33 +1636,49 @@ impl FromGlib<ffi::PangoOverline> for Overline {
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 impl StaticType for Overline {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_overline_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_overline_get_type()) }
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
+impl glib::HasParamSpec for Overline {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
+    }
+}
+
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 impl glib::value::ValueType for Overline {
     type Type = Self;
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
-unsafe impl<'a> FromValue<'a> for Overline {
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
+unsafe impl<'a> glib::value::FromValue<'a> for Overline {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 impl ToValue for Overline {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -1420,8 +1687,18 @@ impl ToValue for Overline {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
+impl From<Overline> for glib::Value {
+    #[inline]
+    fn from(v: Overline) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -1464,6 +1741,7 @@ impl fmt::Display for RenderPart {
 impl IntoGlib for RenderPart {
     type GlibType = ffi::PangoRenderPart;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoRenderPart {
         match self {
             Self::Foreground => ffi::PANGO_RENDER_PART_FOREGROUND,
@@ -1478,6 +1756,7 @@ impl IntoGlib for RenderPart {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoRenderPart> for RenderPart {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoRenderPart) -> Self {
         match value {
             ffi::PANGO_RENDER_PART_FOREGROUND => Self::Foreground,
@@ -1491,8 +1770,20 @@ impl FromGlib<ffi::PangoRenderPart> for RenderPart {
 }
 
 impl StaticType for RenderPart {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_render_part_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_render_part_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for RenderPart {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -1500,15 +1791,17 @@ impl glib::value::ValueType for RenderPart {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for RenderPart {
+unsafe impl<'a> glib::value::FromValue<'a> for RenderPart {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for RenderPart {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -1517,8 +1810,16 @@ impl ToValue for RenderPart {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<RenderPart> for glib::Value {
+    #[inline]
+    fn from(v: RenderPart) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -1768,6 +2069,7 @@ pub enum Script {
 
 impl Script {
     #[cfg_attr(feature = "v1_44", deprecated = "Since 1.44")]
+    #[allow(deprecated)]
     #[doc(alias = "pango_script_for_unichar")]
     pub fn for_unichar(ch: char) -> Script {
         unsafe { from_glib(ffi::pango_script_for_unichar(ch.into_glib())) }
@@ -2167,8 +2469,20 @@ impl FromGlib<ffi::PangoScript> for Script {
 }
 
 impl StaticType for Script {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_script_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_script_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Script {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2176,15 +2490,17 @@ impl glib::value::ValueType for Script {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Script {
+unsafe impl<'a> glib::value::FromValue<'a> for Script {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Script {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2193,8 +2509,16 @@ impl ToValue for Script {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Script> for glib::Value {
+    #[inline]
+    fn from(v: Script) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -2249,6 +2573,7 @@ impl fmt::Display for Stretch {
 impl IntoGlib for Stretch {
     type GlibType = ffi::PangoStretch;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoStretch {
         match self {
             Self::UltraCondensed => ffi::PANGO_STRETCH_ULTRA_CONDENSED,
@@ -2267,6 +2592,7 @@ impl IntoGlib for Stretch {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoStretch> for Stretch {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoStretch) -> Self {
         match value {
             ffi::PANGO_STRETCH_ULTRA_CONDENSED => Self::UltraCondensed,
@@ -2284,8 +2610,20 @@ impl FromGlib<ffi::PangoStretch> for Stretch {
 }
 
 impl StaticType for Stretch {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_stretch_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_stretch_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Stretch {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2293,15 +2631,17 @@ impl glib::value::ValueType for Stretch {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Stretch {
+unsafe impl<'a> glib::value::FromValue<'a> for Stretch {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Stretch {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2310,8 +2650,16 @@ impl ToValue for Stretch {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Stretch> for glib::Value {
+    #[inline]
+    fn from(v: Stretch) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -2348,6 +2696,7 @@ impl fmt::Display for Style {
 impl IntoGlib for Style {
     type GlibType = ffi::PangoStyle;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoStyle {
         match self {
             Self::Normal => ffi::PANGO_STYLE_NORMAL,
@@ -2360,6 +2709,7 @@ impl IntoGlib for Style {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoStyle> for Style {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoStyle) -> Self {
         match value {
             ffi::PANGO_STYLE_NORMAL => Self::Normal,
@@ -2371,8 +2721,20 @@ impl FromGlib<ffi::PangoStyle> for Style {
 }
 
 impl StaticType for Style {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_style_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_style_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Style {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2380,15 +2742,17 @@ impl glib::value::ValueType for Style {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Style {
+unsafe impl<'a> glib::value::FromValue<'a> for Style {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Style {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2397,8 +2761,16 @@ impl ToValue for Style {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Style> for glib::Value {
+    #[inline]
+    fn from(v: Style) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -2408,16 +2780,16 @@ impl ToValue for Style {
 pub enum TabAlign {
     #[doc(alias = "PANGO_TAB_LEFT")]
     Left,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_TAB_RIGHT")]
     Right,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_TAB_CENTER")]
     Center,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_TAB_DECIMAL")]
     Decimal,
     #[doc(hidden)]
@@ -2431,11 +2803,11 @@ impl fmt::Display for TabAlign {
             "TabAlign::{}",
             match *self {
                 Self::Left => "Left",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::Right => "Right",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::Center => "Center",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::Decimal => "Decimal",
                 _ => "Unknown",
             }
@@ -2447,14 +2819,15 @@ impl fmt::Display for TabAlign {
 impl IntoGlib for TabAlign {
     type GlibType = ffi::PangoTabAlign;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoTabAlign {
         match self {
             Self::Left => ffi::PANGO_TAB_LEFT,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::Right => ffi::PANGO_TAB_RIGHT,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::Center => ffi::PANGO_TAB_CENTER,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::Decimal => ffi::PANGO_TAB_DECIMAL,
             Self::__Unknown(value) => value,
         }
@@ -2463,14 +2836,15 @@ impl IntoGlib for TabAlign {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoTabAlign> for TabAlign {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoTabAlign) -> Self {
         match value {
             ffi::PANGO_TAB_LEFT => Self::Left,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_TAB_RIGHT => Self::Right,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_TAB_CENTER => Self::Center,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_TAB_DECIMAL => Self::Decimal,
             value => Self::__Unknown(value),
         }
@@ -2478,8 +2852,20 @@ impl FromGlib<ffi::PangoTabAlign> for TabAlign {
 }
 
 impl StaticType for TabAlign {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_tab_align_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_tab_align_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for TabAlign {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2487,15 +2873,17 @@ impl glib::value::ValueType for TabAlign {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for TabAlign {
+unsafe impl<'a> glib::value::FromValue<'a> for TabAlign {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for TabAlign {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2504,13 +2892,21 @@ impl ToValue for TabAlign {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+impl From<TabAlign> for glib::Value {
+    #[inline]
+    fn from(v: TabAlign) -> Self {
+        ToValue::to_value(&v)
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
 #[non_exhaustive]
 #[doc(alias = "PangoTextTransform")]
@@ -2527,8 +2923,8 @@ pub enum TextTransform {
     __Unknown(i32),
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl fmt::Display for TextTransform {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -2545,12 +2941,13 @@ impl fmt::Display for TextTransform {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[doc(hidden)]
 impl IntoGlib for TextTransform {
     type GlibType = ffi::PangoTextTransform;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoTextTransform {
         match self {
             Self::None => ffi::PANGO_TEXT_TRANSFORM_NONE,
@@ -2562,10 +2959,11 @@ impl IntoGlib for TextTransform {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 #[doc(hidden)]
 impl FromGlib<ffi::PangoTextTransform> for TextTransform {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoTextTransform) -> Self {
         match value {
             ffi::PANGO_TEXT_TRANSFORM_NONE => Self::None,
@@ -2577,33 +2975,49 @@ impl FromGlib<ffi::PangoTextTransform> for TextTransform {
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl StaticType for TextTransform {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_text_transform_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_text_transform_get_type()) }
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+impl glib::HasParamSpec for TextTransform {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl glib::value::ValueType for TextTransform {
     type Type = Self;
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
-unsafe impl<'a> FromValue<'a> for TextTransform {
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+unsafe impl<'a> glib::value::FromValue<'a> for TextTransform {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl ToValue for TextTransform {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2612,8 +3026,18 @@ impl ToValue for TextTransform {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
+impl From<TextTransform> for glib::Value {
+    #[inline]
+    fn from(v: TextTransform) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -2665,6 +3089,7 @@ impl fmt::Display for Underline {
 impl IntoGlib for Underline {
     type GlibType = ffi::PangoUnderline;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoUnderline {
         match self {
             Self::None => ffi::PANGO_UNDERLINE_NONE,
@@ -2682,6 +3107,7 @@ impl IntoGlib for Underline {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoUnderline> for Underline {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoUnderline) -> Self {
         match value {
             ffi::PANGO_UNDERLINE_NONE => Self::None,
@@ -2698,8 +3124,20 @@ impl FromGlib<ffi::PangoUnderline> for Underline {
 }
 
 impl StaticType for Underline {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_underline_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_underline_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Underline {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2707,15 +3145,17 @@ impl glib::value::ValueType for Underline {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Underline {
+unsafe impl<'a> glib::value::FromValue<'a> for Underline {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Underline {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2724,8 +3164,16 @@ impl ToValue for Underline {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Underline> for glib::Value {
+    #[inline]
+    fn from(v: Underline) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -2737,24 +3185,24 @@ pub enum Variant {
     Normal,
     #[doc(alias = "PANGO_VARIANT_SMALL_CAPS")]
     SmallCaps,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_VARIANT_ALL_SMALL_CAPS")]
     AllSmallCaps,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_VARIANT_PETITE_CAPS")]
     PetiteCaps,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_VARIANT_ALL_PETITE_CAPS")]
     AllPetiteCaps,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_VARIANT_UNICASE")]
     Unicase,
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "PANGO_VARIANT_TITLE_CAPS")]
     TitleCaps,
     #[doc(hidden)]
@@ -2769,15 +3217,15 @@ impl fmt::Display for Variant {
             match *self {
                 Self::Normal => "Normal",
                 Self::SmallCaps => "SmallCaps",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::AllSmallCaps => "AllSmallCaps",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::PetiteCaps => "PetiteCaps",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::AllPetiteCaps => "AllPetiteCaps",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::Unicase => "Unicase",
-                #[cfg(any(feature = "v1_50", feature = "dox"))]
+                #[cfg(feature = "v1_50")]
                 Self::TitleCaps => "TitleCaps",
                 _ => "Unknown",
             }
@@ -2789,19 +3237,20 @@ impl fmt::Display for Variant {
 impl IntoGlib for Variant {
     type GlibType = ffi::PangoVariant;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoVariant {
         match self {
             Self::Normal => ffi::PANGO_VARIANT_NORMAL,
             Self::SmallCaps => ffi::PANGO_VARIANT_SMALL_CAPS,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::AllSmallCaps => ffi::PANGO_VARIANT_ALL_SMALL_CAPS,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::PetiteCaps => ffi::PANGO_VARIANT_PETITE_CAPS,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::AllPetiteCaps => ffi::PANGO_VARIANT_ALL_PETITE_CAPS,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::Unicase => ffi::PANGO_VARIANT_UNICASE,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             Self::TitleCaps => ffi::PANGO_VARIANT_TITLE_CAPS,
             Self::__Unknown(value) => value,
         }
@@ -2810,19 +3259,20 @@ impl IntoGlib for Variant {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoVariant> for Variant {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoVariant) -> Self {
         match value {
             ffi::PANGO_VARIANT_NORMAL => Self::Normal,
             ffi::PANGO_VARIANT_SMALL_CAPS => Self::SmallCaps,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_VARIANT_ALL_SMALL_CAPS => Self::AllSmallCaps,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_VARIANT_PETITE_CAPS => Self::PetiteCaps,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_VARIANT_ALL_PETITE_CAPS => Self::AllPetiteCaps,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_VARIANT_UNICASE => Self::Unicase,
-            #[cfg(any(feature = "v1_50", feature = "dox"))]
+            #[cfg(feature = "v1_50")]
             ffi::PANGO_VARIANT_TITLE_CAPS => Self::TitleCaps,
             value => Self::__Unknown(value),
         }
@@ -2830,8 +3280,20 @@ impl FromGlib<ffi::PangoVariant> for Variant {
 }
 
 impl StaticType for Variant {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_variant_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_variant_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Variant {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2839,15 +3301,17 @@ impl glib::value::ValueType for Variant {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Variant {
+unsafe impl<'a> glib::value::FromValue<'a> for Variant {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Variant {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2856,8 +3320,16 @@ impl ToValue for Variant {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Variant> for glib::Value {
+    #[inline]
+    fn from(v: Variant) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -2921,6 +3393,7 @@ impl fmt::Display for Weight {
 impl IntoGlib for Weight {
     type GlibType = ffi::PangoWeight;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoWeight {
         match self {
             Self::Thin => ffi::PANGO_WEIGHT_THIN,
@@ -2942,6 +3415,7 @@ impl IntoGlib for Weight {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoWeight> for Weight {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoWeight) -> Self {
         match value {
             ffi::PANGO_WEIGHT_THIN => Self::Thin,
@@ -2962,8 +3436,20 @@ impl FromGlib<ffi::PangoWeight> for Weight {
 }
 
 impl StaticType for Weight {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_weight_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_weight_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Weight {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -2971,15 +3457,17 @@ impl glib::value::ValueType for Weight {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Weight {
+unsafe impl<'a> glib::value::FromValue<'a> for Weight {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Weight {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -2988,8 +3476,16 @@ impl ToValue for Weight {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Weight> for glib::Value {
+    #[inline]
+    fn from(v: Weight) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -3026,6 +3522,7 @@ impl fmt::Display for WrapMode {
 impl IntoGlib for WrapMode {
     type GlibType = ffi::PangoWrapMode;
 
+    #[inline]
     fn into_glib(self) -> ffi::PangoWrapMode {
         match self {
             Self::Word => ffi::PANGO_WRAP_WORD,
@@ -3038,6 +3535,7 @@ impl IntoGlib for WrapMode {
 
 #[doc(hidden)]
 impl FromGlib<ffi::PangoWrapMode> for WrapMode {
+    #[inline]
     unsafe fn from_glib(value: ffi::PangoWrapMode) -> Self {
         match value {
             ffi::PANGO_WRAP_WORD => Self::Word,
@@ -3049,8 +3547,20 @@ impl FromGlib<ffi::PangoWrapMode> for WrapMode {
 }
 
 impl StaticType for WrapMode {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "pango_wrap_mode_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::pango_wrap_mode_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for WrapMode {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -3058,15 +3568,17 @@ impl glib::value::ValueType for WrapMode {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for WrapMode {
+unsafe impl<'a> glib::value::FromValue<'a> for WrapMode {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for WrapMode {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -3075,7 +3587,15 @@ impl ToValue for WrapMode {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<WrapMode> for glib::Value {
+    #[inline]
+    fn from(v: WrapMode) -> Self {
+        ToValue::to_value(&v)
     }
 }

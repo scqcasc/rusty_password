@@ -6,21 +6,34 @@ use proc_macro_error::abort_call_site;
 use quote::{quote, quote_spanned};
 use syn::{
     punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Data, DeriveInput, Ident,
-    NestedMeta, Variant, Visibility,
+    Variant, Visibility,
 };
 
-use crate::utils::{
-    crate_ident_new, find_attribute_meta, find_nested_meta, parse_item_attributes,
-    parse_name_attribute, ItemAttribute,
-};
+use crate::utils::{crate_ident_new, parse_nested_meta_items, NestedMetaItem};
 
-// Flag is not registered if it has the #[flags_value(skip)] meta
-fn attribute_has_skip(attrs: &[Attribute]) -> bool {
-    let meta = find_attribute_meta(attrs, "flags_value").unwrap();
+pub struct AttrInput {
+    pub enum_name: syn::LitStr,
+}
+struct FlagsDesc {
+    variant: Variant,
+    name: Option<String>,
+    nick: Option<String>,
+    skip: bool,
+}
+impl FlagsDesc {
+    fn from_attrs(variant: Variant, attrs: &[Attribute]) -> syn::Result<Self> {
+        let mut name = NestedMetaItem::<syn::LitStr>::new("name").value_required();
+        let mut nick = NestedMetaItem::<syn::LitStr>::new("nick").value_required();
+        let mut skip = NestedMetaItem::<syn::LitBool>::new("skip").value_optional();
 
-    match meta {
-        None => false,
-        Some(meta) => find_nested_meta(&meta, "skip").is_some(),
+        parse_nested_meta_items(attrs, "flags_value", &mut [&mut name, &mut nick, &mut skip])?;
+
+        Ok(Self {
+            variant,
+            name: name.value.map(|s| s.value()),
+            nick: nick.value.map(|s| s.value()),
+            skip: skip.found || skip.value.map(|b| b.value()).unwrap_or(false),
+        })
     }
 }
 
@@ -38,39 +51,35 @@ fn gen_flags_values(
 
     // start at one as GFlagsValue array is null-terminated
     let mut n = 1;
-    let recurse = enum_variants.iter().filter(|v| { !attribute_has_skip(&v.attrs) } ).map(|v| {
-        let name = &v.ident;
-        let mut value_name = name.to_string().to_upper_camel_case();
-        let mut value_nick = name.to_string().to_kebab_case();
+    let recurse = enum_variants
+        .iter()
+        .map(|v| FlagsDesc::from_attrs(v.clone(), &v.attrs).unwrap())
+        .filter(|desc| !desc.skip)
+        .map(|desc| {
+            let v = desc.variant;
+            let name = &v.ident;
+            let mut value_name = name.to_string().to_upper_camel_case();
+            let mut value_nick = name.to_string().to_kebab_case();
 
-        let attrs = parse_item_attributes("flags_value", &v.attrs);
-        let attrs = match attrs {
-            Ok(attrs) => attrs,
-            Err(e) => abort_call_site!(
-                "{}: #[glib::flags] supports only the following optional attributes: #[flags_value(name = \"The Name\", nick = \"the-nick\")] or #[flags_value(skip)]",
-                e
-            ),
-        };
-
-        attrs.into_iter().for_each(|attr|
-            match attr {
-                ItemAttribute::Name(n) => value_name = n,
-                ItemAttribute::Nick(n) => value_nick = n,
+            if let Some(n) = desc.name {
+                value_name = n;
             }
-        );
+            if let Some(n) = desc.nick {
+                value_nick = n;
+            }
 
-        let value_name = format!("{}\0", value_name);
-        let value_nick = format!("{}\0", value_nick);
+            let value_name = format!("{value_name}\0");
+            let value_nick = format!("{value_nick}\0");
 
-        n += 1;
-        quote_spanned! {v.span()=>
-            #crate_ident::gobject_ffi::GFlagsValue {
-                value: #enum_name::#name.bits(),
-                value_name: #value_name as *const _ as *const _,
-                value_nick: #value_nick as *const _ as *const _,
-            },
-        }
-    });
+            n += 1;
+            quote_spanned! {v.span()=>
+                #crate_ident::gobject_ffi::GFlagsValue {
+                    value: #enum_name::#name.bits(),
+                    value_name: #value_name as *const _ as *const _,
+                    value_nick: #value_nick as *const _ as *const _,
+                },
+            }
+        });
     (
         quote! {
             #(#recurse)*
@@ -97,6 +106,7 @@ fn gen_bitflags(
 
     quote! {
         #crate_ident::bitflags::bitflags! {
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
             #visibility struct #enum_name: u32 {
                 #(#recurse)*
             }
@@ -104,15 +114,8 @@ fn gen_bitflags(
     }
 }
 
-pub fn impl_flags(attrs: &NestedMeta, input: &DeriveInput) -> TokenStream {
-    let gtype_name = match parse_name_attribute(attrs) {
-        Ok(name) => name,
-        Err(e) => abort_call_site!(
-            "{}: [glib::flags] requires #[glib::flags(name = \"FlagsTypeName\")]",
-            e
-        ),
-    };
-
+pub fn impl_flags(attrs: AttrInput, input: &DeriveInput) -> TokenStream {
+    let gtype_name = attrs.enum_name.value();
     let name = &input.ident;
     let visibility = &input.vis;
 
@@ -132,12 +135,14 @@ pub fn impl_flags(attrs: &NestedMeta, input: &DeriveInput) -> TokenStream {
         impl #crate_ident::translate::IntoGlib for #name {
             type GlibType = u32;
 
+            #[inline]
             fn into_glib(self) -> u32 {
                 self.bits()
             }
         }
 
         impl #crate_ident::translate::FromGlib<u32> for #name {
+            #[inline]
             unsafe fn from_glib(value: u32) -> Self {
                 Self::from_bits_truncate(value)
             }
@@ -150,6 +155,7 @@ pub fn impl_flags(attrs: &NestedMeta, input: &DeriveInput) -> TokenStream {
         unsafe impl<'a> #crate_ident::value::FromValue<'a> for #name {
             type Checker = #crate_ident::value::GenericValueTypeChecker<Self>;
 
+            #[inline]
             unsafe fn from_value(value: &'a #crate_ident::value::Value) -> Self {
                 #crate_ident::translate::from_glib(#crate_ident::gobject_ffi::g_value_get_flags(
                     #crate_ident::translate::ToGlibPtr::to_glib_none(value).0
@@ -158,6 +164,7 @@ pub fn impl_flags(attrs: &NestedMeta, input: &DeriveInput) -> TokenStream {
         }
 
         impl #crate_ident::value::ToValue for #name {
+            #[inline]
             fn to_value(&self) -> #crate_ident::value::Value {
                 let mut value = #crate_ident::value::Value::for_value_type::<Self>();
                 unsafe {
@@ -169,12 +176,31 @@ pub fn impl_flags(attrs: &NestedMeta, input: &DeriveInput) -> TokenStream {
                 value
             }
 
+            #[inline]
             fn value_type(&self) -> #crate_ident::Type {
                 <Self as #crate_ident::StaticType>::static_type()
             }
         }
 
+        impl #crate_ident::HasParamSpec for #name {
+            type ParamSpec = #crate_ident::ParamSpecFlags;
+            type SetValue = Self;
+            type BuilderFn = fn(&::core::primitive::str) -> #crate_ident::ParamSpecFlagsBuilder<Self>;
+
+            fn param_spec_builder() -> Self::BuilderFn {
+                |name| Self::ParamSpec::builder(name)
+            }
+        }
+
+        impl ::std::convert::From<#name> for #crate_ident::Value {
+            #[inline]
+            fn from(v: #name) -> Self {
+                #crate_ident::value::ToValue::to_value(&v)
+            }
+        }
+
         impl #crate_ident::StaticType for #name {
+            #[inline]
             fn static_type() -> #crate_ident::Type {
                 static ONCE: ::std::sync::Once = ::std::sync::Once::new();
                 static mut TYPE: #crate_ident::Type = #crate_ident::Type::INVALID;
@@ -192,12 +218,13 @@ pub fn impl_flags(attrs: &NestedMeta, input: &DeriveInput) -> TokenStream {
                     let name = ::std::ffi::CString::new(#gtype_name).expect("CString::new failed");
                     unsafe {
                         let type_ = #crate_ident::gobject_ffi::g_flags_register_static(name.as_ptr(), VALUES.as_ptr());
-                        TYPE = #crate_ident::translate::from_glib(type_);
+                        let type_: #crate_ident::Type = #crate_ident::translate::from_glib(type_);
+                        assert!(type_.is_valid());
+                        TYPE = type_;
                     }
                 });
 
                 unsafe {
-                    assert!(TYPE.is_valid());
                     TYPE
                 }
             }

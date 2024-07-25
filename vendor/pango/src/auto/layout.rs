@@ -2,28 +2,21 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Alignment;
-use crate::AttrList;
-use crate::Context;
-#[cfg(any(feature = "v1_46", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 use crate::Direction;
-use crate::EllipsizeMode;
-use crate::FontDescription;
-use crate::LayoutIter;
-use crate::LayoutLine;
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 use crate::LayoutSerializeFlags;
-use crate::Rectangle;
-use crate::TabArray;
-use crate::WrapMode;
+use crate::{
+    Alignment, AttrList, Context, EllipsizeMode, FontDescription, LayoutIter, LayoutLine,
+    Rectangle, TabArray, WrapMode,
+};
 use glib::translate::*;
-use std::fmt;
-use std::mem;
-#[cfg(any(feature = "v1_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 use std::ptr;
+use std::{fmt, mem};
 
 glib::wrapper! {
     #[doc(alias = "PangoLayout")]
@@ -49,7 +42,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_copy")]
     #[must_use]
-    pub fn copy(&self) -> Option<Layout> {
+    pub fn copy(&self) -> Layout {
         unsafe { from_glib_full(ffi::pango_layout_copy(self.to_glib_none().0)) }
     }
 
@@ -77,8 +70,8 @@ impl Layout {
         unsafe { ffi::pango_layout_get_baseline(self.to_glib_none().0) }
     }
 
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "pango_layout_get_caret_pos")]
     #[doc(alias = "get_caret_pos")]
     pub fn caret_pos(&self, index_: i32) -> (Rectangle, Rectangle) {
@@ -103,7 +96,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_get_context")]
     #[doc(alias = "get_context")]
-    pub fn context(&self) -> Option<Context> {
+    pub fn context(&self) -> Context {
         unsafe { from_glib_none(ffi::pango_layout_get_context(self.to_glib_none().0)) }
     }
 
@@ -123,8 +116,8 @@ impl Layout {
         }
     }
 
-    #[cfg(any(feature = "v1_46", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+    #[cfg(feature = "v1_46")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
     #[doc(alias = "pango_layout_get_direction")]
     #[doc(alias = "get_direction")]
     pub fn direction(&self, index: i32) -> Direction {
@@ -181,7 +174,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_get_iter")]
     #[doc(alias = "get_iter")]
-    pub fn iter(&self) -> Option<LayoutIter> {
+    pub fn iter(&self) -> LayoutIter {
         unsafe { from_glib_full(ffi::pango_layout_get_iter(self.to_glib_none().0)) }
     }
 
@@ -191,8 +184,8 @@ impl Layout {
         unsafe { from_glib(ffi::pango_layout_get_justify(self.to_glib_none().0)) }
     }
 
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "pango_layout_get_justify_last_line")]
     #[doc(alias = "get_justify_last_line")]
     pub fn is_justify_last_line(&self) -> bool {
@@ -226,8 +219,8 @@ impl Layout {
         }
     }
 
-    #[cfg(any(feature = "v1_44", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_44")))]
+    #[cfg(feature = "v1_44")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_44")))]
     #[doc(alias = "pango_layout_get_line_spacing")]
     #[doc(alias = "get_line_spacing")]
     pub fn line_spacing(&self) -> f32 {
@@ -290,9 +283,7 @@ impl Layout {
                 width.as_mut_ptr(),
                 height.as_mut_ptr(),
             );
-            let width = width.assume_init();
-            let height = height.assume_init();
-            (width, height)
+            (width.assume_init(), height.assume_init())
         }
     }
 
@@ -323,9 +314,7 @@ impl Layout {
                 width.as_mut_ptr(),
                 height.as_mut_ptr(),
             );
-            let width = width.assume_init();
-            let height = height.assume_init();
-            (width, height)
+            (width.assume_init(), height.assume_init())
         }
     }
 
@@ -343,7 +332,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_get_text")]
     #[doc(alias = "get_text")]
-    pub fn text(&self) -> Option<glib::GString> {
+    pub fn text(&self) -> glib::GString {
         unsafe { from_glib_none(ffi::pango_layout_get_text(self.to_glib_none().0)) }
     }
 
@@ -377,9 +366,7 @@ impl Layout {
                 line.as_mut_ptr(),
                 x_pos.as_mut_ptr(),
             );
-            let line = line.assume_init();
-            let x_pos = x_pos.assume_init();
-            (line, x_pos)
+            (line.assume_init(), x_pos.assume_init())
         }
     }
 
@@ -422,14 +409,12 @@ impl Layout {
                 new_index.as_mut_ptr(),
                 new_trailing.as_mut_ptr(),
             );
-            let new_index = new_index.assume_init();
-            let new_trailing = new_trailing.assume_init();
-            (new_index, new_trailing)
+            (new_index.assume_init(), new_trailing.assume_init())
         }
     }
 
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "pango_layout_serialize")]
     pub fn serialize(&self, flags: LayoutSerializeFlags) -> glib::Bytes {
         unsafe {
@@ -496,8 +481,8 @@ impl Layout {
         }
     }
 
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "pango_layout_set_justify_last_line")]
     pub fn set_justify_last_line(&self, justify: bool) {
         unsafe {
@@ -505,8 +490,8 @@ impl Layout {
         }
     }
 
-    #[cfg(any(feature = "v1_44", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_44")))]
+    #[cfg(feature = "v1_44")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_44")))]
     #[doc(alias = "pango_layout_set_line_spacing")]
     pub fn set_line_spacing(&self, factor: f32) {
         unsafe {
@@ -516,7 +501,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_set_markup")]
     pub fn set_markup(&self, markup: &str) {
-        let length = markup.len() as i32;
+        let length = markup.len() as _;
         unsafe {
             ffi::pango_layout_set_markup(self.to_glib_none().0, markup.to_glib_none().0, length);
         }
@@ -524,7 +509,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_set_markup_with_accel")]
     pub fn set_markup_with_accel(&self, markup: &str, accel_marker: char) -> char {
-        let length = markup.len() as i32;
+        let length = markup.len() as _;
         unsafe {
             let mut accel_char = mem::MaybeUninit::uninit();
             ffi::pango_layout_set_markup_with_accel(
@@ -534,8 +519,7 @@ impl Layout {
                 accel_marker.into_glib(),
                 accel_char.as_mut_ptr(),
             );
-            let accel_char = accel_char.assume_init();
-            std::convert::TryFrom::try_from(accel_char)
+            std::convert::TryFrom::try_from(accel_char.assume_init())
                 .expect("conversion from an invalid Unicode value attempted")
         }
     }
@@ -563,7 +547,7 @@ impl Layout {
 
     #[doc(alias = "pango_layout_set_text")]
     pub fn set_text(&self, text: &str) {
-        let length = text.len() as i32;
+        let length = text.len() as _;
         unsafe {
             ffi::pango_layout_set_text(self.to_glib_none().0, text.to_glib_none().0, length);
         }
@@ -583,8 +567,8 @@ impl Layout {
         }
     }
 
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "pango_layout_write_to_file")]
     pub fn write_to_file(
         &self,
@@ -599,7 +583,7 @@ impl Layout {
                 filename.as_ref().to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -620,9 +604,7 @@ impl Layout {
                 index_.as_mut_ptr(),
                 trailing.as_mut_ptr(),
             ));
-            let index_ = index_.assume_init();
-            let trailing = trailing.assume_init();
-            (ret, index_, trailing)
+            (ret, index_.assume_init(), trailing.assume_init())
         }
     }
 }

@@ -2,27 +2,16 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::PageSetup;
-use crate::PrintContext;
-use crate::PrintOperationAction;
-use crate::PrintOperationPreview;
-use crate::PrintOperationResult;
-use crate::PrintSettings;
-use crate::PrintStatus;
-use crate::Unit;
-use crate::Widget;
-use crate::Window;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
-use std::ptr;
+use crate::{
+    PageSetup, PrintContext, PrintOperationAction, PrintOperationPreview, PrintOperationResult,
+    PrintSettings, PrintStatus, Unit, Widget, Window,
+};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GtkPrintOperation")]
@@ -47,7 +36,7 @@ impl PrintOperation {
     ///
     /// This method returns an instance of [`PrintOperationBuilder`](crate::builders::PrintOperationBuilder) which can be used to create [`PrintOperation`] objects.
     pub fn builder() -> PrintOperationBuilder {
-        PrintOperationBuilder::default()
+        PrintOperationBuilder::new()
     }
 }
 
@@ -57,415 +46,154 @@ impl Default for PrintOperation {
     }
 }
 
-#[derive(Clone, Default)]
 // rustdoc-stripper-ignore-next
 /// A [builder-pattern] type to construct [`PrintOperation`] objects.
 ///
 /// [builder-pattern]: https://doc.rust-lang.org/1.0.0/style/ownership/builders.html
 #[must_use = "The builder must be built to be used"]
 pub struct PrintOperationBuilder {
-    allow_async: Option<bool>,
-    current_page: Option<i32>,
-    custom_tab_label: Option<String>,
-    default_page_setup: Option<PageSetup>,
-    embed_page_setup: Option<bool>,
-    export_filename: Option<String>,
-    has_selection: Option<bool>,
-    job_name: Option<String>,
-    n_pages: Option<i32>,
-    print_settings: Option<PrintSettings>,
-    show_progress: Option<bool>,
-    support_selection: Option<bool>,
-    track_print_status: Option<bool>,
-    unit: Option<Unit>,
-    use_full_page: Option<bool>,
+    builder: glib::object::ObjectBuilder<'static, PrintOperation>,
 }
 
 impl PrintOperationBuilder {
-    // rustdoc-stripper-ignore-next
-    /// Create a new [`PrintOperationBuilder`].
-    pub fn new() -> Self {
-        Self::default()
+    fn new() -> Self {
+        Self {
+            builder: glib::object::Object::builder(),
+        }
+    }
+
+    pub fn allow_async(self, allow_async: bool) -> Self {
+        Self {
+            builder: self.builder.property("allow-async", allow_async),
+        }
+    }
+
+    pub fn current_page(self, current_page: i32) -> Self {
+        Self {
+            builder: self.builder.property("current-page", current_page),
+        }
+    }
+
+    pub fn custom_tab_label(self, custom_tab_label: impl Into<glib::GString>) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("custom-tab-label", custom_tab_label.into()),
+        }
+    }
+
+    pub fn default_page_setup(self, default_page_setup: &PageSetup) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("default-page-setup", default_page_setup.clone()),
+        }
+    }
+
+    pub fn embed_page_setup(self, embed_page_setup: bool) -> Self {
+        Self {
+            builder: self.builder.property("embed-page-setup", embed_page_setup),
+        }
+    }
+
+    pub fn export_filename(self, export_filename: impl Into<glib::GString>) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("export-filename", export_filename.into()),
+        }
+    }
+
+    pub fn has_selection(self, has_selection: bool) -> Self {
+        Self {
+            builder: self.builder.property("has-selection", has_selection),
+        }
+    }
+
+    pub fn job_name(self, job_name: impl Into<glib::GString>) -> Self {
+        Self {
+            builder: self.builder.property("job-name", job_name.into()),
+        }
+    }
+
+    pub fn n_pages(self, n_pages: i32) -> Self {
+        Self {
+            builder: self.builder.property("n-pages", n_pages),
+        }
+    }
+
+    pub fn print_settings(self, print_settings: &PrintSettings) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("print-settings", print_settings.clone()),
+        }
+    }
+
+    pub fn show_progress(self, show_progress: bool) -> Self {
+        Self {
+            builder: self.builder.property("show-progress", show_progress),
+        }
+    }
+
+    pub fn support_selection(self, support_selection: bool) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("support-selection", support_selection),
+        }
+    }
+
+    pub fn track_print_status(self, track_print_status: bool) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("track-print-status", track_print_status),
+        }
+    }
+
+    pub fn unit(self, unit: Unit) -> Self {
+        Self {
+            builder: self.builder.property("unit", unit),
+        }
+    }
+
+    pub fn use_full_page(self, use_full_page: bool) -> Self {
+        Self {
+            builder: self.builder.property("use-full-page", use_full_page),
+        }
     }
 
     // rustdoc-stripper-ignore-next
     /// Build the [`PrintOperation`].
     #[must_use = "Building the object from the builder is usually expensive and is not expected to have side effects"]
     pub fn build(self) -> PrintOperation {
-        let mut properties: Vec<(&str, &dyn ToValue)> = vec![];
-        if let Some(ref allow_async) = self.allow_async {
-            properties.push(("allow-async", allow_async));
-        }
-        if let Some(ref current_page) = self.current_page {
-            properties.push(("current-page", current_page));
-        }
-        if let Some(ref custom_tab_label) = self.custom_tab_label {
-            properties.push(("custom-tab-label", custom_tab_label));
-        }
-        if let Some(ref default_page_setup) = self.default_page_setup {
-            properties.push(("default-page-setup", default_page_setup));
-        }
-        if let Some(ref embed_page_setup) = self.embed_page_setup {
-            properties.push(("embed-page-setup", embed_page_setup));
-        }
-        if let Some(ref export_filename) = self.export_filename {
-            properties.push(("export-filename", export_filename));
-        }
-        if let Some(ref has_selection) = self.has_selection {
-            properties.push(("has-selection", has_selection));
-        }
-        if let Some(ref job_name) = self.job_name {
-            properties.push(("job-name", job_name));
-        }
-        if let Some(ref n_pages) = self.n_pages {
-            properties.push(("n-pages", n_pages));
-        }
-        if let Some(ref print_settings) = self.print_settings {
-            properties.push(("print-settings", print_settings));
-        }
-        if let Some(ref show_progress) = self.show_progress {
-            properties.push(("show-progress", show_progress));
-        }
-        if let Some(ref support_selection) = self.support_selection {
-            properties.push(("support-selection", support_selection));
-        }
-        if let Some(ref track_print_status) = self.track_print_status {
-            properties.push(("track-print-status", track_print_status));
-        }
-        if let Some(ref unit) = self.unit {
-            properties.push(("unit", unit));
-        }
-        if let Some(ref use_full_page) = self.use_full_page {
-            properties.push(("use-full-page", use_full_page));
-        }
-        glib::Object::new::<PrintOperation>(&properties)
-            .expect("Failed to create an instance of PrintOperation")
-    }
-
-    pub fn allow_async(mut self, allow_async: bool) -> Self {
-        self.allow_async = Some(allow_async);
-        self
-    }
-
-    pub fn current_page(mut self, current_page: i32) -> Self {
-        self.current_page = Some(current_page);
-        self
-    }
-
-    pub fn custom_tab_label(mut self, custom_tab_label: &str) -> Self {
-        self.custom_tab_label = Some(custom_tab_label.to_string());
-        self
-    }
-
-    pub fn default_page_setup(mut self, default_page_setup: &PageSetup) -> Self {
-        self.default_page_setup = Some(default_page_setup.clone());
-        self
-    }
-
-    pub fn embed_page_setup(mut self, embed_page_setup: bool) -> Self {
-        self.embed_page_setup = Some(embed_page_setup);
-        self
-    }
-
-    pub fn export_filename(mut self, export_filename: &str) -> Self {
-        self.export_filename = Some(export_filename.to_string());
-        self
-    }
-
-    pub fn has_selection(mut self, has_selection: bool) -> Self {
-        self.has_selection = Some(has_selection);
-        self
-    }
-
-    pub fn job_name(mut self, job_name: &str) -> Self {
-        self.job_name = Some(job_name.to_string());
-        self
-    }
-
-    pub fn n_pages(mut self, n_pages: i32) -> Self {
-        self.n_pages = Some(n_pages);
-        self
-    }
-
-    pub fn print_settings(mut self, print_settings: &PrintSettings) -> Self {
-        self.print_settings = Some(print_settings.clone());
-        self
-    }
-
-    pub fn show_progress(mut self, show_progress: bool) -> Self {
-        self.show_progress = Some(show_progress);
-        self
-    }
-
-    pub fn support_selection(mut self, support_selection: bool) -> Self {
-        self.support_selection = Some(support_selection);
-        self
-    }
-
-    pub fn track_print_status(mut self, track_print_status: bool) -> Self {
-        self.track_print_status = Some(track_print_status);
-        self
-    }
-
-    pub fn unit(mut self, unit: Unit) -> Self {
-        self.unit = Some(unit);
-        self
-    }
-
-    pub fn use_full_page(mut self, use_full_page: bool) -> Self {
-        self.use_full_page = Some(use_full_page);
-        self
+        self.builder.build()
     }
 }
 
-pub trait PrintOperationExt: 'static {
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::PrintOperation>> Sealed for T {}
+}
+
+pub trait PrintOperationExt: IsA<PrintOperation> + sealed::Sealed + 'static {
     #[doc(alias = "gtk_print_operation_cancel")]
-    fn cancel(&self);
-
-    #[doc(alias = "gtk_print_operation_draw_page_finish")]
-    fn draw_page_finish(&self);
-
-    #[doc(alias = "gtk_print_operation_get_default_page_setup")]
-    #[doc(alias = "get_default_page_setup")]
-    fn default_page_setup(&self) -> Option<PageSetup>;
-
-    #[doc(alias = "gtk_print_operation_get_embed_page_setup")]
-    #[doc(alias = "get_embed_page_setup")]
-    fn embeds_page_setup(&self) -> bool;
-
-    #[doc(alias = "gtk_print_operation_get_has_selection")]
-    #[doc(alias = "get_has_selection")]
-    fn has_selection(&self) -> bool;
-
-    #[doc(alias = "gtk_print_operation_get_n_pages_to_print")]
-    #[doc(alias = "get_n_pages_to_print")]
-    fn n_pages_to_print(&self) -> i32;
-
-    #[doc(alias = "gtk_print_operation_get_print_settings")]
-    #[doc(alias = "get_print_settings")]
-    fn print_settings(&self) -> Option<PrintSettings>;
-
-    #[doc(alias = "gtk_print_operation_get_status")]
-    #[doc(alias = "get_status")]
-    fn status(&self) -> PrintStatus;
-
-    #[doc(alias = "gtk_print_operation_get_status_string")]
-    #[doc(alias = "get_status_string")]
-    fn status_string(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "gtk_print_operation_get_support_selection")]
-    #[doc(alias = "get_support_selection")]
-    fn supports_selection(&self) -> bool;
-
-    #[doc(alias = "gtk_print_operation_is_finished")]
-    fn is_finished(&self) -> bool;
-
-    #[doc(alias = "gtk_print_operation_run")]
-    fn run(
-        &self,
-        action: PrintOperationAction,
-        parent: Option<&impl IsA<Window>>,
-    ) -> Result<PrintOperationResult, glib::Error>;
-
-    #[doc(alias = "gtk_print_operation_set_allow_async")]
-    fn set_allow_async(&self, allow_async: bool);
-
-    #[doc(alias = "gtk_print_operation_set_current_page")]
-    fn set_current_page(&self, current_page: i32);
-
-    #[doc(alias = "gtk_print_operation_set_custom_tab_label")]
-    fn set_custom_tab_label(&self, label: Option<&str>);
-
-    #[doc(alias = "gtk_print_operation_set_default_page_setup")]
-    fn set_default_page_setup(&self, default_page_setup: Option<&PageSetup>);
-
-    #[doc(alias = "gtk_print_operation_set_defer_drawing")]
-    fn set_defer_drawing(&self);
-
-    #[doc(alias = "gtk_print_operation_set_embed_page_setup")]
-    fn set_embed_page_setup(&self, embed: bool);
-
-    #[doc(alias = "gtk_print_operation_set_export_filename")]
-    fn set_export_filename(&self, filename: impl AsRef<std::path::Path>);
-
-    #[doc(alias = "gtk_print_operation_set_has_selection")]
-    fn set_has_selection(&self, has_selection: bool);
-
-    #[doc(alias = "gtk_print_operation_set_job_name")]
-    fn set_job_name(&self, job_name: &str);
-
-    #[doc(alias = "gtk_print_operation_set_n_pages")]
-    fn set_n_pages(&self, n_pages: i32);
-
-    #[doc(alias = "gtk_print_operation_set_print_settings")]
-    fn set_print_settings(&self, print_settings: Option<&PrintSettings>);
-
-    #[doc(alias = "gtk_print_operation_set_show_progress")]
-    fn set_show_progress(&self, show_progress: bool);
-
-    #[doc(alias = "gtk_print_operation_set_support_selection")]
-    fn set_support_selection(&self, support_selection: bool);
-
-    #[doc(alias = "gtk_print_operation_set_track_print_status")]
-    fn set_track_print_status(&self, track_status: bool);
-
-    #[doc(alias = "gtk_print_operation_set_unit")]
-    fn set_unit(&self, unit: Unit);
-
-    #[doc(alias = "gtk_print_operation_set_use_full_page")]
-    fn set_use_full_page(&self, full_page: bool);
-
-    #[doc(alias = "allow-async")]
-    fn allows_async(&self) -> bool;
-
-    #[doc(alias = "current-page")]
-    fn current_page(&self) -> i32;
-
-    #[doc(alias = "custom-tab-label")]
-    fn custom_tab_label(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "export-filename")]
-    fn export_filename(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "job-name")]
-    fn job_name(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "n-pages")]
-    fn n_pages(&self) -> i32;
-
-    #[doc(alias = "show-progress")]
-    fn shows_progress(&self) -> bool;
-
-    #[doc(alias = "track-print-status")]
-    fn tracks_print_status(&self) -> bool;
-
-    fn unit(&self) -> Unit;
-
-    #[doc(alias = "use-full-page")]
-    fn uses_full_page(&self) -> bool;
-
-    #[doc(alias = "begin-print")]
-    fn connect_begin_print<F: Fn(&Self, &PrintContext) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "create-custom-widget")]
-    fn connect_create_custom_widget<F: Fn(&Self) -> glib::Object + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "custom-widget-apply")]
-    fn connect_custom_widget_apply<F: Fn(&Self, &Widget) + 'static>(&self, f: F)
-        -> SignalHandlerId;
-
-    #[doc(alias = "done")]
-    fn connect_done<F: Fn(&Self, PrintOperationResult) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "draw-page")]
-    fn connect_draw_page<F: Fn(&Self, &PrintContext, i32) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "end-print")]
-    fn connect_end_print<F: Fn(&Self, &PrintContext) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "paginate")]
-    fn connect_paginate<F: Fn(&Self, &PrintContext) -> bool + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "preview")]
-    fn connect_preview<
-        F: Fn(&Self, &PrintOperationPreview, &PrintContext, Option<&Window>) -> bool + 'static,
-    >(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "request-page-setup")]
-    fn connect_request_page_setup<F: Fn(&Self, &PrintContext, i32, &PageSetup) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "status-changed")]
-    fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "update-custom-widget")]
-    fn connect_update_custom_widget<F: Fn(&Self, &Widget, &PageSetup, &PrintSettings) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "allow-async")]
-    fn connect_allow_async_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "current-page")]
-    fn connect_current_page_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "custom-tab-label")]
-    fn connect_custom_tab_label_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "default-page-setup")]
-    fn connect_default_page_setup_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "embed-page-setup")]
-    fn connect_embed_page_setup_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "export-filename")]
-    fn connect_export_filename_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "has-selection")]
-    fn connect_has_selection_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "job-name")]
-    fn connect_job_name_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "n-pages")]
-    fn connect_n_pages_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "n-pages-to-print")]
-    fn connect_n_pages_to_print_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "print-settings")]
-    fn connect_print_settings_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "show-progress")]
-    fn connect_show_progress_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "status")]
-    fn connect_status_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "status-string")]
-    fn connect_status_string_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "support-selection")]
-    fn connect_support_selection_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "track-print-status")]
-    fn connect_track_print_status_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "unit")]
-    fn connect_unit_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "use-full-page")]
-    fn connect_use_full_page_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-}
-
-impl<O: IsA<PrintOperation>> PrintOperationExt for O {
     fn cancel(&self) {
         unsafe {
             ffi::gtk_print_operation_cancel(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_print_operation_draw_page_finish")]
     fn draw_page_finish(&self) {
         unsafe {
             ffi::gtk_print_operation_draw_page_finish(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_default_page_setup")]
+    #[doc(alias = "get_default_page_setup")]
     fn default_page_setup(&self) -> Option<PageSetup> {
         unsafe {
             from_glib_none(ffi::gtk_print_operation_get_default_page_setup(
@@ -474,6 +202,8 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_embed_page_setup")]
+    #[doc(alias = "get_embed_page_setup")]
     fn embeds_page_setup(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_print_operation_get_embed_page_setup(
@@ -482,6 +212,8 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_has_selection")]
+    #[doc(alias = "get_has_selection")]
     fn has_selection(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_print_operation_get_has_selection(
@@ -490,10 +222,14 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_n_pages_to_print")]
+    #[doc(alias = "get_n_pages_to_print")]
     fn n_pages_to_print(&self) -> i32 {
         unsafe { ffi::gtk_print_operation_get_n_pages_to_print(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gtk_print_operation_get_print_settings")]
+    #[doc(alias = "get_print_settings")]
     fn print_settings(&self) -> Option<PrintSettings> {
         unsafe {
             from_glib_none(ffi::gtk_print_operation_get_print_settings(
@@ -502,6 +238,8 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_status")]
+    #[doc(alias = "get_status")]
     fn status(&self) -> PrintStatus {
         unsafe {
             from_glib(ffi::gtk_print_operation_get_status(
@@ -510,6 +248,8 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_status_string")]
+    #[doc(alias = "get_status_string")]
     fn status_string(&self) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::gtk_print_operation_get_status_string(
@@ -518,6 +258,8 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_get_support_selection")]
+    #[doc(alias = "get_support_selection")]
     fn supports_selection(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_print_operation_get_support_selection(
@@ -526,6 +268,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_is_finished")]
     fn is_finished(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_print_operation_is_finished(
@@ -534,6 +277,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_run")]
     fn run(
         &self,
         action: PrintOperationAction,
@@ -555,6 +299,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_allow_async")]
     fn set_allow_async(&self, allow_async: bool) {
         unsafe {
             ffi::gtk_print_operation_set_allow_async(
@@ -564,12 +309,14 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_current_page")]
     fn set_current_page(&self, current_page: i32) {
         unsafe {
             ffi::gtk_print_operation_set_current_page(self.as_ref().to_glib_none().0, current_page);
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_custom_tab_label")]
     fn set_custom_tab_label(&self, label: Option<&str>) {
         unsafe {
             ffi::gtk_print_operation_set_custom_tab_label(
@@ -579,6 +326,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_default_page_setup")]
     fn set_default_page_setup(&self, default_page_setup: Option<&PageSetup>) {
         unsafe {
             ffi::gtk_print_operation_set_default_page_setup(
@@ -588,12 +336,14 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_defer_drawing")]
     fn set_defer_drawing(&self) {
         unsafe {
             ffi::gtk_print_operation_set_defer_drawing(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_embed_page_setup")]
     fn set_embed_page_setup(&self, embed: bool) {
         unsafe {
             ffi::gtk_print_operation_set_embed_page_setup(
@@ -603,6 +353,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_export_filename")]
     fn set_export_filename(&self, filename: impl AsRef<std::path::Path>) {
         unsafe {
             ffi::gtk_print_operation_set_export_filename(
@@ -612,6 +363,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_has_selection")]
     fn set_has_selection(&self, has_selection: bool) {
         unsafe {
             ffi::gtk_print_operation_set_has_selection(
@@ -621,6 +373,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_job_name")]
     fn set_job_name(&self, job_name: &str) {
         unsafe {
             ffi::gtk_print_operation_set_job_name(
@@ -630,12 +383,14 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_n_pages")]
     fn set_n_pages(&self, n_pages: i32) {
         unsafe {
             ffi::gtk_print_operation_set_n_pages(self.as_ref().to_glib_none().0, n_pages);
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_print_settings")]
     fn set_print_settings(&self, print_settings: Option<&PrintSettings>) {
         unsafe {
             ffi::gtk_print_operation_set_print_settings(
@@ -645,6 +400,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_show_progress")]
     fn set_show_progress(&self, show_progress: bool) {
         unsafe {
             ffi::gtk_print_operation_set_show_progress(
@@ -654,6 +410,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_support_selection")]
     fn set_support_selection(&self, support_selection: bool) {
         unsafe {
             ffi::gtk_print_operation_set_support_selection(
@@ -663,6 +420,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_track_print_status")]
     fn set_track_print_status(&self, track_status: bool) {
         unsafe {
             ffi::gtk_print_operation_set_track_print_status(
@@ -672,12 +430,14 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_unit")]
     fn set_unit(&self, unit: Unit) {
         unsafe {
             ffi::gtk_print_operation_set_unit(self.as_ref().to_glib_none().0, unit.into_glib());
         }
     }
 
+    #[doc(alias = "gtk_print_operation_set_use_full_page")]
     fn set_use_full_page(&self, full_page: bool) {
         unsafe {
             ffi::gtk_print_operation_set_use_full_page(
@@ -687,46 +447,56 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "allow-async")]
     fn allows_async(&self) -> bool {
-        glib::ObjectExt::property(self.as_ref(), "allow-async")
+        ObjectExt::property(self.as_ref(), "allow-async")
     }
 
+    #[doc(alias = "current-page")]
     fn current_page(&self) -> i32 {
-        glib::ObjectExt::property(self.as_ref(), "current-page")
+        ObjectExt::property(self.as_ref(), "current-page")
     }
 
+    #[doc(alias = "custom-tab-label")]
     fn custom_tab_label(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "custom-tab-label")
+        ObjectExt::property(self.as_ref(), "custom-tab-label")
     }
 
+    #[doc(alias = "export-filename")]
     fn export_filename(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "export-filename")
+        ObjectExt::property(self.as_ref(), "export-filename")
     }
 
+    #[doc(alias = "job-name")]
     fn job_name(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "job-name")
+        ObjectExt::property(self.as_ref(), "job-name")
     }
 
+    #[doc(alias = "n-pages")]
     fn n_pages(&self) -> i32 {
-        glib::ObjectExt::property(self.as_ref(), "n-pages")
+        ObjectExt::property(self.as_ref(), "n-pages")
     }
 
+    #[doc(alias = "show-progress")]
     fn shows_progress(&self) -> bool {
-        glib::ObjectExt::property(self.as_ref(), "show-progress")
+        ObjectExt::property(self.as_ref(), "show-progress")
     }
 
+    #[doc(alias = "track-print-status")]
     fn tracks_print_status(&self) -> bool {
-        glib::ObjectExt::property(self.as_ref(), "track-print-status")
+        ObjectExt::property(self.as_ref(), "track-print-status")
     }
 
     fn unit(&self) -> Unit {
-        glib::ObjectExt::property(self.as_ref(), "unit")
+        ObjectExt::property(self.as_ref(), "unit")
     }
 
+    #[doc(alias = "use-full-page")]
     fn uses_full_page(&self) -> bool {
-        glib::ObjectExt::property(self.as_ref(), "use-full-page")
+        ObjectExt::property(self.as_ref(), "use-full-page")
     }
 
+    #[doc(alias = "begin-print")]
     fn connect_begin_print<F: Fn(&Self, &PrintContext) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn begin_print_trampoline<
             P: IsA<PrintOperation>,
@@ -755,6 +525,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "create-custom-widget")]
     fn connect_create_custom_widget<F: Fn(&Self) -> glib::Object + 'static>(
         &self,
         f: F,
@@ -784,6 +555,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "custom-widget-apply")]
     fn connect_custom_widget_apply<F: Fn(&Self, &Widget) + 'static>(
         &self,
         f: F,
@@ -815,6 +587,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "done")]
     fn connect_done<F: Fn(&Self, PrintOperationResult) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn done_trampoline<
             P: IsA<PrintOperation>,
@@ -843,6 +616,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "draw-page")]
     fn connect_draw_page<F: Fn(&Self, &PrintContext, i32) + 'static>(
         &self,
         f: F,
@@ -876,6 +650,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "end-print")]
     fn connect_end_print<F: Fn(&Self, &PrintContext) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn end_print_trampoline<
             P: IsA<PrintOperation>,
@@ -904,6 +679,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "paginate")]
     fn connect_paginate<F: Fn(&Self, &PrintContext) -> bool + 'static>(
         &self,
         f: F,
@@ -936,6 +712,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "preview")]
     fn connect_preview<
         F: Fn(&Self, &PrintOperationPreview, &PrintContext, Option<&Window>) -> bool + 'static,
     >(
@@ -974,6 +751,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "request-page-setup")]
     fn connect_request_page_setup<F: Fn(&Self, &PrintContext, i32, &PageSetup) + 'static>(
         &self,
         f: F,
@@ -1009,6 +787,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "status-changed")]
     fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn status_changed_trampoline<
             P: IsA<PrintOperation>,
@@ -1033,6 +812,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "update-custom-widget")]
     fn connect_update_custom_widget<F: Fn(&Self, &Widget, &PageSetup, &PrintSettings) + 'static>(
         &self,
         f: F,
@@ -1068,6 +848,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "allow-async")]
     fn connect_allow_async_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_allow_async_trampoline<
             P: IsA<PrintOperation>,
@@ -1093,6 +874,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "current-page")]
     fn connect_current_page_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_current_page_trampoline<
             P: IsA<PrintOperation>,
@@ -1118,6 +900,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "custom-tab-label")]
     fn connect_custom_tab_label_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_custom_tab_label_trampoline<
             P: IsA<PrintOperation>,
@@ -1143,6 +926,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "default-page-setup")]
     fn connect_default_page_setup_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_default_page_setup_trampoline<
             P: IsA<PrintOperation>,
@@ -1168,6 +952,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "embed-page-setup")]
     fn connect_embed_page_setup_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_embed_page_setup_trampoline<
             P: IsA<PrintOperation>,
@@ -1193,6 +978,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "export-filename")]
     fn connect_export_filename_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_export_filename_trampoline<
             P: IsA<PrintOperation>,
@@ -1218,6 +1004,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "has-selection")]
     fn connect_has_selection_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_has_selection_trampoline<
             P: IsA<PrintOperation>,
@@ -1243,6 +1030,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "job-name")]
     fn connect_job_name_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_job_name_trampoline<
             P: IsA<PrintOperation>,
@@ -1268,6 +1056,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "n-pages")]
     fn connect_n_pages_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_n_pages_trampoline<
             P: IsA<PrintOperation>,
@@ -1293,6 +1082,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "n-pages-to-print")]
     fn connect_n_pages_to_print_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_n_pages_to_print_trampoline<
             P: IsA<PrintOperation>,
@@ -1318,6 +1108,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "print-settings")]
     fn connect_print_settings_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_print_settings_trampoline<
             P: IsA<PrintOperation>,
@@ -1343,6 +1134,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "show-progress")]
     fn connect_show_progress_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_show_progress_trampoline<
             P: IsA<PrintOperation>,
@@ -1368,6 +1160,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "status")]
     fn connect_status_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_status_trampoline<
             P: IsA<PrintOperation>,
@@ -1393,6 +1186,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "status-string")]
     fn connect_status_string_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_status_string_trampoline<
             P: IsA<PrintOperation>,
@@ -1418,6 +1212,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "support-selection")]
     fn connect_support_selection_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_support_selection_trampoline<
             P: IsA<PrintOperation>,
@@ -1443,6 +1238,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "track-print-status")]
     fn connect_track_print_status_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_track_print_status_trampoline<
             P: IsA<PrintOperation>,
@@ -1468,6 +1264,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "unit")]
     fn connect_unit_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_unit_trampoline<P: IsA<PrintOperation>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkPrintOperation,
@@ -1490,6 +1287,7 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 
+    #[doc(alias = "use-full-page")]
     fn connect_use_full_page_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_use_full_page_trampoline<
             P: IsA<PrintOperation>,
@@ -1515,6 +1313,8 @@ impl<O: IsA<PrintOperation>> PrintOperationExt for O {
         }
     }
 }
+
+impl<O: IsA<PrintOperation>> PrintOperationExt for O {}
 
 impl fmt::Display for PrintOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

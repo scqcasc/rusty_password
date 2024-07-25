@@ -2,20 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::InputHints;
-use crate::InputPurpose;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::mem::transmute;
-use std::ptr;
+use crate::{InputHints, InputPurpose};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem, mem::transmute, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GtkIMContext")]
@@ -30,84 +23,13 @@ impl IMContext {
     pub const NONE: Option<&'static IMContext> = None;
 }
 
-pub trait IMContextExt: 'static {
-    #[doc(alias = "gtk_im_context_delete_surrounding")]
-    fn delete_surrounding(&self, offset: i32, n_chars: i32) -> bool;
-
-    #[doc(alias = "gtk_im_context_filter_keypress")]
-    fn filter_keypress(&self, event: &gdk::EventKey) -> bool;
-
-    #[doc(alias = "gtk_im_context_focus_in")]
-    fn focus_in(&self);
-
-    #[doc(alias = "gtk_im_context_focus_out")]
-    fn focus_out(&self);
-
-    #[doc(alias = "gtk_im_context_get_preedit_string")]
-    #[doc(alias = "get_preedit_string")]
-    fn preedit_string(&self) -> (glib::GString, pango::AttrList, i32);
-
-    #[doc(alias = "gtk_im_context_get_surrounding")]
-    #[doc(alias = "get_surrounding")]
-    fn surrounding(&self) -> Option<(glib::GString, i32)>;
-
-    #[doc(alias = "gtk_im_context_reset")]
-    fn reset(&self);
-
-    #[doc(alias = "gtk_im_context_set_client_window")]
-    fn set_client_window(&self, window: Option<&gdk::Window>);
-
-    #[doc(alias = "gtk_im_context_set_cursor_location")]
-    fn set_cursor_location(&self, area: &gdk::Rectangle);
-
-    #[doc(alias = "gtk_im_context_set_surrounding")]
-    fn set_surrounding(&self, text: &str, cursor_index: i32);
-
-    #[doc(alias = "gtk_im_context_set_use_preedit")]
-    fn set_use_preedit(&self, use_preedit: bool);
-
-    #[doc(alias = "input-hints")]
-    fn input_hints(&self) -> InputHints;
-
-    #[doc(alias = "input-hints")]
-    fn set_input_hints(&self, input_hints: InputHints);
-
-    #[doc(alias = "input-purpose")]
-    fn input_purpose(&self) -> InputPurpose;
-
-    #[doc(alias = "input-purpose")]
-    fn set_input_purpose(&self, input_purpose: InputPurpose);
-
-    #[doc(alias = "commit")]
-    fn connect_commit<F: Fn(&Self, &str) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "delete-surrounding")]
-    fn connect_delete_surrounding<F: Fn(&Self, i32, i32) -> bool + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "preedit-changed")]
-    fn connect_preedit_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "preedit-end")]
-    fn connect_preedit_end<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "preedit-start")]
-    fn connect_preedit_start<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "retrieve-surrounding")]
-    fn connect_retrieve_surrounding<F: Fn(&Self) -> bool + 'static>(&self, f: F)
-        -> SignalHandlerId;
-
-    #[doc(alias = "input-hints")]
-    fn connect_input_hints_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "input-purpose")]
-    fn connect_input_purpose_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::IMContext>> Sealed for T {}
 }
 
-impl<O: IsA<IMContext>> IMContextExt for O {
+pub trait IMContextExt: IsA<IMContext> + sealed::Sealed + 'static {
+    #[doc(alias = "gtk_im_context_delete_surrounding")]
     fn delete_surrounding(&self, offset: i32, n_chars: i32) -> bool {
         unsafe {
             from_glib(ffi::gtk_im_context_delete_surrounding(
@@ -118,6 +40,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "gtk_im_context_filter_keypress")]
     fn filter_keypress(&self, event: &gdk::EventKey) -> bool {
         unsafe {
             from_glib(ffi::gtk_im_context_filter_keypress(
@@ -127,18 +50,22 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "gtk_im_context_focus_in")]
     fn focus_in(&self) {
         unsafe {
             ffi::gtk_im_context_focus_in(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_im_context_focus_out")]
     fn focus_out(&self) {
         unsafe {
             ffi::gtk_im_context_focus_out(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_im_context_get_preedit_string")]
+    #[doc(alias = "get_preedit_string")]
     fn preedit_string(&self) -> (glib::GString, pango::AttrList, i32) {
         unsafe {
             let mut str = ptr::null_mut();
@@ -150,11 +77,16 @@ impl<O: IsA<IMContext>> IMContextExt for O {
                 &mut attrs,
                 cursor_pos.as_mut_ptr(),
             );
-            let cursor_pos = cursor_pos.assume_init();
-            (from_glib_full(str), from_glib_full(attrs), cursor_pos)
+            (
+                from_glib_full(str),
+                from_glib_full(attrs),
+                cursor_pos.assume_init(),
+            )
         }
     }
 
+    #[doc(alias = "gtk_im_context_get_surrounding")]
+    #[doc(alias = "get_surrounding")]
     fn surrounding(&self) -> Option<(glib::GString, i32)> {
         unsafe {
             let mut text = ptr::null_mut();
@@ -164,21 +96,22 @@ impl<O: IsA<IMContext>> IMContextExt for O {
                 &mut text,
                 cursor_index.as_mut_ptr(),
             ));
-            let cursor_index = cursor_index.assume_init();
             if ret {
-                Some((from_glib_full(text), cursor_index))
+                Some((from_glib_full(text), cursor_index.assume_init()))
             } else {
                 None
             }
         }
     }
 
+    #[doc(alias = "gtk_im_context_reset")]
     fn reset(&self) {
         unsafe {
             ffi::gtk_im_context_reset(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_im_context_set_client_window")]
     fn set_client_window(&self, window: Option<&gdk::Window>) {
         unsafe {
             ffi::gtk_im_context_set_client_window(
@@ -188,6 +121,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "gtk_im_context_set_cursor_location")]
     fn set_cursor_location(&self, area: &gdk::Rectangle) {
         unsafe {
             ffi::gtk_im_context_set_cursor_location(
@@ -197,8 +131,9 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "gtk_im_context_set_surrounding")]
     fn set_surrounding(&self, text: &str, cursor_index: i32) {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             ffi::gtk_im_context_set_surrounding(
                 self.as_ref().to_glib_none().0,
@@ -209,6 +144,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "gtk_im_context_set_use_preedit")]
     fn set_use_preedit(&self, use_preedit: bool) {
         unsafe {
             ffi::gtk_im_context_set_use_preedit(
@@ -218,22 +154,27 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "input-hints")]
     fn input_hints(&self) -> InputHints {
-        glib::ObjectExt::property(self.as_ref(), "input-hints")
+        ObjectExt::property(self.as_ref(), "input-hints")
     }
 
+    #[doc(alias = "input-hints")]
     fn set_input_hints(&self, input_hints: InputHints) {
-        glib::ObjectExt::set_property(self.as_ref(), "input-hints", &input_hints)
+        ObjectExt::set_property(self.as_ref(), "input-hints", input_hints)
     }
 
+    #[doc(alias = "input-purpose")]
     fn input_purpose(&self) -> InputPurpose {
-        glib::ObjectExt::property(self.as_ref(), "input-purpose")
+        ObjectExt::property(self.as_ref(), "input-purpose")
     }
 
+    #[doc(alias = "input-purpose")]
     fn set_input_purpose(&self, input_purpose: InputPurpose) {
-        glib::ObjectExt::set_property(self.as_ref(), "input-purpose", &input_purpose)
+        ObjectExt::set_property(self.as_ref(), "input-purpose", input_purpose)
     }
 
+    #[doc(alias = "commit")]
     fn connect_commit<F: Fn(&Self, &str) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn commit_trampoline<P: IsA<IMContext>, F: Fn(&P, &str) + 'static>(
             this: *mut ffi::GtkIMContext,
@@ -259,6 +200,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "delete-surrounding")]
     fn connect_delete_surrounding<F: Fn(&Self, i32, i32) -> bool + 'static>(
         &self,
         f: F,
@@ -293,6 +235,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "preedit-changed")]
     fn connect_preedit_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn preedit_changed_trampoline<P: IsA<IMContext>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkIMContext,
@@ -314,6 +257,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "preedit-end")]
     fn connect_preedit_end<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn preedit_end_trampoline<P: IsA<IMContext>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkIMContext,
@@ -335,6 +279,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "preedit-start")]
     fn connect_preedit_start<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn preedit_start_trampoline<P: IsA<IMContext>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkIMContext,
@@ -356,6 +301,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "retrieve-surrounding")]
     fn connect_retrieve_surrounding<F: Fn(&Self) -> bool + 'static>(
         &self,
         f: F,
@@ -383,6 +329,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "input-hints")]
     fn connect_input_hints_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_input_hints_trampoline<
             P: IsA<IMContext>,
@@ -408,6 +355,7 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 
+    #[doc(alias = "input-purpose")]
     fn connect_input_purpose_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_input_purpose_trampoline<
             P: IsA<IMContext>,
@@ -433,6 +381,8 @@ impl<O: IsA<IMContext>> IMContextExt for O {
         }
     }
 }
+
+impl<O: IsA<IMContext>> IMContextExt for O {}
 
 impl fmt::Display for IMContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

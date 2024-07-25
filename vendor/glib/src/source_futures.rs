@@ -1,19 +1,16 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use futures_channel::{mpsc, oneshot};
-use futures_core::future::{FusedFuture, Future};
-use futures_core::stream::{FusedStream, Stream};
-use futures_core::task;
-use futures_core::task::Poll;
-use std::marker::Unpin;
-use std::pin;
-use std::pin::Pin;
-use std::time::Duration;
+use std::{marker::Unpin, pin, pin::Pin, time::Duration};
 
-use crate::Continue;
-use crate::MainContext;
-use crate::Priority;
-use crate::Source;
+use futures_channel::{mpsc, oneshot};
+use futures_core::{
+    future::{FusedFuture, Future},
+    stream::{FusedStream, Stream},
+    task,
+    task::Poll,
+};
+
+use crate::{ControlFlow, MainContext, Priority, Source};
 
 // rustdoc-stripper-ignore-next
 /// Represents a `Future` around a `glib::Source`. The future will
@@ -122,7 +119,7 @@ impl<T, F> Drop for SourceFuture<T, F> {
 ///
 /// The `Future` must be spawned on an `Executor` backed by a `glib::MainContext`.
 pub fn timeout_future(value: Duration) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
-    timeout_future_with_priority(crate::PRIORITY_DEFAULT, value)
+    timeout_future_with_priority(crate::Priority::default(), value)
 }
 
 // rustdoc-stripper-ignore-next
@@ -137,7 +134,7 @@ pub fn timeout_future_with_priority(
         let mut send = Some(send);
         crate::timeout_source_new(value, None, priority, move || {
             let _ = send.take().unwrap().send(());
-            Continue(false)
+            ControlFlow::Break
         })
     }))
 }
@@ -147,7 +144,7 @@ pub fn timeout_future_with_priority(
 ///
 /// The `Future` must be spawned on an `Executor` backed by a `glib::MainContext`.
 pub fn timeout_future_seconds(value: u32) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
-    timeout_future_seconds_with_priority(crate::PRIORITY_DEFAULT, value)
+    timeout_future_seconds_with_priority(crate::Priority::default(), value)
 }
 
 // rustdoc-stripper-ignore-next
@@ -162,7 +159,7 @@ pub fn timeout_future_seconds_with_priority(
         let mut send = Some(send);
         crate::timeout_source_new_seconds(value, None, priority, move || {
             let _ = send.take().unwrap().send(());
-            Continue(false)
+            ControlFlow::Break
         })
     }))
 }
@@ -176,7 +173,7 @@ pub fn timeout_future_seconds_with_priority(
 pub fn child_watch_future(
     pid: crate::Pid,
 ) -> Pin<Box<dyn Future<Output = (crate::Pid, i32)> + Send + 'static>> {
-    child_watch_future_with_priority(crate::PRIORITY_DEFAULT, pid)
+    child_watch_future_with_priority(crate::Priority::default(), pid)
 }
 
 // rustdoc-stripper-ignore-next
@@ -197,18 +194,18 @@ pub fn child_watch_future_with_priority(
     }))
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Create a `Future` that will resolve once the given UNIX signal is raised
 ///
 /// The `Future` must be spawned on an `Executor` backed by a `glib::MainContext`.
 pub fn unix_signal_future(signum: i32) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
-    unix_signal_future_with_priority(crate::PRIORITY_DEFAULT, signum)
+    unix_signal_future_with_priority(crate::Priority::default(), signum)
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Create a `Future` that will resolve once the given UNIX signal is raised
 ///
@@ -221,7 +218,7 @@ pub fn unix_signal_future_with_priority(
         let mut send = Some(send);
         crate::unix_signal_source_new(signum, None, priority, move || {
             let _ = send.take().unwrap().send(());
-            Continue(false)
+            ControlFlow::Break
         })
     }))
 }
@@ -334,7 +331,7 @@ impl<T, F> Drop for SourceStream<T, F> {
 ///
 /// The `Future` must be spawned on an `Executor` backed by a `glib::MainContext`.
 pub fn interval_stream(value: Duration) -> Pin<Box<dyn Stream<Item = ()> + Send + 'static>> {
-    interval_stream_with_priority(crate::PRIORITY_DEFAULT, value)
+    interval_stream_with_priority(crate::Priority::default(), value)
 }
 
 // rustdoc-stripper-ignore-next
@@ -348,9 +345,9 @@ pub fn interval_stream_with_priority(
     Box::pin(SourceStream::new(move |send| {
         crate::timeout_source_new(value, None, priority, move || {
             if send.unbounded_send(()).is_err() {
-                Continue(false)
+                ControlFlow::Break
             } else {
-                Continue(true)
+                ControlFlow::Continue
             }
         })
     }))
@@ -361,7 +358,7 @@ pub fn interval_stream_with_priority(
 ///
 /// The `Stream` must be spawned on an `Executor` backed by a `glib::MainContext`.
 pub fn interval_stream_seconds(value: u32) -> Pin<Box<dyn Stream<Item = ()> + Send + 'static>> {
-    interval_stream_seconds_with_priority(crate::PRIORITY_DEFAULT, value)
+    interval_stream_seconds_with_priority(crate::Priority::default(), value)
 }
 
 // rustdoc-stripper-ignore-next
@@ -375,26 +372,26 @@ pub fn interval_stream_seconds_with_priority(
     Box::pin(SourceStream::new(move |send| {
         crate::timeout_source_new_seconds(value, None, priority, move || {
             if send.unbounded_send(()).is_err() {
-                Continue(false)
+                ControlFlow::Break
             } else {
-                Continue(true)
+                ControlFlow::Continue
             }
         })
     }))
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Create a `Stream` that will provide a value whenever the given UNIX signal is raised
 ///
 /// The `Stream` must be spawned on an `Executor` backed by a `glib::MainContext`.
 pub fn unix_signal_stream(signum: i32) -> Pin<Box<dyn Stream<Item = ()> + Send + 'static>> {
-    unix_signal_stream_with_priority(crate::PRIORITY_DEFAULT, signum)
+    unix_signal_stream_with_priority(crate::Priority::default(), signum)
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Create a `Stream` that will provide a value whenever the given UNIX signal is raised
 ///
@@ -406,9 +403,9 @@ pub fn unix_signal_stream_with_priority(
     Box::pin(SourceStream::new(move |send| {
         crate::unix_signal_source_new(signum, None, priority, move || {
             if send.unbounded_send(()).is_err() {
-                Continue(false)
+                ControlFlow::Break
             } else {
-                Continue(true)
+                ControlFlow::Continue
             }
         })
     }))
@@ -416,11 +413,11 @@ pub fn unix_signal_stream_with_priority(
 
 #[cfg(test)]
 mod tests {
+    use std::{thread, time::Duration};
+
+    use futures_util::{future::FutureExt, stream::StreamExt};
+
     use super::*;
-    use futures_util::future::FutureExt;
-    use futures_util::stream::StreamExt;
-    use std::thread;
-    use std::time::Duration;
 
     #[test]
     fn test_timeout() {

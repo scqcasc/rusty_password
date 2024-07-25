@@ -3,16 +3,12 @@
 // DO NOT EDIT
 
 use crate::Range;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::mem::transmute;
-use std::ptr;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem, mem::transmute, ptr};
 
 glib::wrapper! {
     #[doc(alias = "AtkValue")]
@@ -27,50 +23,14 @@ impl Value {
     pub const NONE: Option<&'static Value> = None;
 }
 
-pub trait ValueExt: 'static {
-    #[doc(alias = "atk_value_get_current_value")]
-    #[doc(alias = "get_current_value")]
-    fn current_value(&self) -> glib::Value;
-
-    #[doc(alias = "atk_value_get_increment")]
-    #[doc(alias = "get_increment")]
-    fn increment(&self) -> f64;
-
-    #[doc(alias = "atk_value_get_maximum_value")]
-    #[doc(alias = "get_maximum_value")]
-    fn maximum_value(&self) -> glib::Value;
-
-    #[doc(alias = "atk_value_get_minimum_increment")]
-    #[doc(alias = "get_minimum_increment")]
-    fn minimum_increment(&self) -> glib::Value;
-
-    #[doc(alias = "atk_value_get_minimum_value")]
-    #[doc(alias = "get_minimum_value")]
-    fn minimum_value(&self) -> glib::Value;
-
-    #[doc(alias = "atk_value_get_range")]
-    #[doc(alias = "get_range")]
-    fn range(&self) -> Option<Range>;
-
-    #[doc(alias = "atk_value_get_sub_ranges")]
-    #[doc(alias = "get_sub_ranges")]
-    fn sub_ranges(&self) -> Vec<Range>;
-
-    #[doc(alias = "atk_value_get_value_and_text")]
-    #[doc(alias = "get_value_and_text")]
-    fn value_and_text(&self) -> (f64, glib::GString);
-
-    #[doc(alias = "atk_value_set_current_value")]
-    fn set_current_value(&self, value: &glib::Value) -> bool;
-
-    #[doc(alias = "atk_value_set_value")]
-    fn set_value(&self, new_value: f64);
-
-    #[doc(alias = "value-changed")]
-    fn connect_value_changed<F: Fn(&Self, f64, &str) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Value>> Sealed for T {}
 }
 
-impl<O: IsA<Value>> ValueExt for O {
+pub trait ValueExt: IsA<Value> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_value_get_current_value")]
+    #[doc(alias = "get_current_value")]
     fn current_value(&self) -> glib::Value {
         unsafe {
             let mut value = glib::Value::uninitialized();
@@ -82,10 +42,14 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 
+    #[doc(alias = "atk_value_get_increment")]
+    #[doc(alias = "get_increment")]
     fn increment(&self) -> f64 {
         unsafe { ffi::atk_value_get_increment(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_value_get_maximum_value")]
+    #[doc(alias = "get_maximum_value")]
     fn maximum_value(&self) -> glib::Value {
         unsafe {
             let mut value = glib::Value::uninitialized();
@@ -97,6 +61,8 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 
+    #[doc(alias = "atk_value_get_minimum_increment")]
+    #[doc(alias = "get_minimum_increment")]
     fn minimum_increment(&self) -> glib::Value {
         unsafe {
             let mut value = glib::Value::uninitialized();
@@ -108,6 +74,8 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 
+    #[doc(alias = "atk_value_get_minimum_value")]
+    #[doc(alias = "get_minimum_value")]
     fn minimum_value(&self) -> glib::Value {
         unsafe {
             let mut value = glib::Value::uninitialized();
@@ -119,10 +87,14 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 
+    #[doc(alias = "atk_value_get_range")]
+    #[doc(alias = "get_range")]
     fn range(&self) -> Option<Range> {
         unsafe { from_glib_full(ffi::atk_value_get_range(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "atk_value_get_sub_ranges")]
+    #[doc(alias = "get_sub_ranges")]
     fn sub_ranges(&self) -> Vec<Range> {
         unsafe {
             FromGlibPtrContainer::from_glib_full(ffi::atk_value_get_sub_ranges(
@@ -131,6 +103,8 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 
+    #[doc(alias = "atk_value_get_value_and_text")]
+    #[doc(alias = "get_value_and_text")]
     fn value_and_text(&self) -> (f64, glib::GString) {
         unsafe {
             let mut value = mem::MaybeUninit::uninit();
@@ -140,11 +114,11 @@ impl<O: IsA<Value>> ValueExt for O {
                 value.as_mut_ptr(),
                 &mut text,
             );
-            let value = value.assume_init();
-            (value, from_glib_full(text))
+            (value.assume_init(), from_glib_full(text))
         }
     }
 
+    #[doc(alias = "atk_value_set_current_value")]
     fn set_current_value(&self, value: &glib::Value) -> bool {
         unsafe {
             from_glib(ffi::atk_value_set_current_value(
@@ -154,12 +128,14 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 
+    #[doc(alias = "atk_value_set_value")]
     fn set_value(&self, new_value: f64) {
         unsafe {
             ffi::atk_value_set_value(self.as_ref().to_glib_none().0, new_value);
         }
     }
 
+    #[doc(alias = "value-changed")]
     fn connect_value_changed<F: Fn(&Self, f64, &str) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn value_changed_trampoline<
             P: IsA<Value>,
@@ -190,6 +166,8 @@ impl<O: IsA<Value>> ValueExt for O {
         }
     }
 }
+
+impl<O: IsA<Value>> ValueExt for O {}
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

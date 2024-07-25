@@ -2,17 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Action;
-use crate::Object;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{Action, Object};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "AtkHyperlink")]
@@ -27,58 +23,26 @@ impl Hyperlink {
     pub const NONE: Option<&'static Hyperlink> = None;
 }
 
-pub trait HyperlinkExt: 'static {
-    #[doc(alias = "atk_hyperlink_get_end_index")]
-    #[doc(alias = "get_end_index")]
-    fn end_index(&self) -> i32;
-
-    #[doc(alias = "atk_hyperlink_get_n_anchors")]
-    #[doc(alias = "get_n_anchors")]
-    fn n_anchors(&self) -> i32;
-
-    #[doc(alias = "atk_hyperlink_get_object")]
-    #[doc(alias = "get_object")]
-    fn object(&self, i: i32) -> Option<Object>;
-
-    #[doc(alias = "atk_hyperlink_get_start_index")]
-    #[doc(alias = "get_start_index")]
-    fn start_index(&self) -> i32;
-
-    #[doc(alias = "atk_hyperlink_get_uri")]
-    #[doc(alias = "get_uri")]
-    fn uri(&self, i: i32) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_hyperlink_is_inline")]
-    fn is_inline(&self) -> bool;
-
-    #[doc(alias = "atk_hyperlink_is_valid")]
-    fn is_valid(&self) -> bool;
-
-    #[doc(alias = "number-of-anchors")]
-    fn number_of_anchors(&self) -> i32;
-
-    #[doc(alias = "link-activated")]
-    fn connect_link_activated<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "end-index")]
-    fn connect_end_index_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "number-of-anchors")]
-    fn connect_number_of_anchors_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "start-index")]
-    fn connect_start_index_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Hyperlink>> Sealed for T {}
 }
 
-impl<O: IsA<Hyperlink>> HyperlinkExt for O {
+pub trait HyperlinkExt: IsA<Hyperlink> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_hyperlink_get_end_index")]
+    #[doc(alias = "get_end_index")]
     fn end_index(&self) -> i32 {
         unsafe { ffi::atk_hyperlink_get_end_index(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_hyperlink_get_n_anchors")]
+    #[doc(alias = "get_n_anchors")]
     fn n_anchors(&self) -> i32 {
         unsafe { ffi::atk_hyperlink_get_n_anchors(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_hyperlink_get_object")]
+    #[doc(alias = "get_object")]
     fn object(&self, i: i32) -> Option<Object> {
         unsafe {
             from_glib_none(ffi::atk_hyperlink_get_object(
@@ -88,10 +52,14 @@ impl<O: IsA<Hyperlink>> HyperlinkExt for O {
         }
     }
 
+    #[doc(alias = "atk_hyperlink_get_start_index")]
+    #[doc(alias = "get_start_index")]
     fn start_index(&self) -> i32 {
         unsafe { ffi::atk_hyperlink_get_start_index(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_hyperlink_get_uri")]
+    #[doc(alias = "get_uri")]
     fn uri(&self, i: i32) -> Option<glib::GString> {
         unsafe {
             from_glib_full(ffi::atk_hyperlink_get_uri(
@@ -101,18 +69,22 @@ impl<O: IsA<Hyperlink>> HyperlinkExt for O {
         }
     }
 
+    #[doc(alias = "atk_hyperlink_is_inline")]
     fn is_inline(&self) -> bool {
         unsafe { from_glib(ffi::atk_hyperlink_is_inline(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "atk_hyperlink_is_valid")]
     fn is_valid(&self) -> bool {
         unsafe { from_glib(ffi::atk_hyperlink_is_valid(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "number-of-anchors")]
     fn number_of_anchors(&self) -> i32 {
-        glib::ObjectExt::property(self.as_ref(), "number-of-anchors")
+        ObjectExt::property(self.as_ref(), "number-of-anchors")
     }
 
+    #[doc(alias = "link-activated")]
     fn connect_link_activated<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn link_activated_trampoline<P: IsA<Hyperlink>, F: Fn(&P) + 'static>(
             this: *mut ffi::AtkHyperlink,
@@ -134,6 +106,7 @@ impl<O: IsA<Hyperlink>> HyperlinkExt for O {
         }
     }
 
+    #[doc(alias = "end-index")]
     fn connect_end_index_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_end_index_trampoline<P: IsA<Hyperlink>, F: Fn(&P) + 'static>(
             this: *mut ffi::AtkHyperlink,
@@ -156,6 +129,7 @@ impl<O: IsA<Hyperlink>> HyperlinkExt for O {
         }
     }
 
+    #[doc(alias = "number-of-anchors")]
     fn connect_number_of_anchors_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_number_of_anchors_trampoline<
             P: IsA<Hyperlink>,
@@ -181,6 +155,7 @@ impl<O: IsA<Hyperlink>> HyperlinkExt for O {
         }
     }
 
+    #[doc(alias = "start-index")]
     fn connect_start_index_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_start_index_trampoline<
             P: IsA<Hyperlink>,
@@ -206,6 +181,8 @@ impl<O: IsA<Hyperlink>> HyperlinkExt for O {
         }
     }
 }
+
+impl<O: IsA<Hyperlink>> HyperlinkExt for O {}
 
 impl fmt::Display for Hyperlink {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

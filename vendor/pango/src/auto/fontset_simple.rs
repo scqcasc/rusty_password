@@ -2,11 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Font;
-use crate::Fontset;
-use crate::Language;
-use glib::object::IsA;
-use glib::translate::*;
+use crate::{Font, Fontset, Language};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -25,9 +22,9 @@ impl FontsetSimple {
     }
 
     #[doc(alias = "pango_fontset_simple_append")]
-    pub fn append(&self, font: &impl IsA<Font>) {
+    pub fn append(&self, font: impl IsA<Font>) {
         unsafe {
-            ffi::pango_fontset_simple_append(self.to_glib_none().0, font.as_ref().to_glib_full());
+            ffi::pango_fontset_simple_append(self.to_glib_none().0, font.upcast().into_glib_ptr());
         }
     }
 

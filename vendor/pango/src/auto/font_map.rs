@@ -2,21 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Context;
-use crate::Font;
-use crate::FontDescription;
-use crate::FontFamily;
-use crate::Fontset;
-use crate::Language;
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::mem;
-use std::ptr;
+use crate::{Context, Font, FontDescription, FontFamily, Fontset, Language};
+use glib::{prelude::*, translate::*};
+use std::{fmt, mem, ptr};
 
 glib::wrapper! {
     #[doc(alias = "PangoFontMap")]
-    pub struct FontMap(Object<ffi::PangoFontMap, ffi::PangoFontMapClass>);
+    pub struct FontMap(Object<ffi::PangoFontMap, ffi::PangoFontMapClass>) @implements gio::ListModel;
 
     match fn {
         type_ => || ffi::pango_font_map_get_type(),
@@ -27,46 +19,21 @@ impl FontMap {
     pub const NONE: Option<&'static FontMap> = None;
 }
 
-pub trait FontMapExt: 'static {
-    #[doc(alias = "pango_font_map_changed")]
-    fn changed(&self);
-
-    #[doc(alias = "pango_font_map_create_context")]
-    fn create_context(&self) -> Option<Context>;
-
-    #[cfg(any(feature = "v1_46", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
-    #[doc(alias = "pango_font_map_get_family")]
-    #[doc(alias = "get_family")]
-    fn family(&self, name: &str) -> Option<FontFamily>;
-
-    #[doc(alias = "pango_font_map_get_serial")]
-    #[doc(alias = "get_serial")]
-    fn serial(&self) -> u32;
-
-    #[doc(alias = "pango_font_map_list_families")]
-    fn list_families(&self) -> Vec<FontFamily>;
-
-    #[doc(alias = "pango_font_map_load_font")]
-    fn load_font(&self, context: &Context, desc: &FontDescription) -> Option<Font>;
-
-    #[doc(alias = "pango_font_map_load_fontset")]
-    fn load_fontset(
-        &self,
-        context: &Context,
-        desc: &FontDescription,
-        language: &Language,
-    ) -> Option<Fontset>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::FontMap>> Sealed for T {}
 }
 
-impl<O: IsA<FontMap>> FontMapExt for O {
+pub trait FontMapExt: IsA<FontMap> + sealed::Sealed + 'static {
+    #[doc(alias = "pango_font_map_changed")]
     fn changed(&self) {
         unsafe {
             ffi::pango_font_map_changed(self.as_ref().to_glib_none().0);
         }
     }
 
-    fn create_context(&self) -> Option<Context> {
+    #[doc(alias = "pango_font_map_create_context")]
+    fn create_context(&self) -> Context {
         unsafe {
             from_glib_full(ffi::pango_font_map_create_context(
                 self.as_ref().to_glib_none().0,
@@ -74,9 +41,11 @@ impl<O: IsA<FontMap>> FontMapExt for O {
         }
     }
 
-    #[cfg(any(feature = "v1_46", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
-    fn family(&self, name: &str) -> Option<FontFamily> {
+    #[cfg(feature = "v1_46")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
+    #[doc(alias = "pango_font_map_get_family")]
+    #[doc(alias = "get_family")]
+    fn family(&self, name: &str) -> FontFamily {
         unsafe {
             from_glib_none(ffi::pango_font_map_get_family(
                 self.as_ref().to_glib_none().0,
@@ -85,10 +54,13 @@ impl<O: IsA<FontMap>> FontMapExt for O {
         }
     }
 
+    #[doc(alias = "pango_font_map_get_serial")]
+    #[doc(alias = "get_serial")]
     fn serial(&self) -> u32 {
         unsafe { ffi::pango_font_map_get_serial(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "pango_font_map_list_families")]
     fn list_families(&self) -> Vec<FontFamily> {
         unsafe {
             let mut families = ptr::null_mut();
@@ -98,10 +70,11 @@ impl<O: IsA<FontMap>> FontMapExt for O {
                 &mut families,
                 n_families.as_mut_ptr(),
             );
-            FromGlibContainer::from_glib_container_num(families, n_families.assume_init() as usize)
+            FromGlibContainer::from_glib_container_num(families, n_families.assume_init() as _)
         }
     }
 
+    #[doc(alias = "pango_font_map_load_font")]
     fn load_font(&self, context: &Context, desc: &FontDescription) -> Option<Font> {
         unsafe {
             from_glib_full(ffi::pango_font_map_load_font(
@@ -112,6 +85,7 @@ impl<O: IsA<FontMap>> FontMapExt for O {
         }
     }
 
+    #[doc(alias = "pango_font_map_load_fontset")]
     fn load_fontset(
         &self,
         context: &Context,
@@ -128,6 +102,8 @@ impl<O: IsA<FontMap>> FontMapExt for O {
         }
     }
 }
+
+impl<O: IsA<FontMap>> FontMapExt for O {}
 
 impl fmt::Display for FontMap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

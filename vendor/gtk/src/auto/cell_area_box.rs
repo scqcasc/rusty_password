@@ -2,22 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Buildable;
-use crate::CellArea;
-use crate::CellLayout;
-use crate::CellRenderer;
-use crate::Orientable;
-use crate::Orientation;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{Buildable, CellArea, CellLayout, CellRenderer, Orientable, Orientation};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GtkCellAreaBox")]
@@ -42,7 +33,7 @@ impl CellAreaBox {
     ///
     /// This method returns an instance of [`CellAreaBoxBuilder`](crate::builders::CellAreaBoxBuilder) which can be used to create [`CellAreaBox`] objects.
     pub fn builder() -> CellAreaBoxBuilder {
-        CellAreaBoxBuilder::default()
+        CellAreaBoxBuilder::new()
     }
 }
 
@@ -52,82 +43,63 @@ impl Default for CellAreaBox {
     }
 }
 
-#[derive(Clone, Default)]
 // rustdoc-stripper-ignore-next
 /// A [builder-pattern] type to construct [`CellAreaBox`] objects.
 ///
 /// [builder-pattern]: https://doc.rust-lang.org/1.0.0/style/ownership/builders.html
 #[must_use = "The builder must be built to be used"]
 pub struct CellAreaBoxBuilder {
-    spacing: Option<i32>,
-    focus_cell: Option<CellRenderer>,
-    orientation: Option<Orientation>,
+    builder: glib::object::ObjectBuilder<'static, CellAreaBox>,
 }
 
 impl CellAreaBoxBuilder {
-    // rustdoc-stripper-ignore-next
-    /// Create a new [`CellAreaBoxBuilder`].
-    pub fn new() -> Self {
-        Self::default()
+    fn new() -> Self {
+        Self {
+            builder: glib::object::Object::builder(),
+        }
+    }
+
+    pub fn spacing(self, spacing: i32) -> Self {
+        Self {
+            builder: self.builder.property("spacing", spacing),
+        }
+    }
+
+    pub fn focus_cell(self, focus_cell: &impl IsA<CellRenderer>) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("focus-cell", focus_cell.clone().upcast()),
+        }
+    }
+
+    pub fn orientation(self, orientation: Orientation) -> Self {
+        Self {
+            builder: self.builder.property("orientation", orientation),
+        }
     }
 
     // rustdoc-stripper-ignore-next
     /// Build the [`CellAreaBox`].
     #[must_use = "Building the object from the builder is usually expensive and is not expected to have side effects"]
     pub fn build(self) -> CellAreaBox {
-        let mut properties: Vec<(&str, &dyn ToValue)> = vec![];
-        if let Some(ref spacing) = self.spacing {
-            properties.push(("spacing", spacing));
-        }
-        if let Some(ref focus_cell) = self.focus_cell {
-            properties.push(("focus-cell", focus_cell));
-        }
-        if let Some(ref orientation) = self.orientation {
-            properties.push(("orientation", orientation));
-        }
-        glib::Object::new::<CellAreaBox>(&properties)
-            .expect("Failed to create an instance of CellAreaBox")
-    }
-
-    pub fn spacing(mut self, spacing: i32) -> Self {
-        self.spacing = Some(spacing);
-        self
-    }
-
-    pub fn focus_cell(mut self, focus_cell: &impl IsA<CellRenderer>) -> Self {
-        self.focus_cell = Some(focus_cell.clone().upcast());
-        self
-    }
-
-    pub fn orientation(mut self, orientation: Orientation) -> Self {
-        self.orientation = Some(orientation);
-        self
+        self.builder.build()
     }
 }
 
-pub trait CellAreaBoxExt: 'static {
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::CellAreaBox>> Sealed for T {}
+}
+
+pub trait CellAreaBoxExt: IsA<CellAreaBox> + sealed::Sealed + 'static {
     #[doc(alias = "gtk_cell_area_box_get_spacing")]
     #[doc(alias = "get_spacing")]
-    fn spacing(&self) -> i32;
-
-    #[doc(alias = "gtk_cell_area_box_pack_end")]
-    fn pack_end(&self, renderer: &impl IsA<CellRenderer>, expand: bool, align: bool, fixed: bool);
-
-    #[doc(alias = "gtk_cell_area_box_pack_start")]
-    fn pack_start(&self, renderer: &impl IsA<CellRenderer>, expand: bool, align: bool, fixed: bool);
-
-    #[doc(alias = "gtk_cell_area_box_set_spacing")]
-    fn set_spacing(&self, spacing: i32);
-
-    #[doc(alias = "spacing")]
-    fn connect_spacing_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-}
-
-impl<O: IsA<CellAreaBox>> CellAreaBoxExt for O {
     fn spacing(&self) -> i32 {
         unsafe { ffi::gtk_cell_area_box_get_spacing(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gtk_cell_area_box_pack_end")]
     fn pack_end(&self, renderer: &impl IsA<CellRenderer>, expand: bool, align: bool, fixed: bool) {
         unsafe {
             ffi::gtk_cell_area_box_pack_end(
@@ -140,6 +112,7 @@ impl<O: IsA<CellAreaBox>> CellAreaBoxExt for O {
         }
     }
 
+    #[doc(alias = "gtk_cell_area_box_pack_start")]
     fn pack_start(
         &self,
         renderer: &impl IsA<CellRenderer>,
@@ -158,12 +131,14 @@ impl<O: IsA<CellAreaBox>> CellAreaBoxExt for O {
         }
     }
 
+    #[doc(alias = "gtk_cell_area_box_set_spacing")]
     fn set_spacing(&self, spacing: i32) {
         unsafe {
             ffi::gtk_cell_area_box_set_spacing(self.as_ref().to_glib_none().0, spacing);
         }
     }
 
+    #[doc(alias = "spacing")]
     fn connect_spacing_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_spacing_trampoline<P: IsA<CellAreaBox>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkCellAreaBox,
@@ -186,6 +161,8 @@ impl<O: IsA<CellAreaBox>> CellAreaBoxExt for O {
         }
     }
 }
+
+impl<O: IsA<CellAreaBox>> CellAreaBoxExt for O {}
 
 impl fmt::Display for CellAreaBox {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

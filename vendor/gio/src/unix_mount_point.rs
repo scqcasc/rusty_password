@@ -1,11 +1,13 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::UnixMountPoint;
-use glib::translate::*;
 use std::mem;
 
+use glib::translate::*;
+
+use crate::UnixMountPoint;
+
 impl UnixMountPoint {
-    #[cfg(any(unix, feature = "dox"))]
+    #[cfg(any(unix, docsrs))]
     #[doc(alias = "g_unix_mount_points_get")]
     #[doc(alias = "get_mount_points")]
     pub fn mount_points() -> (Vec<UnixMountPoint>, u64) {

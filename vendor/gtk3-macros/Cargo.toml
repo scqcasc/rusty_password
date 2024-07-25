@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.70"
 name = "gtk3-macros"
-version = "0.15.6"
+version = "0.18.0"
 authors = ["The gtk-rs Project Developers"]
 exclude = [
     "gir-files/*",
@@ -40,9 +40,6 @@ resolver = "1"
 [lib]
 proc-macro = true
 
-[dependencies.anyhow]
-version = "1.0"
-
 [dependencies.proc-macro-crate]
 version = "1.0"
 
@@ -56,7 +53,8 @@ version = "1.0"
 version = "1.0"
 
 [dependencies.syn]
-version = "1.0"
+version = "2.0"
 features = ["full"]
 
-[dev-dependencies]
+[dev-dependencies.gtk]
+version = "0.18"

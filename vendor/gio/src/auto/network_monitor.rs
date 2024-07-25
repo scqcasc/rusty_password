@@ -2,21 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::Initable;
-use crate::NetworkConnectivity;
-use crate::SocketConnectable;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
-use std::pin::Pin;
-use std::ptr;
+use crate::{AsyncResult, Cancellable, Initable, NetworkConnectivity, SocketConnectable};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GNetworkMonitor")]
@@ -32,58 +24,19 @@ impl NetworkMonitor {
 
     #[doc(alias = "g_network_monitor_get_default")]
     #[doc(alias = "get_default")]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> NetworkMonitor {
         unsafe { from_glib_none(ffi::g_network_monitor_get_default()) }
     }
 }
 
-pub trait NetworkMonitorExt: 'static {
-    #[doc(alias = "g_network_monitor_can_reach")]
-    fn can_reach(
-        &self,
-        connectable: &impl IsA<SocketConnectable>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<(), glib::Error>;
-
-    #[doc(alias = "g_network_monitor_can_reach_async")]
-    fn can_reach_async<P: FnOnce(Result<(), glib::Error>) + 'static>(
-        &self,
-        connectable: &impl IsA<SocketConnectable>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn can_reach_future(
-        &self,
-        connectable: &(impl IsA<SocketConnectable> + Clone + 'static),
-    ) -> Pin<Box_<dyn std::future::Future<Output = Result<(), glib::Error>> + 'static>>;
-
-    #[doc(alias = "g_network_monitor_get_connectivity")]
-    #[doc(alias = "get_connectivity")]
-    fn connectivity(&self) -> NetworkConnectivity;
-
-    #[doc(alias = "g_network_monitor_get_network_available")]
-    #[doc(alias = "get_network_available")]
-    fn is_network_available(&self) -> bool;
-
-    #[doc(alias = "g_network_monitor_get_network_metered")]
-    #[doc(alias = "get_network_metered")]
-    fn is_network_metered(&self) -> bool;
-
-    #[doc(alias = "network-changed")]
-    fn connect_network_changed<F: Fn(&Self, bool) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "connectivity")]
-    fn connect_connectivity_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "network-available")]
-    fn connect_network_available_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "network-metered")]
-    fn connect_network_metered_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::NetworkMonitor>> Sealed for T {}
 }
 
-impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
+pub trait NetworkMonitorExt: IsA<NetworkMonitor> + sealed::Sealed + 'static {
+    #[doc(alias = "g_network_monitor_can_reach")]
     fn can_reach(
         &self,
         connectable: &impl IsA<SocketConnectable>,
@@ -97,7 +50,7 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
                 cancellable.map(|p| p.as_ref()).to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -106,6 +59,7 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "g_network_monitor_can_reach_async")]
     fn can_reach_async<P: FnOnce(Result<(), glib::Error>) + 'static>(
         &self,
         connectable: &impl IsA<SocketConnectable>,
@@ -171,6 +125,8 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         ))
     }
 
+    #[doc(alias = "g_network_monitor_get_connectivity")]
+    #[doc(alias = "get_connectivity")]
     fn connectivity(&self) -> NetworkConnectivity {
         unsafe {
             from_glib(ffi::g_network_monitor_get_connectivity(
@@ -179,6 +135,8 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "g_network_monitor_get_network_available")]
+    #[doc(alias = "get_network_available")]
     fn is_network_available(&self) -> bool {
         unsafe {
             from_glib(ffi::g_network_monitor_get_network_available(
@@ -187,6 +145,8 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "g_network_monitor_get_network_metered")]
+    #[doc(alias = "get_network_metered")]
     fn is_network_metered(&self) -> bool {
         unsafe {
             from_glib(ffi::g_network_monitor_get_network_metered(
@@ -195,6 +155,7 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "network-changed")]
     fn connect_network_changed<F: Fn(&Self, bool) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn network_changed_trampoline<
             P: IsA<NetworkMonitor>,
@@ -223,6 +184,7 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "connectivity")]
     fn connect_connectivity_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_connectivity_trampoline<
             P: IsA<NetworkMonitor>,
@@ -248,6 +210,7 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "network-available")]
     fn connect_network_available_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_network_available_trampoline<
             P: IsA<NetworkMonitor>,
@@ -273,6 +236,7 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 
+    #[doc(alias = "network-metered")]
     fn connect_network_metered_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_network_metered_trampoline<
             P: IsA<NetworkMonitor>,
@@ -298,6 +262,8 @@ impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {
         }
     }
 }
+
+impl<O: IsA<NetworkMonitor>> NetworkMonitorExt for O {}
 
 impl fmt::Display for NetworkMonitor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

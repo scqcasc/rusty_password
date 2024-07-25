@@ -2,8 +2,7 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::object::IsA;
-use glib::translate::*;
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -25,48 +24,39 @@ impl SettingsBackend {
 
     #[doc(alias = "g_settings_backend_get_default")]
     #[doc(alias = "get_default")]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> SettingsBackend {
         unsafe { from_glib_full(ffi::g_settings_backend_get_default()) }
     }
 }
 
-pub trait SettingsBackendExt: 'static {
-    //#[doc(alias = "g_settings_backend_changed")]
-    //fn changed(&self, key: &str, origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>);
-
-    //#[doc(alias = "g_settings_backend_changed_tree")]
-    //fn changed_tree(&self, tree: /*Ignored*/&glib::Tree, origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>);
-
-    //#[doc(alias = "g_settings_backend_keys_changed")]
-    //fn keys_changed(&self, path: &str, items: &[&str], origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>);
-
-    //#[doc(alias = "g_settings_backend_path_changed")]
-    //fn path_changed(&self, path: &str, origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>);
-
-    #[doc(alias = "g_settings_backend_path_writable_changed")]
-    fn path_writable_changed(&self, path: &str);
-
-    #[doc(alias = "g_settings_backend_writable_changed")]
-    fn writable_changed(&self, key: &str);
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::SettingsBackend>> Sealed for T {}
 }
 
-impl<O: IsA<SettingsBackend>> SettingsBackendExt for O {
-    //fn changed(&self, key: &str, origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>) {
+pub trait SettingsBackendExt: IsA<SettingsBackend> + sealed::Sealed + 'static {
+    //#[doc(alias = "g_settings_backend_changed")]
+    //fn changed(&self, key: &str, origin_tag: /*Unimplemented*/Option<Basic: Pointer>) {
     //    unsafe { TODO: call ffi:g_settings_backend_changed() }
     //}
 
-    //fn changed_tree(&self, tree: /*Ignored*/&glib::Tree, origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>) {
+    //#[doc(alias = "g_settings_backend_changed_tree")]
+    //fn changed_tree(&self, tree: /*Ignored*/&glib::Tree, origin_tag: /*Unimplemented*/Option<Basic: Pointer>) {
     //    unsafe { TODO: call ffi:g_settings_backend_changed_tree() }
     //}
 
-    //fn keys_changed(&self, path: &str, items: &[&str], origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>) {
+    //#[doc(alias = "g_settings_backend_keys_changed")]
+    //fn keys_changed(&self, path: &str, items: &[&str], origin_tag: /*Unimplemented*/Option<Basic: Pointer>) {
     //    unsafe { TODO: call ffi:g_settings_backend_keys_changed() }
     //}
 
-    //fn path_changed(&self, path: &str, origin_tag: /*Unimplemented*/Option<Fundamental: Pointer>) {
+    //#[doc(alias = "g_settings_backend_path_changed")]
+    //fn path_changed(&self, path: &str, origin_tag: /*Unimplemented*/Option<Basic: Pointer>) {
     //    unsafe { TODO: call ffi:g_settings_backend_path_changed() }
     //}
 
+    #[doc(alias = "g_settings_backend_path_writable_changed")]
     fn path_writable_changed(&self, path: &str) {
         unsafe {
             ffi::g_settings_backend_path_writable_changed(
@@ -76,6 +66,7 @@ impl<O: IsA<SettingsBackend>> SettingsBackendExt for O {
         }
     }
 
+    #[doc(alias = "g_settings_backend_writable_changed")]
     fn writable_changed(&self, key: &str) {
         unsafe {
             ffi::g_settings_backend_writable_changed(
@@ -85,6 +76,8 @@ impl<O: IsA<SettingsBackend>> SettingsBackendExt for O {
         }
     }
 }
+
+impl<O: IsA<SettingsBackend>> SettingsBackendExt for O {}
 
 impl fmt::Display for SettingsBackend {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

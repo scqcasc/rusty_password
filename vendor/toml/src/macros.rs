@@ -8,6 +8,11 @@ use crate::value::{Array, Table, Value};
 /// let cargo_toml = toml::toml! {
 ///     [package]
 ///     name = "toml"
+///     version = "0.4.5"
+///     authors = ["Alex Crichton <alex@alexcrichton.com>"]
+///
+///     [badges]
+///     travis-ci = { repository = "alexcrichton/toml-rs" }
 ///
 ///     [dependencies]
 ///     serde = "1.0"
@@ -193,15 +198,15 @@ macro_rules! toml_internal {
     }};
 
     (@value (-nan)) => {
-        $crate::Value::Float(::std::f64::NAN.copysign(-1.0))
+        $crate::Value::Float(-::std::f64::NAN)
     };
 
     (@value (nan)) => {
-        $crate::Value::Float(::std::f64::NAN.copysign(1.0))
+        $crate::Value::Float(::std::f64::NAN)
     };
 
     (@value nan) => {
-        $crate::Value::Float(::std::f64::NAN.copysign(1.0))
+        $crate::Value::Float(::std::f64::NAN)
     };
 
     (@value (-inf)) => {

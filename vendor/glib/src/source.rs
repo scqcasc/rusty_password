@@ -1,21 +1,16 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::translate::{from_glib, from_glib_full, FromGlib, IntoGlib, ToGlibPtr};
-#[cfg(any(unix, feature = "dox"))]
-use crate::IOCondition;
-use ffi::{self, gboolean, gpointer};
-#[cfg(all(not(unix), feature = "dox"))]
-use libc::c_int as RawFd;
-use std::cell::RefCell;
-use std::mem::transmute;
-use std::num::NonZeroU32;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
-use std::time::Duration;
+use std::{cell::RefCell, mem::transmute, num::NonZeroU32, time::Duration};
 
-use crate::thread_guard::ThreadGuard;
-use crate::MainContext;
-use crate::Source;
+use ffi::{self, gboolean, gpointer};
+#[cfg(all(not(unix), docsrs))]
+use libc::c_int as RawFd;
+
+#[cfg(any(unix, docsrs))]
+use crate::IOCondition;
+use crate::{thread_guard::ThreadGuard, translate::*, ControlFlow, MainContext, Source};
 
 // rustdoc-stripper-ignore-next
 /// The id of a source that is returned by `idle_add` and `timeout_add`.
@@ -28,7 +23,7 @@ pub struct SourceId(NonZeroU32);
 impl SourceId {
     // rustdoc-stripper-ignore-next
     /// Returns the internal source ID.
-    pub unsafe fn as_raw(&self) -> u32 {
+    pub fn as_raw(&self) -> u32 {
         self.0.get()
     }
 
@@ -52,7 +47,7 @@ impl SourceId {
 impl FromGlib<u32> for SourceId {
     #[inline]
     unsafe fn from_glib(val: u32) -> Self {
-        assert_ne!(val, 0);
+        debug_assert_ne!(val, 0);
         Self(NonZeroU32::new_unchecked(val))
     }
 }
@@ -84,55 +79,34 @@ impl FromGlib<ffi::GPid> for Pid {
     }
 }
 
-// rustdoc-stripper-ignore-next
-/// Continue calling the closure in the future iterations or drop it.
-///
-/// This is the return type of `idle_add` and `timeout_add` closures.
-///
-/// `Continue(true)` keeps the closure assigned, to be rerun when appropriate.
-///
-/// `Continue(false)` disconnects and drops it.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Continue(pub bool);
-
-#[doc(hidden)]
-impl IntoGlib for Continue {
-    type GlibType = gboolean;
-
-    #[inline]
-    fn into_glib(self) -> gboolean {
-        self.0.into_glib()
-    }
-}
-
-unsafe extern "C" fn trampoline<F: FnMut() -> Continue + Send + 'static>(
+unsafe extern "C" fn trampoline<F: FnMut() -> ControlFlow + Send + 'static>(
     func: gpointer,
 ) -> gboolean {
     let func: &RefCell<F> = &*(func as *const RefCell<F>);
     (*func.borrow_mut())().into_glib()
 }
 
-unsafe extern "C" fn trampoline_local<F: FnMut() -> Continue + 'static>(
+unsafe extern "C" fn trampoline_local<F: FnMut() -> ControlFlow + 'static>(
     func: gpointer,
 ) -> gboolean {
     let func: &ThreadGuard<RefCell<F>> = &*(func as *const ThreadGuard<RefCell<F>>);
     (*func.get_ref().borrow_mut())().into_glib()
 }
 
-unsafe extern "C" fn destroy_closure<F: FnMut() -> Continue + Send + 'static>(ptr: gpointer) {
-    Box::<RefCell<F>>::from_raw(ptr as *mut _);
+unsafe extern "C" fn destroy_closure<F: FnMut() -> ControlFlow + Send + 'static>(ptr: gpointer) {
+    let _ = Box::<RefCell<F>>::from_raw(ptr as *mut _);
 }
 
-unsafe extern "C" fn destroy_closure_local<F: FnMut() -> Continue + 'static>(ptr: gpointer) {
-    Box::<ThreadGuard<RefCell<F>>>::from_raw(ptr as *mut _);
+unsafe extern "C" fn destroy_closure_local<F: FnMut() -> ControlFlow + 'static>(ptr: gpointer) {
+    let _ = Box::<ThreadGuard<RefCell<F>>>::from_raw(ptr as *mut _);
 }
 
-fn into_raw<F: FnMut() -> Continue + Send + 'static>(func: F) -> gpointer {
+fn into_raw<F: FnMut() -> ControlFlow + Send + 'static>(func: F) -> gpointer {
     let func: Box<RefCell<F>> = Box::new(RefCell::new(func));
     Box::into_raw(func) as gpointer
 }
 
-fn into_raw_local<F: FnMut() -> Continue + 'static>(func: F) -> gpointer {
+fn into_raw_local<F: FnMut() -> ControlFlow + 'static>(func: F) -> gpointer {
     let func: Box<ThreadGuard<RefCell<F>>> = Box::new(ThreadGuard::new(RefCell::new(func)));
     Box::into_raw(func) as gpointer
 }
@@ -158,13 +132,13 @@ unsafe extern "C" fn trampoline_child_watch_local<F: FnMut(Pid, i32) + 'static>(
 unsafe extern "C" fn destroy_closure_child_watch<F: FnMut(Pid, i32) + Send + 'static>(
     ptr: gpointer,
 ) {
-    Box::<RefCell<F>>::from_raw(ptr as *mut _);
+    let _ = Box::<RefCell<F>>::from_raw(ptr as *mut _);
 }
 
 unsafe extern "C" fn destroy_closure_child_watch_local<F: FnMut(Pid, i32) + 'static>(
     ptr: gpointer,
 ) {
-    Box::<ThreadGuard<RefCell<F>>>::from_raw(ptr as *mut _);
+    let _ = Box::<ThreadGuard<RefCell<F>>>::from_raw(ptr as *mut _);
 }
 
 fn into_raw_child_watch<F: FnMut(Pid, i32) + Send + 'static>(func: F) -> gpointer {
@@ -177,10 +151,10 @@ fn into_raw_child_watch_local<F: FnMut(Pid, i32) + 'static>(func: F) -> gpointer
     Box::into_raw(func) as gpointer
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 unsafe extern "C" fn trampoline_unix_fd<
-    F: FnMut(RawFd, IOCondition) -> Continue + Send + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + Send + 'static,
 >(
     fd: i32,
     condition: ffi::GIOCondition,
@@ -190,10 +164,10 @@ unsafe extern "C" fn trampoline_unix_fd<
     (*func.borrow_mut())(fd, from_glib(condition)).into_glib()
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 unsafe extern "C" fn trampoline_unix_fd_local<
-    F: FnMut(RawFd, IOCondition) -> Continue + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + 'static,
 >(
     fd: i32,
     condition: ffi::GIOCondition,
@@ -203,38 +177,40 @@ unsafe extern "C" fn trampoline_unix_fd_local<
     (*func.get_ref().borrow_mut())(fd, from_glib(condition)).into_glib()
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 unsafe extern "C" fn destroy_closure_unix_fd<
-    F: FnMut(RawFd, IOCondition) -> Continue + Send + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + Send + 'static,
 >(
     ptr: gpointer,
 ) {
-    Box::<RefCell<F>>::from_raw(ptr as *mut _);
+    let _ = Box::<RefCell<F>>::from_raw(ptr as *mut _);
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 unsafe extern "C" fn destroy_closure_unix_fd_local<
-    F: FnMut(RawFd, IOCondition) -> Continue + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + 'static,
 >(
     ptr: gpointer,
 ) {
-    Box::<ThreadGuard<RefCell<F>>>::from_raw(ptr as *mut _);
+    let _ = Box::<ThreadGuard<RefCell<F>>>::from_raw(ptr as *mut _);
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
-fn into_raw_unix_fd<F: FnMut(RawFd, IOCondition) -> Continue + Send + 'static>(
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
+fn into_raw_unix_fd<F: FnMut(RawFd, IOCondition) -> ControlFlow + Send + 'static>(
     func: F,
 ) -> gpointer {
     let func: Box<RefCell<F>> = Box::new(RefCell::new(func));
     Box::into_raw(func) as gpointer
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
-fn into_raw_unix_fd_local<F: FnMut(RawFd, IOCondition) -> Continue + 'static>(func: F) -> gpointer {
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
+fn into_raw_unix_fd_local<F: FnMut(RawFd, IOCondition) -> ControlFlow + 'static>(
+    func: F,
+) -> gpointer {
     let func: Box<ThreadGuard<RefCell<F>>> = Box::new(ThreadGuard::new(RefCell::new(func)));
     Box::into_raw(func) as gpointer
 }
@@ -242,26 +218,26 @@ fn into_raw_unix_fd_local<F: FnMut(RawFd, IOCondition) -> Continue + 'static>(fu
 // rustdoc-stripper-ignore-next
 /// Transform a generic FnOnce into a closure that can be used as callback in various glib methods
 ///
-/// The resulting function can only be called once and will panic otherwise. It will return `Continue(false)`
+/// The resulting function can only be called once and will panic otherwise. It will return `ControlFlow::Break`
 /// in order to prevent being called twice.
 #[inline(always)]
 fn fnmut_callback_wrapper(
     func: impl FnOnce() + Send + 'static,
-) -> impl FnMut() -> Continue + Send + 'static {
+) -> impl FnMut() -> ControlFlow + Send + 'static {
     let mut func = Some(func);
     move || {
         let func = func
             .take()
-            .expect("GSource closure called after returning glib::Continue(false)");
+            .expect("GSource closure called after returning ControlFlow::Break");
         func();
-        Continue(false)
+        ControlFlow::Break
     }
 }
 
 // rustdoc-stripper-ignore-next
 /// Transform a generic FnOnce into a closure that can be used as callback in various glib methods
 ///
-/// The resulting function can only be called once and will panic otherwise. It will return `Continue(false)`
+/// The resulting function can only be called once and will panic otherwise. It will return `ControlFlow::Break`
 /// in order to prevent being called twice.
 ///
 /// Different to `fnmut_callback_wrapper()`, this does not require `func` to be
@@ -269,28 +245,28 @@ fn fnmut_callback_wrapper(
 #[inline(always)]
 fn fnmut_callback_wrapper_local(
     func: impl FnOnce() + 'static,
-) -> impl FnMut() -> Continue + 'static {
+) -> impl FnMut() -> ControlFlow + 'static {
     let mut func = Some(func);
     move || {
         let func = func
             .take()
-            .expect("GSource closure called after returning glib::Continue(false)");
+            .expect("GSource closure called after returning glib::ControlFlow::Break");
         func();
-        Continue(false)
+        ControlFlow::Break
     }
 }
 
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop when it's idle.
 ///
-/// `func` will be called repeatedly until it returns `Continue(false)`.
+/// `func` will be called repeatedly until it returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
 #[doc(alias = "g_idle_add_full")]
 pub fn idle_add<F>(func: F) -> SourceId
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         from_glib(ffi::g_idle_add_full(
@@ -305,14 +281,38 @@ where
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop when it's idle.
 ///
-/// `func` will be called repeatedly until it returns `Continue(false)`.
+/// `func` will be called repeatedly with `priority` until it returns
+/// `ControlFlow::Break`.
+///
+/// The default main loop almost always is the main loop of the main thread.
+/// Thus, the closure is called on the main thread.
+#[doc(alias = "g_idle_add_full")]
+pub fn idle_add_full<F>(priority: Priority, func: F) -> SourceId
+where
+    F: FnMut() -> ControlFlow + Send + 'static,
+{
+    unsafe {
+        from_glib(ffi::g_idle_add_full(
+            priority.into_glib(),
+            Some(trampoline::<F>),
+            into_raw(func),
+            Some(destroy_closure::<F>),
+        ))
+    }
+}
+
+// rustdoc-stripper-ignore-next
+/// Adds a closure to be called by the default main loop when it's idle.
+///
+/// `func` will be called repeatedly until it returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
 ///
 /// In comparison to `idle_add()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_idle_add_full")]
+#[doc(alias = "g_idle_add_once")]
 pub fn idle_add_once<F>(func: F) -> SourceId
 where
     F: FnOnce() + Send + 'static,
@@ -323,7 +323,7 @@ where
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop when it's idle.
 ///
-/// `func` will be called repeatedly until it returns `Continue(false)`.
+/// `func` will be called repeatedly until it returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
@@ -336,7 +336,7 @@ where
 #[doc(alias = "g_idle_add_full")]
 pub fn idle_add_local<F>(func: F) -> SourceId
 where
-    F: FnMut() -> Continue + 'static,
+    F: FnMut() -> ControlFlow + 'static,
 {
     unsafe {
         let context = MainContext::default();
@@ -355,7 +355,40 @@ where
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop when it's idle.
 ///
-/// `func` will be called repeatedly until it returns `Continue(false)`.
+/// `func` will be called repeatedly with `priority` until it returns
+/// `ControlFlow::Break`.
+///
+/// The default main loop almost always is the main loop of the main thread.
+/// Thus, the closure is called on the main thread.
+///
+/// Different to `idle_add()`, this does not require `func` to be
+/// `Send` but can only be called from the thread that owns the main context.
+///
+/// This function panics if called from a different thread than the one that
+/// owns the default main context.
+#[doc(alias = "g_idle_add_full")]
+pub fn idle_add_local_full<F>(priority: Priority, func: F) -> SourceId
+where
+    F: FnMut() -> ControlFlow + 'static,
+{
+    unsafe {
+        let context = MainContext::default();
+        let _acquire = context
+            .acquire()
+            .expect("default main context already acquired by another thread");
+        from_glib(ffi::g_idle_add_full(
+            priority.into_glib(),
+            Some(trampoline_local::<F>),
+            into_raw_local(func),
+            Some(destroy_closure_local::<F>),
+        ))
+    }
+}
+
+// rustdoc-stripper-ignore-next
+/// Adds a closure to be called by the default main loop when it's idle.
+///
+/// `func` will be called repeatedly until it returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
@@ -367,7 +400,7 @@ where
 /// owns the main context.
 ///
 /// In comparison to `idle_add_local()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_idle_add_full")]
 pub fn idle_add_local_once<F>(func: F) -> SourceId
 where
@@ -381,7 +414,7 @@ where
 /// with millisecond granularity.
 ///
 /// `func` will be called repeatedly every `interval` milliseconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events. Prefer `timeout_add_seconds` when millisecond
 /// precision is not necessary.
 ///
@@ -390,7 +423,7 @@ where
 #[doc(alias = "g_timeout_add_full")]
 pub fn timeout_add<F>(interval: Duration, func: F) -> SourceId
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         from_glib(ffi::g_timeout_add_full(
@@ -407,8 +440,35 @@ where
 /// Adds a closure to be called by the default main loop at regular intervals
 /// with millisecond granularity.
 ///
+/// `func` will be called repeatedly every `interval` milliseconds with `priority`
+/// until it returns `ControlFlow::Break`. Precise timing is not guaranteed, the
+/// timeout may be delayed by other events. Prefer `timeout_add_seconds` when
+/// millisecond precision is not necessary.
+///
+/// The default main loop almost always is the main loop of the main thread.
+/// Thus, the closure is called on the main thread.
+#[doc(alias = "g_timeout_add_full")]
+pub fn timeout_add_full<F>(interval: Duration, priority: Priority, func: F) -> SourceId
+where
+    F: FnMut() -> ControlFlow + Send + 'static,
+{
+    unsafe {
+        from_glib(ffi::g_timeout_add_full(
+            priority.into_glib(),
+            interval.as_millis() as _,
+            Some(trampoline::<F>),
+            into_raw(func),
+            Some(destroy_closure::<F>),
+        ))
+    }
+}
+
+// rustdoc-stripper-ignore-next
+/// Adds a closure to be called by the default main loop at regular intervals
+/// with millisecond granularity.
+///
 /// `func` will be called repeatedly every `interval` milliseconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events. Prefer `timeout_add_seconds` when millisecond
 /// precision is not necessary.
 ///
@@ -416,8 +476,9 @@ where
 /// Thus, the closure is called on the main thread.
 ///
 /// In comparison to `timeout_add()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_timeout_add_full")]
+#[doc(alias = "g_timeout_add_once")]
 pub fn timeout_add_once<F>(interval: Duration, func: F) -> SourceId
 where
     F: FnOnce() + Send + 'static,
@@ -430,7 +491,7 @@ where
 /// with millisecond granularity.
 ///
 /// `func` will be called repeatedly every `interval` milliseconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events. Prefer `timeout_add_seconds` when millisecond
 /// precision is not necessary.
 ///
@@ -445,7 +506,7 @@ where
 #[doc(alias = "g_timeout_add_full")]
 pub fn timeout_add_local<F>(interval: Duration, func: F) -> SourceId
 where
-    F: FnMut() -> Continue + 'static,
+    F: FnMut() -> ControlFlow + 'static,
 {
     unsafe {
         let context = MainContext::default();
@@ -466,8 +527,45 @@ where
 /// Adds a closure to be called by the default main loop at regular intervals
 /// with millisecond granularity.
 ///
+/// `func` will be called repeatedly every `interval` milliseconds with `priority`
+/// until it returns `ControlFlow::Break`. Precise timing is not guaranteed, the
+/// timeout may be delayed by other events. Prefer `timeout_add_seconds` when
+/// millisecond precision is not necessary.
+///
+/// The default main loop almost always is the main loop of the main thread.
+/// Thus, the closure is called on the main thread.
+///
+/// Different to `timeout_add()`, this does not require `func` to be
+/// `Send` but can only be called from the thread that owns the main context.
+///
+/// This function panics if called from a different thread than the one that
+/// owns the main context.
+#[doc(alias = "g_timeout_add_full")]
+pub fn timeout_add_local_full<F>(interval: Duration, priority: Priority, func: F) -> SourceId
+where
+    F: FnMut() -> ControlFlow + 'static,
+{
+    unsafe {
+        let context = MainContext::default();
+        let _acquire = context
+            .acquire()
+            .expect("default main context already acquired by another thread");
+        from_glib(ffi::g_timeout_add_full(
+            priority.into_glib(),
+            interval.as_millis() as _,
+            Some(trampoline_local::<F>),
+            into_raw_local(func),
+            Some(destroy_closure_local::<F>),
+        ))
+    }
+}
+
+// rustdoc-stripper-ignore-next
+/// Adds a closure to be called by the default main loop at regular intervals
+/// with millisecond granularity.
+///
 /// `func` will be called repeatedly every `interval` milliseconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events. Prefer `timeout_add_seconds` when millisecond
 /// precision is not necessary.
 ///
@@ -481,7 +579,7 @@ where
 /// owns the main context.
 ///
 /// In comparison to `timeout_add_local()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_timeout_add_full")]
 pub fn timeout_add_local_once<F>(interval: Duration, func: F) -> SourceId
 where
@@ -495,7 +593,7 @@ where
 /// with second granularity.
 ///
 /// `func` will be called repeatedly every `interval` seconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events.
 ///
 /// The default main loop almost always is the main loop of the main thread.
@@ -503,7 +601,7 @@ where
 #[doc(alias = "g_timeout_add_seconds_full")]
 pub fn timeout_add_seconds<F>(interval: u32, func: F) -> SourceId
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         from_glib(ffi::g_timeout_add_seconds_full(
@@ -521,14 +619,14 @@ where
 /// with second granularity.
 ///
 /// `func` will be called repeatedly every `interval` seconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
 ///
 /// In comparison to `timeout_add_seconds()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_timeout_add_seconds_full")]
 pub fn timeout_add_seconds_once<F>(interval: u32, func: F) -> SourceId
 where
@@ -542,7 +640,7 @@ where
 /// with second granularity.
 ///
 /// `func` will be called repeatedly every `interval` seconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events.
 ///
 /// The default main loop almost always is the main loop of the main thread.
@@ -556,7 +654,7 @@ where
 #[doc(alias = "g_timeout_add_seconds_full")]
 pub fn timeout_add_seconds_local<F>(interval: u32, func: F) -> SourceId
 where
-    F: FnMut() -> Continue + 'static,
+    F: FnMut() -> ControlFlow + 'static,
 {
     unsafe {
         let context = MainContext::default();
@@ -578,7 +676,7 @@ where
 /// with second granularity.
 ///
 /// `func` will be called repeatedly every `interval` seconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events.
 ///
 /// The default main loop almost always is the main loop of the main thread.
@@ -591,7 +689,7 @@ where
 /// owns the main context.
 ///
 /// In comparison to `timeout_add_seconds_local()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_timeout_add_seconds_full")]
 pub fn timeout_add_seconds_local_once<F>(interval: u32, func: F) -> SourceId
 where
@@ -652,20 +750,20 @@ where
     }
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop whenever a UNIX signal is raised.
 ///
 /// `func` will be called repeatedly every time `signum` is raised until it
-/// returns `Continue(false)`.
+/// returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
 #[doc(alias = "g_unix_signal_add_full")]
 pub fn unix_signal_add<F>(signum: i32, func: F) -> SourceId
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         from_glib(ffi::g_unix_signal_add_full(
@@ -678,19 +776,19 @@ where
     }
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop whenever a UNIX signal is raised.
 ///
 /// `func` will be called repeatedly every time `signum` is raised until it
-/// returns `Continue(false)`.
+/// returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
 ///
 /// In comparison to `unix_signal_add()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_unix_signal_add_full")]
 pub fn unix_signal_add_once<F>(signum: i32, func: F) -> SourceId
 where
@@ -699,13 +797,13 @@ where
     unix_signal_add(signum, fnmut_callback_wrapper(func))
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop whenever a UNIX signal is raised.
 ///
 /// `func` will be called repeatedly every time `signum` is raised until it
-/// returns `Continue(false)`.
+/// returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
@@ -718,7 +816,7 @@ where
 #[doc(alias = "g_unix_signal_add_full")]
 pub fn unix_signal_add_local<F>(signum: i32, func: F) -> SourceId
 where
-    F: FnMut() -> Continue + 'static,
+    F: FnMut() -> ControlFlow + 'static,
 {
     unsafe {
         let context = MainContext::default();
@@ -735,13 +833,13 @@ where
     }
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the default main loop whenever a UNIX signal is raised.
 ///
 /// `func` will be called repeatedly every time `signum` is raised until it
-/// returns `Continue(false)`.
+/// returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
@@ -753,7 +851,7 @@ where
 /// owns the main context.
 ///
 /// In comparison to `unix_signal_add_local()`, this only requires `func` to be
-/// `FnOnce`, and will automatically return `Continue(false)`.
+/// `FnOnce`, and will automatically return `ControlFlow::Break`.
 #[doc(alias = "g_unix_signal_add_full")]
 pub fn unix_signal_add_local_once<F>(signum: i32, func: F) -> SourceId
 where
@@ -762,21 +860,21 @@ where
     unix_signal_add_local(signum, fnmut_callback_wrapper_local(func))
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the main loop the returned `Source` is attached to whenever a
 /// UNIX file descriptor reaches the given IO condition.
 ///
 /// `func` will be called repeatedly while the file descriptor matches the given IO condition
-/// until it returns `Continue(false)`.
+/// until it returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
 #[doc(alias = "g_unix_fd_add_full")]
 pub fn unix_fd_add<F>(fd: RawFd, condition: IOCondition, func: F) -> SourceId
 where
-    F: FnMut(RawFd, IOCondition) -> Continue + Send + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + Send + 'static,
 {
     unsafe {
         from_glib(ffi::g_unix_fd_add_full(
@@ -790,14 +888,14 @@ where
     }
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the main loop the returned `Source` is attached to whenever a
 /// UNIX file descriptor reaches the given IO condition.
 ///
 /// `func` will be called repeatedly while the file descriptor matches the given IO condition
-/// until it returns `Continue(false)`.
+/// until it returns `ControlFlow::Break`.
 ///
 /// The default main loop almost always is the main loop of the main thread.
 /// Thus, the closure is called on the main thread.
@@ -810,7 +908,7 @@ where
 #[doc(alias = "g_unix_fd_add_full")]
 pub fn unix_fd_add_local<F>(fd: RawFd, condition: IOCondition, func: F) -> SourceId
 where
-    F: FnMut(RawFd, IOCondition) -> Continue + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + 'static,
 {
     unsafe {
         let context = MainContext::default();
@@ -830,8 +928,27 @@ where
 
 // rustdoc-stripper-ignore-next
 /// The priority of sources
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Priority(i32);
+
+impl Priority {
+    #[doc(alias = "G_PRIORITY_HIGH")]
+    pub const HIGH: Self = Self(ffi::G_PRIORITY_HIGH);
+    #[doc(alias = "G_PRIORITY_DEFAULT")]
+    pub const DEFAULT: Self = Self(ffi::G_PRIORITY_DEFAULT);
+    #[doc(alias = "G_PRIORITY_HIGH_IDLE")]
+    pub const HIGH_IDLE: Self = Self(ffi::G_PRIORITY_HIGH_IDLE);
+    #[doc(alias = "G_PRIORITY_DEFAULT_IDLE")]
+    pub const DEFAULT_IDLE: Self = Self(ffi::G_PRIORITY_DEFAULT_IDLE);
+    #[doc(alias = "G_PRIORITY_LOW")]
+    pub const LOW: Self = Self(ffi::G_PRIORITY_LOW);
+}
+
+impl Default for Priority {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 #[doc(hidden)]
 impl IntoGlib for Priority {
@@ -847,35 +964,24 @@ impl IntoGlib for Priority {
 impl FromGlib<i32> for Priority {
     #[inline]
     unsafe fn from_glib(val: i32) -> Self {
-        Self(val)
+        Self::from(val)
     }
 }
 
-impl Default for Priority {
-    fn default() -> Self {
-        PRIORITY_DEFAULT
+impl From<i32> for Priority {
+    fn from(value: i32) -> Self {
+        Self(value)
     }
 }
-
-#[doc(alias = "G_PRIORITY_HIGH")]
-pub const PRIORITY_HIGH: Priority = Priority(ffi::G_PRIORITY_HIGH);
-#[doc(alias = "G_PRIORITY_DEFAULT")]
-pub const PRIORITY_DEFAULT: Priority = Priority(ffi::G_PRIORITY_DEFAULT);
-#[doc(alias = "G_PRIORITY_HIGH_IDLE")]
-pub const PRIORITY_HIGH_IDLE: Priority = Priority(ffi::G_PRIORITY_HIGH_IDLE);
-#[doc(alias = "G_PRIORITY_DEFAULT_IDLE")]
-pub const PRIORITY_DEFAULT_IDLE: Priority = Priority(ffi::G_PRIORITY_DEFAULT_IDLE);
-#[doc(alias = "G_PRIORITY_LOW")]
-pub const PRIORITY_LOW: Priority = Priority(ffi::G_PRIORITY_LOW);
 
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the main loop the return `Source` is attached to when it's idle.
 ///
-/// `func` will be called repeatedly until it returns `Continue(false)`.
+/// `func` will be called repeatedly until it returns `ControlFlow::Break`.
 #[doc(alias = "g_idle_source_new")]
 pub fn idle_source_new<F>(name: Option<&str>, priority: Priority, func: F) -> Source
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         let source = ffi::g_idle_source_new();
@@ -900,7 +1006,7 @@ where
 /// intervals with millisecond granularity.
 ///
 /// `func` will be called repeatedly every `interval` milliseconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events. Prefer `timeout_add_seconds` when millisecond
 /// precision is not necessary.
 #[doc(alias = "g_timeout_source_new")]
@@ -911,7 +1017,7 @@ pub fn timeout_source_new<F>(
     func: F,
 ) -> Source
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         let source = ffi::g_timeout_source_new(interval.as_millis() as _);
@@ -936,7 +1042,7 @@ where
 /// intervals with second granularity.
 ///
 /// `func` will be called repeatedly every `interval` seconds until it
-/// returns `Continue(false)`. Precise timing is not guaranteed, the timeout may
+/// returns `ControlFlow::Break`. Precise timing is not guaranteed, the timeout may
 /// be delayed by other events.
 #[doc(alias = "g_timeout_source_new_seconds")]
 pub fn timeout_source_new_seconds<F>(
@@ -946,7 +1052,7 @@ pub fn timeout_source_new_seconds<F>(
     func: F,
 ) -> Source
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         let source = ffi::g_timeout_source_new_seconds(interval);
@@ -1002,14 +1108,14 @@ where
     }
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the main loop the returned `Source` is attached to whenever a
 /// UNIX signal is raised.
 ///
 /// `func` will be called repeatedly every time `signum` is raised until it
-/// returns `Continue(false)`.
+/// returns `ControlFlow::Break`.
 #[doc(alias = "g_unix_signal_source_new")]
 pub fn unix_signal_source_new<F>(
     signum: i32,
@@ -1018,7 +1124,7 @@ pub fn unix_signal_source_new<F>(
     func: F,
 ) -> Source
 where
-    F: FnMut() -> Continue + Send + 'static,
+    F: FnMut() -> ControlFlow + Send + 'static,
 {
     unsafe {
         let source = ffi::g_unix_signal_source_new(signum);
@@ -1038,14 +1144,14 @@ where
     }
 }
 
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(any(unix, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 // rustdoc-stripper-ignore-next
 /// Adds a closure to be called by the main loop the returned `Source` is attached to whenever a
 /// UNIX file descriptor reaches the given IO condition.
 ///
 /// `func` will be called repeatedly while the file descriptor matches the given IO condition
-/// until it returns `Continue(false)`.
+/// until it returns `ControlFlow::Break`.
 #[doc(alias = "g_unix_fd_source_new")]
 pub fn unix_fd_source_new<F>(
     fd: RawFd,
@@ -1055,7 +1161,7 @@ pub fn unix_fd_source_new<F>(
     func: F,
 ) -> Source
 where
-    F: FnMut(RawFd, IOCondition) -> Continue + Send + 'static,
+    F: FnMut(RawFd, IOCondition) -> ControlFlow + Send + 'static,
 {
     unsafe {
         let source = ffi::g_unix_fd_source_new(fd, condition.into_glib());

@@ -3,12 +3,10 @@
 use crate::ascii::Caseless as AsciiCaseless;
 use crate::combinator::*;
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::error::FromRecoverableError;
 use crate::error::{AddContext, FromExternalError, IResult, PResult, ParseError, ParserError};
-use crate::stream::{Compare, Location, ParseSlice, Stream, StreamIsPartial};
+use crate::stream::{AsChar, Compare, Location, ParseSlice, Stream, StreamIsPartial};
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::stream::{Recover, Recoverable};
 
 /// Core trait for parsing
@@ -44,7 +42,7 @@ use crate::stream::{Recover, Recoverable};
 ///
 /// Additionally, some basic types implement `Parser` as well, including
 /// - `u8` and `char`, see [`winnow::token::one_of`][crate::token::one_of]
-/// - `&[u8]` and `&str`, see [`winnow::token::literal`][crate::token::literal]
+/// - `&[u8]` and `&str`, see [`winnow::token::tag`][crate::token::tag]
 pub trait Parser<I, O, E> {
     /// Parse all of `input`, generating `O` from it
     #[inline]
@@ -99,19 +97,19 @@ pub trait Parser<I, O, E> {
     /// # Example
     ///
     /// Because parsers are `FnMut`, they can be called multiple times. This prevents moving `f`
-    /// into [`length_take`][crate::binary::length_take] and `g` into
+    /// into [`length_data`][crate::binary::length_data] and `g` into
     /// [`Parser::complete_err`]:
     /// ```rust,compile_fail
     /// # use winnow::prelude::*;
     /// # use winnow::Parser;
     /// # use winnow::error::ParserError;
-    /// # use winnow::binary::length_take;
+    /// # use winnow::binary::length_data;
     /// pub fn length_value<'i, O, E: ParserError<&'i [u8]>>(
     ///     mut f: impl Parser<&'i [u8], usize, E>,
     ///     mut g: impl Parser<&'i [u8], O, E>
     /// ) -> impl Parser<&'i [u8], O, E> {
     ///   move |i: &mut &'i [u8]| {
-    ///     let mut data = length_take(f).parse_next(i)?;
+    ///     let mut data = length_data(f).parse_next(i)?;
     ///     let o = g.complete_err().parse_next(&mut data)?;
     ///     Ok(o)
     ///   }
@@ -123,13 +121,13 @@ pub trait Parser<I, O, E> {
     /// # use winnow::prelude::*;
     /// # use winnow::Parser;
     /// # use winnow::error::ParserError;
-    /// # use winnow::binary::length_take;
+    /// # use winnow::binary::length_data;
     /// pub fn length_value<'i, O, E: ParserError<&'i [u8]>>(
     ///     mut f: impl Parser<&'i [u8], usize, E>,
     ///     mut g: impl Parser<&'i [u8], O, E>
     /// ) -> impl Parser<&'i [u8], O, E> {
     ///   move |i: &mut &'i [u8]| {
-    ///     let mut data = length_take(f.by_ref()).parse_next(i)?;
+    ///     let mut data = length_data(f.by_ref()).parse_next(i)?;
     ///     let o = g.by_ref().complete_err().parse_next(&mut data)?;
     ///     Ok(o)
     ///   }
@@ -258,7 +256,7 @@ pub trait Parser<I, O, E> {
     /// let mut parser = separated_pair(alpha1, ',', alpha1).recognize();
     ///
     /// assert_eq!(parser.parse_peek("abcd,efgh"), Ok(("", "abcd,efgh")));
-    /// assert_eq!(parser.parse_peek("abcd;"),Err(ErrMode::Backtrack(InputError::new(";", ErrorKind::Tag))));
+    /// assert_eq!(parser.parse_peek("abcd;"),Err(ErrMode::Backtrack(InputError::new(";", ErrorKind::Verify))));
     /// # }
     /// ```
     #[doc(alias = "concat")]
@@ -287,7 +285,7 @@ pub trait Parser<I, O, E> {
     /// # use winnow::prelude::*;
     /// # use winnow::{error::ErrMode,error::ErrorKind, error::InputError};
     /// use winnow::ascii::{alpha1};
-    /// use winnow::token::literal;
+    /// use winnow::token::tag;
     /// use winnow::combinator::separated_pair;
     ///
     /// fn inner_parser<'s>(input: &mut &'s str) -> PResult<bool, InputError<&'s str>> {
@@ -297,7 +295,7 @@ pub trait Parser<I, O, E> {
     /// let mut consumed_parser = separated_pair(alpha1, ',', alpha1).value(true).with_recognized();
     ///
     /// assert_eq!(consumed_parser.parse_peek("abcd,efgh1"), Ok(("1", (true, "abcd,efgh"))));
-    /// assert_eq!(consumed_parser.parse_peek("abcd;"),Err(ErrMode::Backtrack(InputError::new(";", ErrorKind::Tag))));
+    /// assert_eq!(consumed_parser.parse_peek("abcd;"),Err(ErrMode::Backtrack(InputError::new(";", ErrorKind::Verify))));
     ///
     /// // the second output (representing the consumed input)
     /// // should be the same as that of the `recognize` parser.
@@ -331,7 +329,7 @@ pub trait Parser<I, O, E> {
     /// let mut parser = separated_pair(alpha1.span(), ',', alpha1.span());
     ///
     /// assert_eq!(parser.parse(Located::new("abcd,efgh")), Ok((0..4, 5..9)));
-    /// assert_eq!(parser.parse_peek(Located::new("abcd;")),Err(ErrMode::Backtrack(InputError::new(Located::new("abcd;").peek_slice(4).0, ErrorKind::Tag))));
+    /// assert_eq!(parser.parse_peek(Located::new("abcd;")),Err(ErrMode::Backtrack(InputError::new(Located::new("abcd;").peek_slice(4).0, ErrorKind::Verify))));
     /// ```
     #[inline(always)]
     fn span(self) -> Span<Self, I, O, E>
@@ -359,7 +357,7 @@ pub trait Parser<I, O, E> {
     /// # use winnow::{error::ErrMode,error::ErrorKind, error::InputError, stream::Stream};
     /// use winnow::stream::Located;
     /// use winnow::ascii::alpha1;
-    /// use winnow::token::literal;
+    /// use winnow::token::tag;
     /// use winnow::combinator::separated_pair;
     ///
     /// fn inner_parser<'s>(input: &mut Located<&'s str>) -> PResult<bool, InputError<Located<&'s str>>> {
@@ -371,7 +369,7 @@ pub trait Parser<I, O, E> {
     /// let mut consumed_parser = separated_pair(alpha1.value(1).with_span(), ',', alpha1.value(2).with_span());
     ///
     /// assert_eq!(consumed_parser.parse(Located::new("abcd,efgh")), Ok(((1, 0..4), (2, 5..9))));
-    /// assert_eq!(consumed_parser.parse_peek(Located::new("abcd;")),Err(ErrMode::Backtrack(InputError::new(Located::new("abcd;").peek_slice(4).0, ErrorKind::Tag))));
+    /// assert_eq!(consumed_parser.parse_peek(Located::new("abcd;")),Err(ErrMode::Backtrack(InputError::new(Located::new("abcd;").peek_slice(4).0, ErrorKind::Verify))));
     ///
     /// // the second output (representing the consumed input)
     /// // should be the same as that of the `span` parser.
@@ -494,12 +492,12 @@ pub trait Parser<I, O, E> {
     /// use winnow::token::take;
     /// use winnow::binary::u8;
     ///
-    /// fn length_take<'s>(input: &mut &'s [u8]) -> PResult<&'s [u8], InputError<&'s [u8]>> {
+    /// fn length_data<'s>(input: &mut &'s [u8]) -> PResult<&'s [u8], InputError<&'s [u8]>> {
     ///     u8.flat_map(take).parse_next(input)
     /// }
     ///
-    /// assert_eq!(length_take.parse_peek(&[2, 0, 1, 2][..]), Ok((&[2][..], &[0, 1][..])));
-    /// assert_eq!(length_take.parse_peek(&[4, 0, 1, 2][..]), Err(ErrMode::Backtrack(InputError::new(&[0, 1, 2][..], ErrorKind::Slice))));
+    /// assert_eq!(length_data.parse_peek(&[2, 0, 1, 2][..]), Ok((&[2][..], &[0, 1][..])));
+    /// assert_eq!(length_data.parse_peek(&[4, 0, 1, 2][..]), Err(ErrMode::Backtrack(InputError::new(&[0, 1, 2][..], ErrorKind::Slice))));
     /// ```
     ///
     /// which is the same as
@@ -508,14 +506,14 @@ pub trait Parser<I, O, E> {
     /// use winnow::token::take;
     /// use winnow::binary::u8;
     ///
-    /// fn length_take<'s>(input: &mut &'s [u8]) -> PResult<&'s [u8], InputError<&'s [u8]>> {
+    /// fn length_data<'s>(input: &mut &'s [u8]) -> PResult<&'s [u8], InputError<&'s [u8]>> {
     ///     let length = u8.parse_next(input)?;
     ///     let data = take(length).parse_next(input)?;
     ///     Ok(data)
     /// }
     ///
-    /// assert_eq!(length_take.parse_peek(&[2, 0, 1, 2][..]), Ok((&[2][..], &[0, 1][..])));
-    /// assert_eq!(length_take.parse_peek(&[4, 0, 1, 2][..]), Err(ErrMode::Backtrack(InputError::new(&[0, 1, 2][..], ErrorKind::Slice))));
+    /// assert_eq!(length_data.parse_peek(&[2, 0, 1, 2][..]), Ok((&[2][..], &[0, 1][..])));
+    /// assert_eq!(length_data.parse_peek(&[4, 0, 1, 2][..]), Err(ErrMode::Backtrack(InputError::new(&[0, 1, 2][..], ErrorKind::Slice))));
     /// ```
     #[inline(always)]
     fn flat_map<G, H, O2>(self, map: G) -> FlatMap<Self, G, H, I, O, O2, E>
@@ -678,7 +676,6 @@ pub trait Parser<I, O, E> {
     /// [`winnow::combinator::alt`][crate::combinator::alt].
     #[inline(always)]
     #[cfg(feature = "unstable-recover")]
-    #[cfg(feature = "std")]
     fn retry_after<R>(self, recover: R) -> RetryAfter<Self, R, I, O, E>
     where
         Self: core::marker::Sized,
@@ -696,7 +693,6 @@ pub trait Parser<I, O, E> {
     /// [`winnow::combinator::alt`][crate::combinator::alt].
     #[inline(always)]
     #[cfg(feature = "unstable-recover")]
-    #[cfg(feature = "std")]
     fn resume_after<R>(self, recover: R) -> ResumeAfter<Self, R, I, O, E>
     where
         Self: core::marker::Sized,
@@ -731,20 +727,19 @@ where
 ///     b'a'.parse_next(i)
 /// }
 /// assert_eq!(parser.parse_peek(&b"abc"[..]), Ok((&b"bc"[..], b'a')));
-/// assert_eq!(parser.parse_peek(&b" abc"[..]), Err(ErrMode::Backtrack(InputError::new(&b" abc"[..], ErrorKind::Tag))));
-/// assert_eq!(parser.parse_peek(&b"bc"[..]), Err(ErrMode::Backtrack(InputError::new(&b"bc"[..], ErrorKind::Tag))));
-/// assert_eq!(parser.parse_peek(&b""[..]), Err(ErrMode::Backtrack(InputError::new(&b""[..], ErrorKind::Tag))));
+/// assert_eq!(parser.parse_peek(&b" abc"[..]), Err(ErrMode::Backtrack(InputError::new(&b" abc"[..], ErrorKind::Verify))));
+/// assert_eq!(parser.parse_peek(&b"bc"[..]), Err(ErrMode::Backtrack(InputError::new(&b"bc"[..], ErrorKind::Verify))));
+/// assert_eq!(parser.parse_peek(&b""[..]), Err(ErrMode::Backtrack(InputError::new(&b""[..], ErrorKind::Token))));
 /// ```
 impl<I, E> Parser<I, u8, E> for u8
 where
     I: StreamIsPartial,
-    I: Stream,
-    I: Compare<u8>,
+    I: Stream<Token = u8>,
     E: ParserError<I>,
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<u8, E> {
-        crate::token::literal(*self).value(*self).parse_next(i)
+        crate::token::one_of(*self).parse_next(i)
     }
 }
 
@@ -759,24 +754,24 @@ where
 ///     'a'.parse_next(i)
 /// }
 /// assert_eq!(parser.parse_peek("abc"), Ok(("bc", 'a')));
-/// assert_eq!(parser.parse_peek(" abc"), Err(ErrMode::Backtrack(InputError::new(" abc", ErrorKind::Tag))));
-/// assert_eq!(parser.parse_peek("bc"), Err(ErrMode::Backtrack(InputError::new("bc", ErrorKind::Tag))));
-/// assert_eq!(parser.parse_peek(""), Err(ErrMode::Backtrack(InputError::new("", ErrorKind::Tag))));
+/// assert_eq!(parser.parse_peek(" abc"), Err(ErrMode::Backtrack(InputError::new(" abc", ErrorKind::Verify))));
+/// assert_eq!(parser.parse_peek("bc"), Err(ErrMode::Backtrack(InputError::new("bc", ErrorKind::Verify))));
+/// assert_eq!(parser.parse_peek(""), Err(ErrMode::Backtrack(InputError::new("", ErrorKind::Token))));
 /// ```
-impl<I, E> Parser<I, char, E> for char
+impl<I, E> Parser<I, <I as Stream>::Token, E> for char
 where
     I: StreamIsPartial,
     I: Stream,
-    I: Compare<char>,
+    <I as Stream>::Token: AsChar + Clone,
     E: ParserError<I>,
 {
     #[inline(always)]
-    fn parse_next(&mut self, i: &mut I) -> PResult<char, E> {
-        crate::token::literal(*self).value(*self).parse_next(i)
+    fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Token, E> {
+        crate::token::one_of(*self).parse_next(i)
     }
 }
 
-/// This is a shortcut for [`literal`][crate::token::literal].
+/// This is a shortcut for [`tag`][crate::token::tag].
 ///
 /// # Example
 /// ```rust
@@ -801,11 +796,11 @@ where
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Slice, E> {
-        crate::token::literal(*self).parse_next(i)
+        crate::token::tag(*self).parse_next(i)
     }
 }
 
-/// This is a shortcut for [`literal`][crate::token::literal].
+/// This is a shortcut for [`tag`][crate::token::tag].
 ///
 /// # Example
 /// ```rust
@@ -833,11 +828,11 @@ where
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Slice, E> {
-        crate::token::literal(*self).parse_next(i)
+        crate::token::tag(*self).parse_next(i)
     }
 }
 
-/// This is a shortcut for [`literal`][crate::token::literal].
+/// This is a shortcut for [`tag`][crate::token::tag].
 ///
 /// # Example
 /// ```rust
@@ -862,11 +857,11 @@ where
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Slice, E> {
-        crate::token::literal(*self).parse_next(i)
+        crate::token::tag(*self).parse_next(i)
     }
 }
 
-/// This is a shortcut for [`literal`][crate::token::literal].
+/// This is a shortcut for [`tag`][crate::token::tag].
 ///
 /// # Example
 /// ```rust
@@ -895,11 +890,11 @@ where
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Slice, E> {
-        crate::token::literal(*self).parse_next(i)
+        crate::token::tag(*self).parse_next(i)
     }
 }
 
-/// This is a shortcut for [`literal`][crate::token::literal].
+/// This is a shortcut for [`tag`][crate::token::tag].
 ///
 /// # Example
 /// ```rust
@@ -924,11 +919,11 @@ where
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Slice, E> {
-        crate::token::literal(*self).parse_next(i)
+        crate::token::tag(*self).parse_next(i)
     }
 }
 
-/// This is a shortcut for [`literal`][crate::token::literal].
+/// This is a shortcut for [`tag`][crate::token::tag].
 ///
 /// # Example
 /// ```rust
@@ -956,11 +951,11 @@ where
 {
     #[inline(always)]
     fn parse_next(&mut self, i: &mut I) -> PResult<<I as Stream>::Slice, E> {
-        crate::token::literal(*self).parse_next(i)
+        crate::token::tag(*self).parse_next(i)
     }
 }
 
-impl<I: Stream, E: ParserError<I>> Parser<I, (), E> for () {
+impl<I, E: ParserError<I>> Parser<I, (), E> for () {
     #[inline(always)]
     fn parse_next(&mut self, _i: &mut I) -> PResult<(), E> {
         Ok(())
@@ -970,7 +965,7 @@ impl<I: Stream, E: ParserError<I>> Parser<I, (), E> for () {
 macro_rules! impl_parser_for_tuple {
   ($($parser:ident $output:ident),+) => (
     #[allow(non_snake_case)]
-    impl<I: Stream, $($output),+, E: ParserError<I>, $($parser),+> Parser<I, ($($output),+,), E> for ($($parser),+,)
+    impl<I, $($output),+, E: ParserError<I>, $($parser),+> Parser<I, ($($output),+,), E> for ($($parser),+,)
     where
       $($parser: Parser<I, $output, E>),+
     {
@@ -1003,7 +998,6 @@ macro_rules! impl_parser_for_tuples {
 ///
 /// [`Parser`]s will need to use [`Recoverable<I, _>`] for their input.
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 pub trait RecoverableParser<I, O, R, E> {
     /// Collect all errors when parsing the input
     ///
@@ -1016,7 +1010,6 @@ pub trait RecoverableParser<I, O, R, E> {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<P, I, O, R, E> RecoverableParser<I, O, R, E> for P
 where
     P: Parser<Recoverable<I, R>, O, E>,
@@ -1057,7 +1050,7 @@ where
         };
 
         let (mut input, mut errs) = input.into_parts();
-        input.reset(&start);
+        input.reset(start);
         if let Some(err) = err {
             errs.push(err);
         }
@@ -1091,7 +1084,7 @@ impl_parser_for_tuples!(
 );
 
 #[cfg(feature = "alloc")]
-use crate::lib::std::boxed::Box;
+use alloc::boxed::Box;
 
 #[cfg(feature = "alloc")]
 impl<'a, I, O, E> Parser<I, O, E> for Box<dyn Parser<I, O, E> + 'a> {

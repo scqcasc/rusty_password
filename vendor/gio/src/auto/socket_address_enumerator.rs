@@ -2,15 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::SocketAddress;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::pin::Pin;
-use std::ptr;
+use crate::{AsyncResult, Cancellable, SocketAddress};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GSocketAddressEnumerator")]
@@ -25,30 +19,15 @@ impl SocketAddressEnumerator {
     pub const NONE: Option<&'static SocketAddressEnumerator> = None;
 }
 
-pub trait SocketAddressEnumeratorExt: 'static {
-    #[doc(alias = "g_socket_address_enumerator_next")]
-    fn next(
-        &self,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<Option<SocketAddress>, glib::Error>;
-
-    #[doc(alias = "g_socket_address_enumerator_next_async")]
-    fn next_async<P: FnOnce(Result<Option<SocketAddress>, glib::Error>) + 'static>(
-        &self,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn next_future(
-        &self,
-    ) -> Pin<
-        Box_<
-            dyn std::future::Future<Output = Result<Option<SocketAddress>, glib::Error>> + 'static,
-        >,
-    >;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::SocketAddressEnumerator>> Sealed for T {}
 }
 
-impl<O: IsA<SocketAddressEnumerator>> SocketAddressEnumeratorExt for O {
+pub trait SocketAddressEnumeratorExt:
+    IsA<SocketAddressEnumerator> + sealed::Sealed + 'static
+{
+    #[doc(alias = "g_socket_address_enumerator_next")]
     fn next(
         &self,
         cancellable: Option<&impl IsA<Cancellable>>,
@@ -68,6 +47,7 @@ impl<O: IsA<SocketAddressEnumerator>> SocketAddressEnumeratorExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_address_enumerator_next_async")]
     fn next_async<P: FnOnce(Result<Option<SocketAddress>, glib::Error>) + 'static>(
         &self,
         cancellable: Option<&impl IsA<Cancellable>>,
@@ -136,6 +116,8 @@ impl<O: IsA<SocketAddressEnumerator>> SocketAddressEnumeratorExt for O {
         ))
     }
 }
+
+impl<O: IsA<SocketAddressEnumerator>> SocketAddressEnumeratorExt for O {}
 
 impl fmt::Display for SocketAddressEnumerator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

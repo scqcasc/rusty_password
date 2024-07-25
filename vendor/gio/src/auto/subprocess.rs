@@ -2,18 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::Initable;
-use crate::InputStream;
-use crate::OutputStream;
-use crate::SubprocessFlags;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::pin::Pin;
-use std::ptr;
+use crate::{AsyncResult, Cancellable, Initable, InputStream, OutputStream, SubprocessFlags};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GSubprocess")]
@@ -26,7 +17,7 @@ glib::wrapper! {
 
 impl Subprocess {
     //#[doc(alias = "g_subprocess_new")]
-    //pub fn new(flags: SubprocessFlags, error: Option<&mut glib::Error>, argv0: &str, : /*Unknown conversion*//*Unimplemented*/Fundamental: VarArgs) -> Subprocess {
+    //pub fn new(flags: SubprocessFlags, error: Option<&mut glib::Error>, argv0: &str, : /*Unknown conversion*//*Unimplemented*/Basic: VarArgs) -> Subprocess {
     //    unsafe { TODO: call ffi:g_subprocess_new() }
     //}
 
@@ -64,7 +55,7 @@ impl Subprocess {
                 &mut stderr_buf,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok((from_glib_full(stdout_buf), from_glib_full(stderr_buf)))
             } else {
@@ -176,7 +167,7 @@ impl Subprocess {
                 &mut stderr_buf,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok((from_glib_full(stdout_buf), from_glib_full(stderr_buf)))
             } else {
@@ -252,8 +243,8 @@ impl Subprocess {
         unsafe { ffi::g_subprocess_get_term_sig(self.to_glib_none().0) }
     }
 
-    #[cfg(any(not(windows), feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(not(windows))))]
+    #[cfg(not(windows))]
+    #[cfg_attr(docsrs, doc(cfg(not(windows))))]
     #[doc(alias = "g_subprocess_send_signal")]
     pub fn send_signal(&self, signal_num: i32) {
         unsafe {
@@ -270,7 +261,7 @@ impl Subprocess {
                 cancellable.map(|p| p.as_ref()).to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -350,7 +341,7 @@ impl Subprocess {
                 cancellable.map(|p| p.as_ref()).to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {

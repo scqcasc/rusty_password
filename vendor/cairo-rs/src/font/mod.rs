@@ -1,15 +1,13 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
+mod font_extents;
 mod font_face;
 mod font_options;
+mod glyph;
 mod scaled_font;
-
-pub use crate::enums::{
-    Antialias, FontSlant, FontType, FontWeight, HintMetrics, HintStyle, SubpixelOrder,
-    TextClusterFlags,
-};
-
-pub use crate::ffi::{FontExtents, Glyph, TextCluster, TextExtents};
+mod text_cluster;
+mod text_extents;
+mod user_fonts;
 
 /* TODO
  Allocates an array of cairo_glyph_t's. This function is only useful in
@@ -36,7 +34,12 @@ impl TextCluster {
     //pub fn cairo_text_cluster_free(clusters: *TextCluster);
 }
 */
-
-pub use self::font_face::FontFace;
-pub use self::font_options::FontOptions;
-pub use self::scaled_font::ScaledFont;
+pub use self::{
+    font_extents::FontExtents, font_face::FontFace, font_options::FontOptions, glyph::Glyph,
+    scaled_font::ScaledFont, text_cluster::TextCluster, text_extents::TextExtents,
+    user_fonts::UserFontFace,
+};
+pub use crate::enums::{
+    Antialias, FontSlant, FontType, FontWeight, HintMetrics, HintStyle, SubpixelOrder,
+    TextClusterFlags,
+};

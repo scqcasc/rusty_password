@@ -7,9 +7,10 @@ use winnow::combinator::peek;
 use winnow::combinator::preceded;
 use winnow::combinator::repeat;
 use winnow::combinator::rest;
-use winnow::combinator::trace;
 use winnow::token::one_of;
+use winnow::token::tag;
 use winnow::token::take;
+use winnow::trace::trace;
 
 use crate::parser::prelude::*;
 use crate::parser::trivia::from_utf8_unchecked;
@@ -62,20 +63,20 @@ pub(crate) fn dec_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                     repeat(
                         0..,
                         alt((
-                            digit.void(),
+                            digit.value(()),
                             (
                                 one_of(b'_'),
                                 cut_err(digit).context(StrContext::Expected(
                                     StrContextValue::Description("digit"),
                                 )),
                             )
-                                .void(),
+                                .value(()),
                         )),
                     )
                     .map(|()| ()),
                 )
-                    .void(),
-                digit.void(),
+                    .value(()),
+                digit.value(()),
             )),
         )
             .recognize()
@@ -100,14 +101,14 @@ pub(crate) fn hex_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 repeat(
                     0..,
                     alt((
-                        hexdig.void(),
+                        hexdig.value(()),
                         (
                             one_of(b'_'),
                             cut_err(hexdig).context(StrContext::Expected(
                                 StrContextValue::Description("digit"),
                             )),
                         )
-                            .void(),
+                            .value(()),
                     )),
                 )
                 .map(|()| ()),
@@ -133,14 +134,14 @@ pub(crate) fn oct_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 repeat(
                     0..,
                     alt((
-                        one_of(DIGIT0_7).void(),
+                        one_of(DIGIT0_7).value(()),
                         (
                             one_of(b'_'),
                             cut_err(one_of(DIGIT0_7)).context(StrContext::Expected(
                                 StrContextValue::Description("digit"),
                             )),
                         )
-                            .void(),
+                            .value(()),
                     )),
                 )
                 .map(|()| ()),
@@ -167,14 +168,14 @@ pub(crate) fn bin_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 repeat(
                     0..,
                     alt((
-                        one_of(DIGIT0_1).void(),
+                        one_of(DIGIT0_1).value(()),
                         (
                             one_of(b'_'),
                             cut_err(one_of(DIGIT0_1)).context(StrContext::Expected(
                                 StrContextValue::Description("digit"),
                             )),
                         )
-                            .void(),
+                            .value(()),
                     )),
                 )
                 .map(|()| ()),
@@ -249,13 +250,13 @@ pub(crate) fn zero_prefixable_int<'i>(input: &mut Input<'i>) -> PResult<&'i str>
         repeat(
             0..,
             alt((
-                digit.void(),
+                digit.value(()),
                 (
                     one_of(b'_'),
                     cut_err(digit)
                         .context(StrContext::Expected(StrContextValue::Description("digit"))),
                 )
-                    .void(),
+                    .value(()),
             )),
         )
         .map(|()| ()),
@@ -295,12 +296,12 @@ pub(crate) fn special_float(input: &mut Input<'_>) -> PResult<f64> {
 }
 // inf = %x69.6e.66  ; inf
 pub(crate) fn inf(input: &mut Input<'_>) -> PResult<f64> {
-    INF.value(f64::INFINITY).parse_next(input)
+    tag(INF).value(f64::INFINITY).parse_next(input)
 }
 const INF: &[u8] = b"inf";
 // nan = %x6e.61.6e  ; nan
 pub(crate) fn nan(input: &mut Input<'_>) -> PResult<f64> {
-    NAN.value(f64::NAN.copysign(1.0)).parse_next(input)
+    tag(NAN).value(f64::NAN).parse_next(input)
 }
 const NAN: &[u8] = b"nan";
 
@@ -318,8 +319,6 @@ pub(crate) const HEXDIG: (RangeInclusive<u8>, RangeInclusive<u8>, RangeInclusive
     (DIGIT, b'A'..=b'F', b'a'..=b'f');
 
 #[cfg(test)]
-#[cfg(feature = "parse")]
-#[cfg(feature = "display")]
 mod test {
     use super::*;
 
@@ -336,8 +335,8 @@ mod test {
             ("0xF", 15),
             ("0o0_755", 493),
             ("0b1_0_1", 5),
-            (&i64::MIN.to_string()[..], i64::MIN),
-            (&i64::MAX.to_string()[..], i64::MAX),
+            (&std::i64::MIN.to_string()[..], std::i64::MIN),
+            (&std::i64::MAX.to_string()[..], std::i64::MAX),
         ];
         for &(input, expected) in &cases {
             dbg!(input);
@@ -354,14 +353,13 @@ mod test {
     fn assert_float_eq(actual: f64, expected: f64) {
         if expected.is_nan() {
             assert!(actual.is_nan());
-            assert_eq!(expected.is_sign_positive(), actual.is_sign_positive());
         } else if expected.is_infinite() {
             assert!(actual.is_infinite());
             assert_eq!(expected.is_sign_positive(), actual.is_sign_positive());
         } else {
             dbg!(expected);
             dbg!(actual);
-            assert!((expected - actual).abs() < f64::EPSILON);
+            assert!((expected - actual).abs() < std::f64::EPSILON);
         }
     }
 
@@ -376,15 +374,15 @@ mod test {
             ("-2E-2", -2E-2),
             ("6.626e-34", 6.626e-34),
             ("9_224_617.445_991_228_313", 9_224_617.445_991_227),
-            ("-1.7976931348623157e+308", f64::MIN),
-            ("1.7976931348623157e+308", f64::MAX),
-            ("nan", f64::NAN.copysign(1.0)),
-            ("+nan", f64::NAN.copysign(1.0)),
-            ("-nan", f64::NAN.copysign(-1.0)),
+            ("-1.7976931348623157e+308", std::f64::MIN),
+            ("1.7976931348623157e+308", std::f64::MAX),
+            ("nan", f64::NAN),
+            ("+nan", f64::NAN),
+            ("-nan", f64::NAN),
             ("inf", f64::INFINITY),
             ("+inf", f64::INFINITY),
             ("-inf", f64::NEG_INFINITY),
-            // ("1e+400", f64::INFINITY),
+            // ("1e+400", std::f64::INFINITY),
         ];
         for &(input, expected) in &cases {
             dbg!(input);

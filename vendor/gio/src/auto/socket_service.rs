@@ -2,17 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::SocketConnection;
-use crate::SocketListener;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{SocketConnection, SocketListener};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GSocketService")]
@@ -38,29 +34,13 @@ impl Default for SocketService {
     }
 }
 
-pub trait SocketServiceExt: 'static {
-    #[doc(alias = "g_socket_service_is_active")]
-    fn is_active(&self) -> bool;
-
-    #[doc(alias = "g_socket_service_start")]
-    fn start(&self);
-
-    #[doc(alias = "g_socket_service_stop")]
-    fn stop(&self);
-
-    fn set_active(&self, active: bool);
-
-    #[doc(alias = "incoming")]
-    fn connect_incoming<F: Fn(&Self, &SocketConnection, Option<&glib::Object>) -> bool + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "active")]
-    fn connect_active_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::SocketService>> Sealed for T {}
 }
 
-impl<O: IsA<SocketService>> SocketServiceExt for O {
+pub trait SocketServiceExt: IsA<SocketService> + sealed::Sealed + 'static {
+    #[doc(alias = "g_socket_service_is_active")]
     fn is_active(&self) -> bool {
         unsafe {
             from_glib(ffi::g_socket_service_is_active(
@@ -69,12 +49,14 @@ impl<O: IsA<SocketService>> SocketServiceExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_service_start")]
     fn start(&self) {
         unsafe {
             ffi::g_socket_service_start(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "g_socket_service_stop")]
     fn stop(&self) {
         unsafe {
             ffi::g_socket_service_stop(self.as_ref().to_glib_none().0);
@@ -82,9 +64,10 @@ impl<O: IsA<SocketService>> SocketServiceExt for O {
     }
 
     fn set_active(&self, active: bool) {
-        glib::ObjectExt::set_property(self.as_ref(), "active", &active)
+        ObjectExt::set_property(self.as_ref(), "active", active)
     }
 
+    #[doc(alias = "incoming")]
     fn connect_incoming<
         F: Fn(&Self, &SocketConnection, Option<&glib::Object>) -> bool + 'static,
     >(
@@ -123,6 +106,7 @@ impl<O: IsA<SocketService>> SocketServiceExt for O {
         }
     }
 
+    #[doc(alias = "active")]
     fn connect_active_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_active_trampoline<
             P: IsA<SocketService>,
@@ -148,6 +132,8 @@ impl<O: IsA<SocketService>> SocketServiceExt for O {
         }
     }
 }
+
+impl<O: IsA<SocketService>> SocketServiceExt for O {}
 
 impl fmt::Display for SocketService {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

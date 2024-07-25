@@ -2,8 +2,7 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::object::IsA;
-use glib::translate::*;
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -19,39 +18,19 @@ impl Action {
     pub const NONE: Option<&'static Action> = None;
 }
 
-pub trait AtkActionExt: 'static {
-    #[doc(alias = "atk_action_do_action")]
-    fn do_action(&self, i: i32) -> bool;
-
-    #[doc(alias = "atk_action_get_description")]
-    #[doc(alias = "get_description")]
-    fn description(&self, i: i32) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_action_get_keybinding")]
-    #[doc(alias = "get_keybinding")]
-    fn keybinding(&self, i: i32) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_action_get_localized_name")]
-    #[doc(alias = "get_localized_name")]
-    fn localized_name(&self, i: i32) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_action_get_n_actions")]
-    #[doc(alias = "get_n_actions")]
-    fn n_actions(&self) -> i32;
-
-    #[doc(alias = "atk_action_get_name")]
-    #[doc(alias = "get_name")]
-    fn name(&self, i: i32) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_action_set_description")]
-    fn set_description(&self, i: i32, desc: &str) -> bool;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Action>> Sealed for T {}
 }
 
-impl<O: IsA<Action>> AtkActionExt for O {
+pub trait AtkActionExt: IsA<Action> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_action_do_action")]
     fn do_action(&self, i: i32) -> bool {
         unsafe { from_glib(ffi::atk_action_do_action(self.as_ref().to_glib_none().0, i)) }
     }
 
+    #[doc(alias = "atk_action_get_description")]
+    #[doc(alias = "get_description")]
     fn description(&self, i: i32) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::atk_action_get_description(
@@ -61,6 +40,8 @@ impl<O: IsA<Action>> AtkActionExt for O {
         }
     }
 
+    #[doc(alias = "atk_action_get_keybinding")]
+    #[doc(alias = "get_keybinding")]
     fn keybinding(&self, i: i32) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::atk_action_get_keybinding(
@@ -70,6 +51,8 @@ impl<O: IsA<Action>> AtkActionExt for O {
         }
     }
 
+    #[doc(alias = "atk_action_get_localized_name")]
+    #[doc(alias = "get_localized_name")]
     fn localized_name(&self, i: i32) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::atk_action_get_localized_name(
@@ -79,14 +62,19 @@ impl<O: IsA<Action>> AtkActionExt for O {
         }
     }
 
+    #[doc(alias = "atk_action_get_n_actions")]
+    #[doc(alias = "get_n_actions")]
     fn n_actions(&self) -> i32 {
         unsafe { ffi::atk_action_get_n_actions(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_action_get_name")]
+    #[doc(alias = "get_name")]
     fn name(&self, i: i32) -> Option<glib::GString> {
         unsafe { from_glib_none(ffi::atk_action_get_name(self.as_ref().to_glib_none().0, i)) }
     }
 
+    #[doc(alias = "atk_action_set_description")]
     fn set_description(&self, i: i32, desc: &str) -> bool {
         unsafe {
             from_glib(ffi::atk_action_set_description(
@@ -97,6 +85,8 @@ impl<O: IsA<Action>> AtkActionExt for O {
         }
     }
 }
+
+impl<O: IsA<Action>> AtkActionExt for O {}
 
 impl fmt::Display for Action {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

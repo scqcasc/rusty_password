@@ -62,34 +62,85 @@ impl fmt::Display for SortColumn {
     }
 }
 
-pub trait TreeSortableExtManual: 'static {
+mod sealed {
+    pub trait Sealed {}
+    impl<T: glib::IsA<crate::TreeSortable>> Sealed for T {}
+}
+
+pub trait TreeSortableExtManual: IsA<TreeSortable> + sealed::Sealed + 'static {
     #[doc(alias = "gtk_tree_sortable_set_default_sort_func")]
     fn set_default_sort_func<F>(&self, sort_func: F)
     where
-        F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering + 'static;
+        F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering + 'static,
+    {
+        unsafe extern "C" fn trampoline<F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering>(
+            this: *mut GtkTreeModel,
+            iter: *mut GtkTreeIter,
+            iter2: *mut GtkTreeIter,
+            f: gpointer,
+        ) -> i32 {
+            let f: &F = &*(f as *const F);
+            f(
+                &TreeModel::from_glib_borrow(this),
+                &from_glib_borrow(iter),
+                &from_glib_borrow(iter2),
+            )
+            .into_glib()
+        }
+        unsafe extern "C" fn destroy_closure<
+            F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering,
+        >(
+            ptr: gpointer,
+        ) {
+            let _ = Box::<F>::from_raw(ptr as *mut _);
+        }
+        unsafe {
+            ffi::gtk_tree_sortable_set_default_sort_func(
+                self.as_ref().to_glib_none().0,
+                Some(trampoline::<F>),
+                into_raw(sort_func),
+                Some(destroy_closure::<F>),
+            )
+        }
+    }
     #[doc(alias = "gtk_tree_sortable_set_sort_func")]
     fn set_sort_func<F>(&self, sort_column_id: SortColumn, sort_func: F)
     where
-        F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering + 'static;
+        F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering + 'static,
+    {
+        unsafe extern "C" fn trampoline<F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering>(
+            this: *mut GtkTreeModel,
+            iter: *mut GtkTreeIter,
+            iter2: *mut GtkTreeIter,
+            f: gpointer,
+        ) -> i32 {
+            let f: &F = &*(f as *const F);
+            f(
+                &TreeModel::from_glib_borrow(this),
+                &from_glib_borrow(iter),
+                &from_glib_borrow(iter2),
+            )
+            .into_glib()
+        }
+        unsafe extern "C" fn destroy_closure<
+            F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering,
+        >(
+            ptr: gpointer,
+        ) {
+            let _ = Box::<F>::from_raw(ptr as *mut _);
+        }
+        unsafe {
+            ffi::gtk_tree_sortable_set_sort_func(
+                self.as_ref().to_glib_none().0,
+                sort_column_id.into_glib(),
+                Some(trampoline::<F>),
+                into_raw(sort_func),
+                Some(destroy_closure::<F>),
+            )
+        }
+    }
     #[doc(alias = "get_sort_column_id")]
     #[doc(alias = "gtk_tree_sortable_get_sort_column_id")]
-    fn sort_column_id(&self) -> Option<(SortColumn, SortType)>;
-    #[doc(alias = "gtk_tree_sortable_set_sort_column_id")]
-    fn set_sort_column_id(&self, sort_column_id: SortColumn, order: SortType);
-    fn set_unsorted(&self);
-}
-
-fn into_raw<F, T>(func: F) -> gpointer
-where
-    F: Fn(&T, &TreeIter, &TreeIter) -> Ordering + 'static,
-{
-    skip_assert_initialized!();
-    let func: Box<F> = Box::new(func);
-    Box::into_raw(func) as gpointer
-}
-
-impl<O: IsA<TreeSortable>> TreeSortableExtManual for O {
-    #[inline]
     fn sort_column_id(&self) -> Option<(SortColumn, SortType)> {
         unsafe {
             let mut sort_column_id = mem::MaybeUninit::uninit();
@@ -107,43 +158,7 @@ impl<O: IsA<TreeSortable>> TreeSortableExtManual for O {
             }
         }
     }
-
-    fn set_default_sort_func<F>(&self, sort_func: F)
-    where
-        F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering + 'static,
-    {
-        unsafe extern "C" fn trampoline<F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering>(
-            this: *mut GtkTreeModel,
-            iter: *mut GtkTreeIter,
-            iter2: *mut GtkTreeIter,
-            f: gpointer,
-        ) -> i32 {
-            let f: &F = &*(f as *const F);
-            f(
-                &TreeModel::from_glib_borrow(this),
-                &from_glib_borrow(iter),
-                &from_glib_borrow(iter2),
-            )
-            .into_glib()
-        }
-        unsafe extern "C" fn destroy_closure<
-            F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering,
-        >(
-            ptr: gpointer,
-        ) {
-            Box::<F>::from_raw(ptr as *mut _);
-        }
-        unsafe {
-            ffi::gtk_tree_sortable_set_default_sort_func(
-                self.as_ref().to_glib_none().0,
-                Some(trampoline::<F>),
-                into_raw(sort_func),
-                Some(destroy_closure::<F>),
-            )
-        }
-    }
-
-    #[inline]
+    #[doc(alias = "gtk_tree_sortable_set_sort_column_id")]
     fn set_sort_column_id(&self, sort_column_id: SortColumn, order: SortType) {
         unsafe {
             ffi::gtk_tree_sortable_set_sort_column_id(
@@ -153,7 +168,6 @@ impl<O: IsA<TreeSortable>> TreeSortableExtManual for O {
             );
         }
     }
-
     fn set_unsorted(&self) {
         unsafe {
             ffi::gtk_tree_sortable_set_sort_column_id(
@@ -163,40 +177,15 @@ impl<O: IsA<TreeSortable>> TreeSortableExtManual for O {
             );
         }
     }
-
-    fn set_sort_func<F>(&self, sort_column_id: SortColumn, sort_func: F)
-    where
-        F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering + 'static,
-    {
-        unsafe extern "C" fn trampoline<F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering>(
-            this: *mut GtkTreeModel,
-            iter: *mut GtkTreeIter,
-            iter2: *mut GtkTreeIter,
-            f: gpointer,
-        ) -> i32 {
-            let f: &F = &*(f as *const F);
-            f(
-                &TreeModel::from_glib_borrow(this),
-                &from_glib_borrow(iter),
-                &from_glib_borrow(iter2),
-            )
-            .into_glib()
-        }
-        unsafe extern "C" fn destroy_closure<
-            F: Fn(&TreeModel, &TreeIter, &TreeIter) -> Ordering,
-        >(
-            ptr: gpointer,
-        ) {
-            Box::<F>::from_raw(ptr as *mut _);
-        }
-        unsafe {
-            ffi::gtk_tree_sortable_set_sort_func(
-                self.as_ref().to_glib_none().0,
-                sort_column_id.into_glib(),
-                Some(trampoline::<F>),
-                into_raw(sort_func),
-                Some(destroy_closure::<F>),
-            )
-        }
-    }
 }
+
+fn into_raw<F, T>(func: F) -> gpointer
+where
+    F: Fn(&T, &TreeIter, &TreeIter) -> Ordering + 'static,
+{
+    skip_assert_initialized!();
+    let func: Box<F> = Box::new(func);
+    Box::into_raw(func) as gpointer
+}
+
+impl<O: IsA<TreeSortable>> TreeSortableExtManual for O {}

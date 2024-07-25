@@ -40,14 +40,12 @@ impl Matrix {
                 xscale.as_mut_ptr(),
                 yscale.as_mut_ptr(),
             );
-            let xscale = xscale.assume_init();
-            let yscale = yscale.assume_init();
-            (xscale, yscale)
+            (xscale.assume_init(), yscale.assume_init())
         }
     }
 
-    #[cfg(any(feature = "v1_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+    #[cfg(feature = "v1_50")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
     #[doc(alias = "pango_matrix_get_slant_ratio")]
     #[doc(alias = "get_slant_ratio")]
     pub fn slant_ratio(&self) -> f64 {

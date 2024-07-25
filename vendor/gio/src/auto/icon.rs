@@ -2,10 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::ptr;
+use glib::{prelude::*, translate::*};
+use std::{fmt, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GIcon")]
@@ -24,15 +22,6 @@ impl Icon {
         unsafe { from_glib_full(ffi::g_icon_deserialize(value.to_glib_none().0)) }
     }
 
-    #[doc(alias = "g_icon_hash")]
-    pub fn hash(&self) -> u32 {
-        unsafe {
-            ffi::g_icon_hash(
-                ToGlibPtr::<*mut ffi::GIcon>::to_glib_none(self).0 as glib::ffi::gconstpointer,
-            )
-        }
-    }
-
     #[doc(alias = "g_icon_new_for_string")]
     #[doc(alias = "new_for_string")]
     pub fn for_string(str: &str) -> Result<Icon, glib::Error> {
@@ -48,18 +37,13 @@ impl Icon {
     }
 }
 
-pub trait IconExt: 'static {
-    #[doc(alias = "g_icon_equal")]
-    fn equal(&self, icon2: Option<&impl IsA<Icon>>) -> bool;
-
-    #[doc(alias = "g_icon_serialize")]
-    fn serialize(&self) -> Option<glib::Variant>;
-
-    #[doc(alias = "g_icon_to_string")]
-    fn to_string(&self) -> Option<glib::GString>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Icon>> Sealed for T {}
 }
 
-impl<O: IsA<Icon>> IconExt for O {
+pub trait IconExt: IsA<Icon> + sealed::Sealed + 'static {
+    #[doc(alias = "g_icon_equal")]
     fn equal(&self, icon2: Option<&impl IsA<Icon>>) -> bool {
         unsafe {
             from_glib(ffi::g_icon_equal(
@@ -69,14 +53,28 @@ impl<O: IsA<Icon>> IconExt for O {
         }
     }
 
+    #[doc(alias = "g_icon_hash")]
+    fn hash(&self) -> u32 {
+        unsafe {
+            ffi::g_icon_hash(
+                ToGlibPtr::<*mut ffi::GIcon>::to_glib_none(self.as_ref()).0
+                    as glib::ffi::gconstpointer,
+            )
+        }
+    }
+
+    #[doc(alias = "g_icon_serialize")]
     fn serialize(&self) -> Option<glib::Variant> {
         unsafe { from_glib_full(ffi::g_icon_serialize(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_icon_to_string")]
     fn to_string(&self) -> Option<glib::GString> {
         unsafe { from_glib_full(ffi::g_icon_to_string(self.as_ref().to_glib_none().0)) }
     }
 }
+
+impl<O: IsA<Icon>> IconExt for O {}
 
 impl fmt::Display for Icon {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -2,17 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::OutputStream;
-use crate::PollableOutputStream;
-use crate::Seekable;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{OutputStream, PollableOutputStream, Seekable};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GMemoryOutputStream")]
@@ -34,23 +30,19 @@ impl MemoryOutputStream {
     }
 }
 
-pub trait MemoryOutputStreamExt: 'static {
-    #[doc(alias = "g_memory_output_stream_get_data_size")]
-    #[doc(alias = "get_data_size")]
-    fn data_size(&self) -> usize;
-
-    #[doc(alias = "g_memory_output_stream_steal_as_bytes")]
-    fn steal_as_bytes(&self) -> glib::Bytes;
-
-    #[doc(alias = "data-size")]
-    fn connect_data_size_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::MemoryOutputStream>> Sealed for T {}
 }
 
-impl<O: IsA<MemoryOutputStream>> MemoryOutputStreamExt for O {
+pub trait MemoryOutputStreamExt: IsA<MemoryOutputStream> + sealed::Sealed + 'static {
+    #[doc(alias = "g_memory_output_stream_get_data_size")]
+    #[doc(alias = "get_data_size")]
     fn data_size(&self) -> usize {
         unsafe { ffi::g_memory_output_stream_get_data_size(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "g_memory_output_stream_steal_as_bytes")]
     fn steal_as_bytes(&self) -> glib::Bytes {
         unsafe {
             from_glib_full(ffi::g_memory_output_stream_steal_as_bytes(
@@ -59,6 +51,7 @@ impl<O: IsA<MemoryOutputStream>> MemoryOutputStreamExt for O {
         }
     }
 
+    #[doc(alias = "data-size")]
     fn connect_data_size_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_data_size_trampoline<
             P: IsA<MemoryOutputStream>,
@@ -84,6 +77,8 @@ impl<O: IsA<MemoryOutputStream>> MemoryOutputStreamExt for O {
         }
     }
 }
+
+impl<O: IsA<MemoryOutputStream>> MemoryOutputStreamExt for O {}
 
 impl fmt::Display for MemoryOutputStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

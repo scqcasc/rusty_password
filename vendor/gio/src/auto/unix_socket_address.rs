@@ -2,12 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::SocketAddress;
-use crate::SocketConnectable;
-use crate::UnixSocketAddressType;
-use glib::object::IsA;
-use glib::translate::*;
-use glib::StaticType;
+use crate::{SocketAddress, SocketConnectable, UnixSocketAddressType};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -42,24 +38,14 @@ impl UnixSocketAddress {
 unsafe impl Send for UnixSocketAddress {}
 unsafe impl Sync for UnixSocketAddress {}
 
-pub trait UnixSocketAddressExt: 'static {
-    #[doc(alias = "g_unix_socket_address_get_address_type")]
-    #[doc(alias = "get_address_type")]
-    fn address_type(&self) -> UnixSocketAddressType;
-
-    #[doc(alias = "g_unix_socket_address_get_is_abstract")]
-    #[doc(alias = "get_is_abstract")]
-    fn is_abstract(&self) -> bool;
-
-    #[doc(alias = "g_unix_socket_address_get_path_len")]
-    #[doc(alias = "get_path_len")]
-    fn path_len(&self) -> usize;
-
-    #[doc(alias = "path-as-array")]
-    fn path_as_array(&self) -> Option<glib::ByteArray>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::UnixSocketAddress>> Sealed for T {}
 }
 
-impl<O: IsA<UnixSocketAddress>> UnixSocketAddressExt for O {
+pub trait UnixSocketAddressExt: IsA<UnixSocketAddress> + sealed::Sealed + 'static {
+    #[doc(alias = "g_unix_socket_address_get_address_type")]
+    #[doc(alias = "get_address_type")]
     fn address_type(&self) -> UnixSocketAddressType {
         unsafe {
             from_glib(ffi::g_unix_socket_address_get_address_type(
@@ -68,6 +54,8 @@ impl<O: IsA<UnixSocketAddress>> UnixSocketAddressExt for O {
         }
     }
 
+    #[doc(alias = "g_unix_socket_address_get_is_abstract")]
+    #[doc(alias = "get_is_abstract")]
     fn is_abstract(&self) -> bool {
         unsafe {
             from_glib(ffi::g_unix_socket_address_get_is_abstract(
@@ -76,14 +64,19 @@ impl<O: IsA<UnixSocketAddress>> UnixSocketAddressExt for O {
         }
     }
 
+    #[doc(alias = "g_unix_socket_address_get_path_len")]
+    #[doc(alias = "get_path_len")]
     fn path_len(&self) -> usize {
         unsafe { ffi::g_unix_socket_address_get_path_len(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "path-as-array")]
     fn path_as_array(&self) -> Option<glib::ByteArray> {
-        glib::ObjectExt::property(self.as_ref(), "path-as-array")
+        ObjectExt::property(self.as_ref(), "path-as-array")
     }
 }
+
+impl<O: IsA<UnixSocketAddress>> UnixSocketAddressExt for O {}
 
 impl fmt::Display for UnixSocketAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

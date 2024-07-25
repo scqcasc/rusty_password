@@ -2,17 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Converter;
-use crate::FileInfo;
-use crate::ZlibCompressorFormat;
-use glib::object::ObjectType as ObjectType_;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{Converter, FileInfo, ZlibCompressorFormat};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GZlibCompressor")]
@@ -43,11 +39,11 @@ impl ZlibCompressor {
     }
 
     pub fn format(&self) -> ZlibCompressorFormat {
-        glib::ObjectExt::property(self, "format")
+        ObjectExt::property(self, "format")
     }
 
     pub fn level(&self) -> i32 {
-        glib::ObjectExt::property(self, "level")
+        ObjectExt::property(self, "level")
     }
 
     #[doc(alias = "file-info")]

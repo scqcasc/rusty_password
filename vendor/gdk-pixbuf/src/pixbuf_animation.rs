@@ -1,20 +1,19 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::PixbufAnimation;
-use crate::PixbufAnimationIter;
-use glib::object::IsA;
-use glib::translate::*;
+use std::{ptr, time::SystemTime};
 
-use std::ptr;
-use std::time::SystemTime;
+use glib::{object::IsA, translate::*};
 
-pub trait PixbufAnimationExtManual {
-    #[doc(alias = "gdk_pixbuf_animation_get_iter")]
-    #[doc(alias = "get_iter")]
-    fn iter(&self, start_time: Option<SystemTime>) -> PixbufAnimationIter;
+use crate::{PixbufAnimation, PixbufAnimationIter};
+
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::PixbufAnimation>> Sealed for T {}
 }
 
-impl<T: IsA<PixbufAnimation>> PixbufAnimationExtManual for T {
+pub trait PixbufAnimationExtManual: sealed::Sealed + IsA<PixbufAnimation> + 'static {
+    #[doc(alias = "gdk_pixbuf_animation_get_iter")]
+    #[doc(alias = "get_iter")]
     fn iter(&self, start_time: Option<SystemTime>) -> PixbufAnimationIter {
         let start_time = start_time.map(|s| {
             let diff = s
@@ -37,3 +36,5 @@ impl<T: IsA<PixbufAnimation>> PixbufAnimationExtManual for T {
         }
     }
 }
+
+impl<O: IsA<PixbufAnimation>> PixbufAnimationExtManual for O {}

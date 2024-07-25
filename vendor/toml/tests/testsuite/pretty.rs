@@ -1,6 +1,5 @@
 use serde::ser::Serialize;
-use snapbox::assert_data_eq;
-use snapbox::prelude::*;
+use snapbox::assert_eq;
 
 const NO_PRETTY: &str = "\
 [example]
@@ -19,7 +18,7 @@ fn no_pretty() {
     let value: toml::Value = toml::from_str(toml).unwrap();
     let mut result = String::with_capacity(128);
     value.serialize(toml::Serializer::new(&mut result)).unwrap();
-    assert_data_eq!(&result, toml.raw());
+    assert_eq(toml, &result);
 }
 
 const PRETTY_STD: &str = "\
@@ -45,10 +44,10 @@ fn pretty_std() {
     value
         .serialize(toml::Serializer::pretty(&mut result))
         .unwrap();
-    assert_data_eq!(&result, toml.raw());
+    assert_eq(toml, &result);
 }
 
-const PRETTY_TRICKY: &str = r#"[example]
+const PRETTY_TRICKY: &str = r##"[example]
 f = "\f"
 glass = """
 Nothing too unusual, except that I can eat glass in:
@@ -73,7 +72,7 @@ This has a ''' in it and \"\"\" cuz it's tricky yo
 Also ' and \" because why not
 this is the fourth line
 """
-"#;
+"##;
 
 #[test]
 fn pretty_tricky() {
@@ -83,10 +82,10 @@ fn pretty_tricky() {
     value
         .serialize(toml::Serializer::pretty(&mut result))
         .unwrap();
-    assert_data_eq!(&result, toml.raw());
+    assert_eq(toml, &result);
 }
 
-const PRETTY_TABLE_ARRAY: &str = r#"[[array]]
+const PRETTY_TABLE_ARRAY: &str = r##"[[array]]
 key = "foo"
 
 [[array]]
@@ -97,7 +96,7 @@ doc = "this is a table"
 
 [example]
 single = "this is a single line string"
-"#;
+"##;
 
 #[test]
 fn pretty_table_array() {
@@ -107,10 +106,10 @@ fn pretty_table_array() {
     value
         .serialize(toml::Serializer::pretty(&mut result))
         .unwrap();
-    assert_data_eq!(&result, toml.raw());
+    assert_eq(toml, &result);
 }
 
-const TABLE_ARRAY: &str = r#"[[array]]
+const TABLE_ARRAY: &str = r##"[[array]]
 key = "foo"
 
 [[array]]
@@ -121,7 +120,7 @@ doc = "this is a table"
 
 [example]
 single = "this is a single line string"
-"#;
+"##;
 
 #[test]
 fn table_array() {
@@ -129,7 +128,7 @@ fn table_array() {
     let value: toml::Value = toml::from_str(toml).unwrap();
     let mut result = String::with_capacity(128);
     value.serialize(toml::Serializer::new(&mut result)).unwrap();
-    assert_data_eq!(&result, toml.raw());
+    assert_eq(toml, &result);
 }
 
 const PRETTY_EMPTY_TABLE: &str = r#"[example]
@@ -141,7 +140,7 @@ fn pretty_empty_table() {
     let value: toml::Value = toml::from_str(toml).unwrap();
     let mut result = String::with_capacity(128);
     value.serialize(toml::Serializer::new(&mut result)).unwrap();
-    assert_data_eq!(&result, toml.raw());
+    assert_eq(toml, &result);
 }
 
 #[test]
@@ -166,7 +165,7 @@ fn error_includes_key() {
 
     #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
     #[serde(untagged, expecting = "expected a boolean or an integer")]
-    pub(crate) enum U32OrBool {
+    pub enum U32OrBool {
         U32(u32),
         Bool(bool),
     }
@@ -181,5 +180,5 @@ debug = true
 
     let pkg: Package = toml::from_str(raw).unwrap();
     let pretty = toml::to_string_pretty(&pkg).unwrap();
-    assert_data_eq!(pretty, raw.raw());
+    assert_eq(raw, pretty);
 }

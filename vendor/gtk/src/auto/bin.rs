@@ -2,11 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Buildable;
-use crate::Container;
-use crate::Widget;
-use glib::object::IsA;
-use glib::translate::*;
+use crate::{Buildable, Container, Widget};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -22,17 +19,20 @@ impl Bin {
     pub const NONE: Option<&'static Bin> = None;
 }
 
-pub trait BinExt: 'static {
-    #[doc(alias = "gtk_bin_get_child")]
-    #[doc(alias = "get_child")]
-    fn child(&self) -> Option<Widget>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Bin>> Sealed for T {}
 }
 
-impl<O: IsA<Bin>> BinExt for O {
+pub trait BinExt: IsA<Bin> + sealed::Sealed + 'static {
+    #[doc(alias = "gtk_bin_get_child")]
+    #[doc(alias = "get_child")]
     fn child(&self) -> Option<Widget> {
         unsafe { from_glib_none(ffi::gtk_bin_get_child(self.as_ref().to_glib_none().0)) }
     }
 }
+
+impl<O: IsA<Bin>> BinExt for O {}
 
 impl fmt::Display for Bin {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

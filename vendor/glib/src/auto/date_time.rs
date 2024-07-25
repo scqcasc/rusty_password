@@ -2,13 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::translate::*;
-use crate::BoolError;
-use crate::TimeSpan;
-use crate::TimeZone;
-use std::cmp;
-use std::hash;
-use std::mem;
+use crate::{translate::*, BoolError, TimeSpan, TimeZone};
+use std::{cmp, hash, mem};
 
 crate::wrapper! {
     #[derive(Debug)]
@@ -46,8 +41,6 @@ impl DateTime {
         }
     }
 
-    #[cfg(any(feature = "v2_56", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_56")))]
     #[doc(alias = "g_date_time_new_from_iso8601")]
     #[doc(alias = "new_from_iso8601")]
     pub fn from_iso8601(text: &str, default_tz: Option<&TimeZone>) -> Result<DateTime, BoolError> {
@@ -61,6 +54,7 @@ impl DateTime {
     }
 
     //#[cfg_attr(feature = "v2_62", deprecated = "Since 2.62")]
+    //#[allow(deprecated)]
     //#[doc(alias = "g_date_time_new_from_timeval_local")]
     //#[doc(alias = "new_from_timeval_local")]
     //pub fn from_timeval_local(tv: /*Ignored*/&TimeVal) -> Result<DateTime, BoolError> {
@@ -68,6 +62,7 @@ impl DateTime {
     //}
 
     //#[cfg_attr(feature = "v2_62", deprecated = "Since 2.62")]
+    //#[allow(deprecated)]
     //#[doc(alias = "g_date_time_new_from_timeval_utc")]
     //#[doc(alias = "new_from_timeval_utc")]
     //pub fn from_timeval_utc(tv: /*Ignored*/&TimeVal) -> Result<DateTime, BoolError> {
@@ -293,8 +288,8 @@ impl DateTime {
         }
     }
 
-    #[cfg(any(feature = "v2_62", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_62")))]
+    #[cfg(feature = "v2_62")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v2_62")))]
     #[doc(alias = "g_date_time_format_iso8601")]
     pub fn format_iso8601(&self) -> Result<crate::GString, BoolError> {
         unsafe {
@@ -357,8 +352,8 @@ impl DateTime {
         unsafe { ffi::g_date_time_get_seconds(self.to_glib_none().0) }
     }
 
-    #[cfg(any(feature = "v2_58", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_58")))]
+    #[cfg(feature = "v2_58")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v2_58")))]
     #[doc(alias = "g_date_time_get_timezone")]
     #[doc(alias = "get_timezone")]
     pub fn timezone(&self) -> TimeZone {
@@ -412,10 +407,7 @@ impl DateTime {
                 month.as_mut_ptr(),
                 day.as_mut_ptr(),
             );
-            let year = year.assume_init();
-            let month = month.assume_init();
-            let day = day.assume_init();
-            (year, month, day)
+            (year.assume_init(), month.assume_init(), day.assume_init())
         }
     }
 
@@ -442,6 +434,7 @@ impl DateTime {
     }
 
     //#[cfg_attr(feature = "v2_62", deprecated = "Since 2.62")]
+    //#[allow(deprecated)]
     //#[doc(alias = "g_date_time_to_timeval")]
     //pub fn to_timeval(&self, tv: /*Ignored*/&mut TimeVal) -> bool {
     //    unsafe { TODO: call ffi:g_date_time_to_timeval() }
@@ -475,7 +468,7 @@ impl DateTime {
 impl PartialOrd for DateTime {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.compare(other).partial_cmp(&0)
+        Some(self.cmp(other))
     }
 }
 

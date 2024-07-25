@@ -3,15 +3,12 @@
 // DO NOT EDIT
 
 use crate::ProxyResolver;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GSimpleProxyResolver")]
@@ -26,28 +23,14 @@ impl SimpleProxyResolver {
     pub const NONE: Option<&'static SimpleProxyResolver> = None;
 }
 
-pub trait SimpleProxyResolverExt: 'static {
-    #[doc(alias = "g_simple_proxy_resolver_set_default_proxy")]
-    fn set_default_proxy(&self, default_proxy: &str);
-
-    #[doc(alias = "g_simple_proxy_resolver_set_uri_proxy")]
-    fn set_uri_proxy(&self, uri_scheme: &str, proxy: &str);
-
-    #[doc(alias = "default-proxy")]
-    fn default_proxy(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "ignore-hosts")]
-    fn ignore_hosts(&self) -> Vec<glib::GString>;
-
-    #[doc(alias = "default-proxy")]
-    fn connect_default_proxy_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "ignore-hosts")]
-    fn connect_ignore_hosts_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::SimpleProxyResolver>> Sealed for T {}
 }
 
-impl<O: IsA<SimpleProxyResolver>> SimpleProxyResolverExt for O {
-    fn set_default_proxy(&self, default_proxy: &str) {
+pub trait SimpleProxyResolverExt: IsA<SimpleProxyResolver> + sealed::Sealed + 'static {
+    #[doc(alias = "g_simple_proxy_resolver_set_default_proxy")]
+    fn set_default_proxy(&self, default_proxy: Option<&str>) {
         unsafe {
             ffi::g_simple_proxy_resolver_set_default_proxy(
                 self.as_ref().to_glib_none().0,
@@ -56,6 +39,7 @@ impl<O: IsA<SimpleProxyResolver>> SimpleProxyResolverExt for O {
         }
     }
 
+    #[doc(alias = "g_simple_proxy_resolver_set_uri_proxy")]
     fn set_uri_proxy(&self, uri_scheme: &str, proxy: &str) {
         unsafe {
             ffi::g_simple_proxy_resolver_set_uri_proxy(
@@ -66,14 +50,17 @@ impl<O: IsA<SimpleProxyResolver>> SimpleProxyResolverExt for O {
         }
     }
 
+    #[doc(alias = "default-proxy")]
     fn default_proxy(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "default-proxy")
+        ObjectExt::property(self.as_ref(), "default-proxy")
     }
 
+    #[doc(alias = "ignore-hosts")]
     fn ignore_hosts(&self) -> Vec<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "ignore-hosts")
+        ObjectExt::property(self.as_ref(), "ignore-hosts")
     }
 
+    #[doc(alias = "default-proxy")]
     fn connect_default_proxy_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_default_proxy_trampoline<
             P: IsA<SimpleProxyResolver>,
@@ -99,6 +86,7 @@ impl<O: IsA<SimpleProxyResolver>> SimpleProxyResolverExt for O {
         }
     }
 
+    #[doc(alias = "ignore-hosts")]
     fn connect_ignore_hosts_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_ignore_hosts_trampoline<
             P: IsA<SimpleProxyResolver>,
@@ -124,6 +112,8 @@ impl<O: IsA<SimpleProxyResolver>> SimpleProxyResolverExt for O {
         }
     }
 }
+
+impl<O: IsA<SimpleProxyResolver>> SimpleProxyResolverExt for O {}
 
 impl fmt::Display for SimpleProxyResolver {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

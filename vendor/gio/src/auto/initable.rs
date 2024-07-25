@@ -3,10 +3,8 @@
 // DO NOT EDIT
 
 use crate::Cancellable;
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::ptr;
+use glib::{prelude::*, translate::*};
+use std::{fmt, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GInitable")]
@@ -21,12 +19,13 @@ impl Initable {
     pub const NONE: Option<&'static Initable> = None;
 }
 
-pub trait InitableExt: 'static {
-    #[doc(alias = "g_initable_init")]
-    unsafe fn init(&self, cancellable: Option<&impl IsA<Cancellable>>) -> Result<(), glib::Error>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Initable>> Sealed for T {}
 }
 
-impl<O: IsA<Initable>> InitableExt for O {
+pub trait InitableExt: IsA<Initable> + sealed::Sealed + 'static {
+    #[doc(alias = "g_initable_init")]
     unsafe fn init(&self, cancellable: Option<&impl IsA<Cancellable>>) -> Result<(), glib::Error> {
         let mut error = ptr::null_mut();
         let is_ok = ffi::g_initable_init(
@@ -34,7 +33,7 @@ impl<O: IsA<Initable>> InitableExt for O {
             cancellable.map(|p| p.as_ref()).to_glib_none().0,
             &mut error,
         );
-        assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+        debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
         if error.is_null() {
             Ok(())
         } else {
@@ -42,6 +41,8 @@ impl<O: IsA<Initable>> InitableExt for O {
         }
     }
 }
+
+impl<O: IsA<Initable>> InitableExt for O {}
 
 impl fmt::Display for Initable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

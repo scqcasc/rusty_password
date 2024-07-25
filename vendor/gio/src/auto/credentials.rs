@@ -3,8 +3,7 @@
 // DO NOT EDIT
 
 use glib::translate::*;
-use std::fmt;
-use std::ptr;
+use std::{fmt, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GCredentials")]
@@ -23,12 +22,12 @@ impl Credentials {
 
     //#[doc(alias = "g_credentials_get_native")]
     //#[doc(alias = "get_native")]
-    //pub fn native(&self, native_type: CredentialsType) -> /*Unimplemented*/Option<Fundamental: Pointer> {
+    //pub fn native(&self, native_type: CredentialsType) -> /*Unimplemented*/Option<Basic: Pointer> {
     //    unsafe { TODO: call ffi:g_credentials_get_native() }
     //}
 
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[doc(alias = "g_credentials_get_unix_pid")]
     #[doc(alias = "get_unix_pid")]
     pub fn unix_pid(&self) -> Result<i32, glib::Error> {
@@ -43,8 +42,8 @@ impl Credentials {
         }
     }
 
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[doc(alias = "g_credentials_get_unix_user")]
     #[doc(alias = "get_unix_user")]
     pub fn unix_user(&self) -> Result<u32, glib::Error> {
@@ -68,7 +67,7 @@ impl Credentials {
                 other_credentials.to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -78,18 +77,18 @@ impl Credentials {
     }
 
     //#[doc(alias = "g_credentials_set_native")]
-    //pub fn set_native(&self, native_type: CredentialsType, native: /*Unimplemented*/Fundamental: Pointer) {
+    //pub fn set_native(&self, native_type: CredentialsType, native: /*Unimplemented*/Basic: Pointer) {
     //    unsafe { TODO: call ffi:g_credentials_set_native() }
     //}
 
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[doc(alias = "g_credentials_set_unix_user")]
     pub fn set_unix_user(&self, uid: u32) -> Result<(), glib::Error> {
         unsafe {
             let mut error = ptr::null_mut();
             let is_ok = ffi::g_credentials_set_unix_user(self.to_glib_none().0, uid, &mut error);
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {

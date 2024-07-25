@@ -3,10 +3,8 @@
 // DO NOT EDIT
 
 use crate::CoordType;
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::mem;
+use glib::{prelude::*, translate::*};
+use std::{fmt, mem};
 
 glib::wrapper! {
     #[doc(alias = "AtkImage")]
@@ -21,28 +19,14 @@ impl Image {
     pub const NONE: Option<&'static Image> = None;
 }
 
-pub trait AtkImageExt: 'static {
-    #[doc(alias = "atk_image_get_image_description")]
-    #[doc(alias = "get_image_description")]
-    fn image_description(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_image_get_image_locale")]
-    #[doc(alias = "get_image_locale")]
-    fn image_locale(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "atk_image_get_image_position")]
-    #[doc(alias = "get_image_position")]
-    fn image_position(&self, coord_type: CoordType) -> (i32, i32);
-
-    #[doc(alias = "atk_image_get_image_size")]
-    #[doc(alias = "get_image_size")]
-    fn image_size(&self) -> (i32, i32);
-
-    #[doc(alias = "atk_image_set_image_description")]
-    fn set_image_description(&self, description: &str) -> bool;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Image>> Sealed for T {}
 }
 
-impl<O: IsA<Image>> AtkImageExt for O {
+pub trait AtkImageExt: IsA<Image> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_image_get_image_description")]
+    #[doc(alias = "get_image_description")]
     fn image_description(&self) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::atk_image_get_image_description(
@@ -51,6 +35,8 @@ impl<O: IsA<Image>> AtkImageExt for O {
         }
     }
 
+    #[doc(alias = "atk_image_get_image_locale")]
+    #[doc(alias = "get_image_locale")]
     fn image_locale(&self) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::atk_image_get_image_locale(
@@ -59,6 +45,8 @@ impl<O: IsA<Image>> AtkImageExt for O {
         }
     }
 
+    #[doc(alias = "atk_image_get_image_position")]
+    #[doc(alias = "get_image_position")]
     fn image_position(&self, coord_type: CoordType) -> (i32, i32) {
         unsafe {
             let mut x = mem::MaybeUninit::uninit();
@@ -69,12 +57,12 @@ impl<O: IsA<Image>> AtkImageExt for O {
                 y.as_mut_ptr(),
                 coord_type.into_glib(),
             );
-            let x = x.assume_init();
-            let y = y.assume_init();
-            (x, y)
+            (x.assume_init(), y.assume_init())
         }
     }
 
+    #[doc(alias = "atk_image_get_image_size")]
+    #[doc(alias = "get_image_size")]
     fn image_size(&self) -> (i32, i32) {
         unsafe {
             let mut width = mem::MaybeUninit::uninit();
@@ -84,12 +72,11 @@ impl<O: IsA<Image>> AtkImageExt for O {
                 width.as_mut_ptr(),
                 height.as_mut_ptr(),
             );
-            let width = width.assume_init();
-            let height = height.assume_init();
-            (width, height)
+            (width.assume_init(), height.assume_init())
         }
     }
 
+    #[doc(alias = "atk_image_set_image_description")]
     fn set_image_description(&self, description: &str) -> bool {
         unsafe {
             from_glib(ffi::atk_image_set_image_description(
@@ -99,6 +86,8 @@ impl<O: IsA<Image>> AtkImageExt for O {
         }
     }
 }
+
+impl<O: IsA<Image>> AtkImageExt for O {}
 
 impl fmt::Display for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

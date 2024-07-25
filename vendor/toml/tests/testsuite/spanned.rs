@@ -5,14 +5,11 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use serde::Deserialize;
-use snapbox::assert_data_eq;
-use snapbox::prelude::*;
-use snapbox::str;
 use toml::value::Datetime;
 use toml::Spanned;
 
 /// A set of good datetimes.
-pub(crate) fn good_datetimes() -> Vec<&'static str> {
+pub fn good_datetimes() -> Vec<&'static str> {
     vec![
         "1997-09-09T09:09:09Z",
         "1997-09-09T09:09:09+09:09",
@@ -251,16 +248,14 @@ fn deny_unknown_fields() {
 fake = 1"#,
     )
     .unwrap_err();
-    assert_data_eq!(
-        error.to_string(),
-        str![[r#"
+    snapbox::assert_eq(
+        "\
 TOML parse error at line 3, column 1
   |
 3 | fake = 1
   | ^^^^
 unknown field `fake`, expected `real`
-
-"#]]
-        .raw()
+",
+        error.to_string(),
     );
 }

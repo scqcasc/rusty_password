@@ -3,14 +3,12 @@
 // DO NOT EDIT
 
 use crate::Object;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "AtkSelection")]
@@ -25,34 +23,13 @@ impl Selection {
     pub const NONE: Option<&'static Selection> = None;
 }
 
-pub trait SelectionExt: 'static {
-    #[doc(alias = "atk_selection_add_selection")]
-    fn add_selection(&self, i: i32) -> bool;
-
-    #[doc(alias = "atk_selection_clear_selection")]
-    fn clear_selection(&self) -> bool;
-
-    #[doc(alias = "atk_selection_get_selection_count")]
-    #[doc(alias = "get_selection_count")]
-    fn selection_count(&self) -> i32;
-
-    #[doc(alias = "atk_selection_is_child_selected")]
-    fn is_child_selected(&self, i: i32) -> bool;
-
-    #[doc(alias = "atk_selection_ref_selection")]
-    fn ref_selection(&self, i: i32) -> Option<Object>;
-
-    #[doc(alias = "atk_selection_remove_selection")]
-    fn remove_selection(&self, i: i32) -> bool;
-
-    #[doc(alias = "atk_selection_select_all_selection")]
-    fn select_all_selection(&self) -> bool;
-
-    #[doc(alias = "selection-changed")]
-    fn connect_selection_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Selection>> Sealed for T {}
 }
 
-impl<O: IsA<Selection>> SelectionExt for O {
+pub trait SelectionExt: IsA<Selection> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_selection_add_selection")]
     fn add_selection(&self, i: i32) -> bool {
         unsafe {
             from_glib(ffi::atk_selection_add_selection(
@@ -62,6 +39,7 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 
+    #[doc(alias = "atk_selection_clear_selection")]
     fn clear_selection(&self) -> bool {
         unsafe {
             from_glib(ffi::atk_selection_clear_selection(
@@ -70,10 +48,13 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 
+    #[doc(alias = "atk_selection_get_selection_count")]
+    #[doc(alias = "get_selection_count")]
     fn selection_count(&self) -> i32 {
         unsafe { ffi::atk_selection_get_selection_count(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "atk_selection_is_child_selected")]
     fn is_child_selected(&self, i: i32) -> bool {
         unsafe {
             from_glib(ffi::atk_selection_is_child_selected(
@@ -83,6 +64,7 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 
+    #[doc(alias = "atk_selection_ref_selection")]
     fn ref_selection(&self, i: i32) -> Option<Object> {
         unsafe {
             from_glib_full(ffi::atk_selection_ref_selection(
@@ -92,6 +74,7 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 
+    #[doc(alias = "atk_selection_remove_selection")]
     fn remove_selection(&self, i: i32) -> bool {
         unsafe {
             from_glib(ffi::atk_selection_remove_selection(
@@ -101,6 +84,7 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 
+    #[doc(alias = "atk_selection_select_all_selection")]
     fn select_all_selection(&self) -> bool {
         unsafe {
             from_glib(ffi::atk_selection_select_all_selection(
@@ -109,6 +93,7 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 
+    #[doc(alias = "selection-changed")]
     fn connect_selection_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn selection_changed_trampoline<
             P: IsA<Selection>,
@@ -133,6 +118,8 @@ impl<O: IsA<Selection>> SelectionExt for O {
         }
     }
 }
+
+impl<O: IsA<Selection>> SelectionExt for O {}
 
 impl fmt::Display for Selection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

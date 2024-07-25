@@ -1,14 +1,8 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::error::Error;
-use crate::gstring::GString;
-use crate::translate::*;
-use crate::KeyFileFlags;
-use std::mem;
-use std::path;
-use std::ptr;
+use std::{mem, path, ptr};
 
-use crate::KeyFile;
+use crate::{translate::*, Error, GString, GStringPtr, KeyFile, KeyFileFlags, PtrSlice};
 
 impl KeyFile {
     #[doc(alias = "g_key_file_save_to_file")]
@@ -91,6 +85,39 @@ impl KeyFile {
         }
     }
 
+    #[doc(alias = "g_key_file_get_groups")]
+    #[doc(alias = "get_groups")]
+    pub fn groups(&self) -> PtrSlice<GStringPtr> {
+        unsafe {
+            let mut length = mem::MaybeUninit::uninit();
+            let ret = ffi::g_key_file_get_groups(self.to_glib_none().0, length.as_mut_ptr());
+            FromGlibContainer::from_glib_full_num(ret, length.assume_init() as _)
+        }
+    }
+
+    #[doc(alias = "g_key_file_get_keys")]
+    #[doc(alias = "get_keys")]
+    pub fn keys(&self, group_name: &str) -> Result<PtrSlice<GStringPtr>, crate::Error> {
+        unsafe {
+            let mut length = mem::MaybeUninit::uninit();
+            let mut error = ptr::null_mut();
+            let ret = ffi::g_key_file_get_keys(
+                self.to_glib_none().0,
+                group_name.to_glib_none().0,
+                length.as_mut_ptr(),
+                &mut error,
+            );
+            if error.is_null() {
+                Ok(FromGlibContainer::from_glib_full_num(
+                    ret,
+                    length.assume_init() as _,
+                ))
+            } else {
+                Err(from_glib_full(error))
+            }
+        }
+    }
+
     #[doc(alias = "g_key_file_get_boolean")]
     #[doc(alias = "get_boolean")]
     pub fn boolean(&self, group_name: &str, key: &str) -> Result<bool, Error> {
@@ -146,7 +173,7 @@ impl KeyFile {
             }
             Ok(FromGlibContainer::from_glib_container_num(
                 ret,
-                length.assume_init() as usize,
+                length.assume_init() as _,
             ))
         }
     }
@@ -173,7 +200,7 @@ impl KeyFile {
 
     #[doc(alias = "g_key_file_get_string_list")]
     #[doc(alias = "get_string_list")]
-    pub fn string_list(&self, group_name: &str, key: &str) -> Result<Vec<GString>, Error> {
+    pub fn string_list(&self, group_name: &str, key: &str) -> Result<PtrSlice<GStringPtr>, Error> {
         unsafe {
             let mut length = mem::MaybeUninit::uninit();
             let mut error = ptr::null_mut();
@@ -187,7 +214,7 @@ impl KeyFile {
             if error.is_null() {
                 Ok(FromGlibContainer::from_glib_full_num(
                     ret,
-                    length.assume_init() as usize,
+                    length.assume_init() as _,
                 ))
             } else {
                 ffi::g_strfreev(ret);
@@ -229,7 +256,7 @@ impl KeyFile {
         group_name: &str,
         key: &str,
         locale: Option<&str>,
-    ) -> Result<Vec<GString>, Error> {
+    ) -> Result<PtrSlice<GStringPtr>, Error> {
         unsafe {
             let mut length = mem::MaybeUninit::uninit();
             let mut error = ptr::null_mut();
@@ -244,7 +271,7 @@ impl KeyFile {
             if error.is_null() {
                 Ok(FromGlibContainer::from_glib_full_num(
                     ret,
-                    length.assume_init() as usize,
+                    length.assume_init() as _,
                 ))
             } else {
                 ffi::g_strfreev(ret);

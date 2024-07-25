@@ -3,14 +3,12 @@
 // DO NOT EDIT
 
 use crate::Icon;
-use glib::object::ObjectType as ObjectType_;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GThemedIcon")]
@@ -30,7 +28,7 @@ impl ThemedIcon {
     #[doc(alias = "g_themed_icon_new_from_names")]
     #[doc(alias = "new_from_names")]
     pub fn from_names(iconnames: &[&str]) -> ThemedIcon {
-        let len = iconnames.len() as i32;
+        let len = iconnames.len() as _;
         unsafe {
             from_glib_full(ffi::g_themed_icon_new_from_names(
                 iconnames.to_glib_none().0,
@@ -75,7 +73,7 @@ impl ThemedIcon {
 
     #[doc(alias = "use-default-fallbacks")]
     pub fn uses_default_fallbacks(&self) -> bool {
-        glib::ObjectExt::property(self, "use-default-fallbacks")
+        ObjectExt::property(self, "use-default-fallbacks")
     }
 
     #[doc(alias = "names")]

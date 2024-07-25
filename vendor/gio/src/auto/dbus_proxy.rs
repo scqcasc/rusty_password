@@ -2,31 +2,19 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncInitable;
-use crate::AsyncResult;
-use crate::BusType;
-use crate::Cancellable;
-use crate::DBusCallFlags;
-use crate::DBusConnection;
-use crate::DBusInterface;
-use crate::DBusInterfaceInfo;
-use crate::DBusProxyFlags;
-use crate::Initable;
-#[cfg(any(unix, feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(unix)))]
+#[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 use crate::UnixFDList;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
-use std::pin::Pin;
-use std::ptr;
+use crate::{
+    AsyncInitable, AsyncResult, BusType, Cancellable, DBusCallFlags, DBusConnection, DBusInterface,
+    DBusInterfaceInfo, DBusProxyFlags, Initable,
+};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GDBusProxy")]
@@ -283,180 +271,13 @@ impl DBusProxy {
 unsafe impl Send for DBusProxy {}
 unsafe impl Sync for DBusProxy {}
 
-pub trait DBusProxyExt: 'static {
-    #[doc(alias = "g_dbus_proxy_call")]
-    fn call<P: FnOnce(Result<glib::Variant, glib::Error>) + 'static>(
-        &self,
-        method_name: &str,
-        parameters: Option<&glib::Variant>,
-        flags: DBusCallFlags,
-        timeout_msec: i32,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn call_future(
-        &self,
-        method_name: &str,
-        parameters: Option<&glib::Variant>,
-        flags: DBusCallFlags,
-        timeout_msec: i32,
-    ) -> Pin<Box_<dyn std::future::Future<Output = Result<glib::Variant, glib::Error>> + 'static>>;
-
-    #[doc(alias = "g_dbus_proxy_call_sync")]
-    fn call_sync(
-        &self,
-        method_name: &str,
-        parameters: Option<&glib::Variant>,
-        flags: DBusCallFlags,
-        timeout_msec: i32,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<glib::Variant, glib::Error>;
-
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
-    #[doc(alias = "g_dbus_proxy_call_with_unix_fd_list")]
-    fn call_with_unix_fd_list<
-        P: FnOnce(Result<(glib::Variant, UnixFDList), glib::Error>) + 'static,
-    >(
-        &self,
-        method_name: &str,
-        parameters: Option<&glib::Variant>,
-        flags: DBusCallFlags,
-        timeout_msec: i32,
-        fd_list: Option<&impl IsA<UnixFDList>>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
-    fn call_with_unix_fd_list_future(
-        &self,
-        method_name: &str,
-        parameters: Option<&glib::Variant>,
-        flags: DBusCallFlags,
-        timeout_msec: i32,
-        fd_list: Option<&(impl IsA<UnixFDList> + Clone + 'static)>,
-    ) -> Pin<
-        Box_<
-            dyn std::future::Future<Output = Result<(glib::Variant, UnixFDList), glib::Error>>
-                + 'static,
-        >,
-    >;
-
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
-    #[doc(alias = "g_dbus_proxy_call_with_unix_fd_list_sync")]
-    fn call_with_unix_fd_list_sync(
-        &self,
-        method_name: &str,
-        parameters: Option<&glib::Variant>,
-        flags: DBusCallFlags,
-        timeout_msec: i32,
-        fd_list: Option<&impl IsA<UnixFDList>>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<(glib::Variant, UnixFDList), glib::Error>;
-
-    #[doc(alias = "g_dbus_proxy_get_cached_property")]
-    #[doc(alias = "get_cached_property")]
-    fn cached_property(&self, property_name: &str) -> Option<glib::Variant>;
-
-    #[doc(alias = "g_dbus_proxy_get_cached_property_names")]
-    #[doc(alias = "get_cached_property_names")]
-    fn cached_property_names(&self) -> Vec<glib::GString>;
-
-    #[doc(alias = "g_dbus_proxy_get_connection")]
-    #[doc(alias = "get_connection")]
-    fn connection(&self) -> DBusConnection;
-
-    #[doc(alias = "g_dbus_proxy_get_default_timeout")]
-    #[doc(alias = "get_default_timeout")]
-    fn default_timeout(&self) -> i32;
-
-    #[doc(alias = "g_dbus_proxy_get_flags")]
-    #[doc(alias = "get_flags")]
-    fn flags(&self) -> DBusProxyFlags;
-
-    #[doc(alias = "g_dbus_proxy_get_interface_info")]
-    #[doc(alias = "get_interface_info")]
-    fn interface_info(&self) -> Option<DBusInterfaceInfo>;
-
-    #[doc(alias = "g_dbus_proxy_get_interface_name")]
-    #[doc(alias = "get_interface_name")]
-    fn interface_name(&self) -> glib::GString;
-
-    #[doc(alias = "g_dbus_proxy_get_name")]
-    #[doc(alias = "get_name")]
-    fn name(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g_dbus_proxy_get_name_owner")]
-    #[doc(alias = "get_name_owner")]
-    fn name_owner(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g_dbus_proxy_get_object_path")]
-    #[doc(alias = "get_object_path")]
-    fn object_path(&self) -> glib::GString;
-
-    #[doc(alias = "g_dbus_proxy_set_cached_property")]
-    fn set_cached_property(&self, property_name: &str, value: Option<&glib::Variant>);
-
-    #[doc(alias = "g_dbus_proxy_set_default_timeout")]
-    fn set_default_timeout(&self, timeout_msec: i32);
-
-    #[doc(alias = "g_dbus_proxy_set_interface_info")]
-    fn set_interface_info(&self, info: Option<&DBusInterfaceInfo>);
-
-    #[doc(alias = "g-connection")]
-    fn g_connection(&self) -> Option<DBusConnection>;
-
-    #[doc(alias = "g-default-timeout")]
-    fn g_default_timeout(&self) -> i32;
-
-    #[doc(alias = "g-default-timeout")]
-    fn set_g_default_timeout(&self, g_default_timeout: i32);
-
-    #[doc(alias = "g-flags")]
-    fn g_flags(&self) -> DBusProxyFlags;
-
-    #[doc(alias = "g-interface-info")]
-    fn g_interface_info(&self) -> Option<DBusInterfaceInfo>;
-
-    #[doc(alias = "g-interface-info")]
-    fn set_g_interface_info(&self, g_interface_info: Option<&DBusInterfaceInfo>);
-
-    #[doc(alias = "g-interface-name")]
-    fn g_interface_name(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g-name")]
-    fn g_name(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g-name-owner")]
-    fn g_name_owner(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g-object-path")]
-    fn g_object_path(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g-default-timeout")]
-    fn connect_g_default_timeout_notify<F: Fn(&Self) + Send + Sync + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "g-interface-info")]
-    fn connect_g_interface_info_notify<F: Fn(&Self) + Send + Sync + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "g-name-owner")]
-    fn connect_g_name_owner_notify<F: Fn(&Self) + Send + Sync + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::DBusProxy>> Sealed for T {}
 }
 
-impl<O: IsA<DBusProxy>> DBusProxyExt for O {
+pub trait DBusProxyExt: IsA<DBusProxy> + sealed::Sealed + 'static {
+    #[doc(alias = "g_dbus_proxy_call")]
     fn call<P: FnOnce(Result<glib::Variant, glib::Error>) + 'static>(
         &self,
         method_name: &str,
@@ -539,6 +360,7 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         ))
     }
 
+    #[doc(alias = "g_dbus_proxy_call_sync")]
     fn call_sync(
         &self,
         method_name: &str,
@@ -566,8 +388,9 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[doc(alias = "g_dbus_proxy_call_with_unix_fd_list")]
     fn call_with_unix_fd_list<
         P: FnOnce(Result<(glib::Variant, UnixFDList), glib::Error>) + 'static,
     >(
@@ -633,8 +456,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     fn call_with_unix_fd_list_future(
         &self,
         method_name: &str,
@@ -669,8 +492,9 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         ))
     }
 
-    #[cfg(any(unix, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(unix)))]
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[doc(alias = "g_dbus_proxy_call_with_unix_fd_list_sync")]
     fn call_with_unix_fd_list_sync(
         &self,
         method_name: &str,
@@ -702,6 +526,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_cached_property")]
+    #[doc(alias = "get_cached_property")]
     fn cached_property(&self, property_name: &str) -> Option<glib::Variant> {
         unsafe {
             from_glib_full(ffi::g_dbus_proxy_get_cached_property(
@@ -711,6 +537,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_cached_property_names")]
+    #[doc(alias = "get_cached_property_names")]
     fn cached_property_names(&self) -> Vec<glib::GString> {
         unsafe {
             FromGlibPtrContainer::from_glib_full(ffi::g_dbus_proxy_get_cached_property_names(
@@ -719,6 +547,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_connection")]
+    #[doc(alias = "get_connection")]
     fn connection(&self) -> DBusConnection {
         unsafe {
             from_glib_none(ffi::g_dbus_proxy_get_connection(
@@ -727,14 +557,20 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_default_timeout")]
+    #[doc(alias = "get_default_timeout")]
     fn default_timeout(&self) -> i32 {
         unsafe { ffi::g_dbus_proxy_get_default_timeout(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_flags")]
+    #[doc(alias = "get_flags")]
     fn flags(&self) -> DBusProxyFlags {
         unsafe { from_glib(ffi::g_dbus_proxy_get_flags(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_interface_info")]
+    #[doc(alias = "get_interface_info")]
     fn interface_info(&self) -> Option<DBusInterfaceInfo> {
         unsafe {
             from_glib_none(ffi::g_dbus_proxy_get_interface_info(
@@ -743,6 +579,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_interface_name")]
+    #[doc(alias = "get_interface_name")]
     fn interface_name(&self) -> glib::GString {
         unsafe {
             from_glib_none(ffi::g_dbus_proxy_get_interface_name(
@@ -751,10 +589,14 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_name")]
+    #[doc(alias = "get_name")]
     fn name(&self) -> Option<glib::GString> {
         unsafe { from_glib_none(ffi::g_dbus_proxy_get_name(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_name_owner")]
+    #[doc(alias = "get_name_owner")]
     fn name_owner(&self) -> Option<glib::GString> {
         unsafe {
             from_glib_full(ffi::g_dbus_proxy_get_name_owner(
@@ -763,6 +605,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_get_object_path")]
+    #[doc(alias = "get_object_path")]
     fn object_path(&self) -> glib::GString {
         unsafe {
             from_glib_none(ffi::g_dbus_proxy_get_object_path(
@@ -771,6 +615,7 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_set_cached_property")]
     fn set_cached_property(&self, property_name: &str, value: Option<&glib::Variant>) {
         unsafe {
             ffi::g_dbus_proxy_set_cached_property(
@@ -781,12 +626,14 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_set_default_timeout")]
     fn set_default_timeout(&self, timeout_msec: i32) {
         unsafe {
             ffi::g_dbus_proxy_set_default_timeout(self.as_ref().to_glib_none().0, timeout_msec);
         }
     }
 
+    #[doc(alias = "g_dbus_proxy_set_interface_info")]
     fn set_interface_info(&self, info: Option<&DBusInterfaceInfo>) {
         unsafe {
             ffi::g_dbus_proxy_set_interface_info(
@@ -796,46 +643,57 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g-connection")]
     fn g_connection(&self) -> Option<DBusConnection> {
-        glib::ObjectExt::property(self.as_ref(), "g-connection")
+        ObjectExt::property(self.as_ref(), "g-connection")
     }
 
+    #[doc(alias = "g-default-timeout")]
     fn g_default_timeout(&self) -> i32 {
-        glib::ObjectExt::property(self.as_ref(), "g-default-timeout")
+        ObjectExt::property(self.as_ref(), "g-default-timeout")
     }
 
+    #[doc(alias = "g-default-timeout")]
     fn set_g_default_timeout(&self, g_default_timeout: i32) {
-        glib::ObjectExt::set_property(self.as_ref(), "g-default-timeout", &g_default_timeout)
+        ObjectExt::set_property(self.as_ref(), "g-default-timeout", g_default_timeout)
     }
 
+    #[doc(alias = "g-flags")]
     fn g_flags(&self) -> DBusProxyFlags {
-        glib::ObjectExt::property(self.as_ref(), "g-flags")
+        ObjectExt::property(self.as_ref(), "g-flags")
     }
 
+    #[doc(alias = "g-interface-info")]
     fn g_interface_info(&self) -> Option<DBusInterfaceInfo> {
-        glib::ObjectExt::property(self.as_ref(), "g-interface-info")
+        ObjectExt::property(self.as_ref(), "g-interface-info")
     }
 
+    #[doc(alias = "g-interface-info")]
     fn set_g_interface_info(&self, g_interface_info: Option<&DBusInterfaceInfo>) {
-        glib::ObjectExt::set_property(self.as_ref(), "g-interface-info", &g_interface_info)
+        ObjectExt::set_property(self.as_ref(), "g-interface-info", g_interface_info)
     }
 
+    #[doc(alias = "g-interface-name")]
     fn g_interface_name(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "g-interface-name")
+        ObjectExt::property(self.as_ref(), "g-interface-name")
     }
 
+    #[doc(alias = "g-name")]
     fn g_name(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "g-name")
+        ObjectExt::property(self.as_ref(), "g-name")
     }
 
+    #[doc(alias = "g-name-owner")]
     fn g_name_owner(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "g-name-owner")
+        ObjectExt::property(self.as_ref(), "g-name-owner")
     }
 
+    #[doc(alias = "g-object-path")]
     fn g_object_path(&self) -> Option<glib::GString> {
-        glib::ObjectExt::property(self.as_ref(), "g-object-path")
+        ObjectExt::property(self.as_ref(), "g-object-path")
     }
 
+    #[doc(alias = "g-default-timeout")]
     fn connect_g_default_timeout_notify<F: Fn(&Self) + Send + Sync + 'static>(
         &self,
         f: F,
@@ -864,6 +722,7 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g-interface-info")]
     fn connect_g_interface_info_notify<F: Fn(&Self) + Send + Sync + 'static>(
         &self,
         f: F,
@@ -892,6 +751,7 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 
+    #[doc(alias = "g-name-owner")]
     fn connect_g_name_owner_notify<F: Fn(&Self) + Send + Sync + 'static>(
         &self,
         f: F,
@@ -920,6 +780,8 @@ impl<O: IsA<DBusProxy>> DBusProxyExt for O {
         }
     }
 }
+
+impl<O: IsA<DBusProxy>> DBusProxyExt for O {}
 
 impl fmt::Display for DBusProxy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

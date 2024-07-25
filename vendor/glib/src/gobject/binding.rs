@@ -1,8 +1,6 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::prelude::*;
-use crate::Binding;
-use crate::Object;
+use crate::{prelude::*, Binding, Object};
 
 impl Binding {
     #[doc(alias = "get_source")]
@@ -18,8 +16,7 @@ impl Binding {
 
 #[cfg(test)]
 mod test {
-    use crate::prelude::*;
-    use crate::subclass::prelude::*;
+    use crate::{prelude::*, subclass::prelude::*};
 
     #[test]
     fn binding() {
@@ -29,7 +26,7 @@ mod test {
         assert!(source.find_property("name").is_some());
         source
             .bind_property("name", &target, "name")
-            .flags(crate::BindingFlags::BIDIRECTIONAL)
+            .bidirectional()
             .build();
 
         source.set_name("test_source_name");
@@ -40,21 +37,76 @@ mod test {
     }
 
     #[test]
-    fn binding_to_transform() {
+    fn binding_to_transform_with_values() {
         let source = TestObject::default();
         let target = TestObject::default();
 
         source
             .bind_property("name", &target, "name")
-            .flags(crate::BindingFlags::SYNC_CREATE)
-            .transform_to(|_binding, value| {
+            .sync_create()
+            .transform_to_with_values(|_binding, value| {
                 let value = value.get::<&str>().unwrap();
-                Some(format!("{} World", value).to_value())
+                Some(format!("{value} World").to_value())
             })
-            .transform_from(|_binding, value| {
+            .transform_from_with_values(|_binding, value| {
                 let value = value.get::<&str>().unwrap();
-                Some(format!("{} World", value).to_value())
+                Some(format!("{value} World").to_value())
             })
+            .build();
+
+        source.set_name("Hello");
+        assert_eq!(target.name(), "Hello World");
+    }
+
+    #[test]
+    fn binding_from_transform_with_values() {
+        let source = TestObject::default();
+        let target = TestObject::default();
+
+        source
+            .bind_property("name", &target, "name")
+            .sync_create()
+            .bidirectional()
+            .transform_to_with_values(|_binding, value| {
+                let value = value.get::<&str>().unwrap();
+                Some(format!("{value} World").to_value())
+            })
+            .transform_from_with_values(|_binding, value| {
+                let value = value.get::<&str>().unwrap();
+                Some(format!("{value} World").to_value())
+            })
+            .build();
+
+        target.set_name("Hello");
+        assert_eq!(source.name(), "Hello World");
+    }
+
+    #[test]
+    fn binding_to_transform_ref() {
+        let source = TestObject::default();
+        let target = TestObject::default();
+
+        source
+            .bind_property("name", &target, "name")
+            .sync_create()
+            .transform_to(|_binding, value: &str| Some(format!("{value} World")))
+            .transform_from(|_binding, value: &str| Some(format!("{value} World")))
+            .build();
+
+        source.set_name("Hello");
+        assert_eq!(target.name(), "Hello World");
+    }
+
+    #[test]
+    fn binding_to_transform_owned_ref() {
+        let source = TestObject::default();
+        let target = TestObject::default();
+
+        source
+            .bind_property("name", &target, "name")
+            .sync_create()
+            .transform_to(|_binding, value: String| Some(format!("{value} World")))
+            .transform_from(|_binding, value: &str| Some(format!("{value} World")))
             .build();
 
         source.set_name("Hello");
@@ -68,19 +120,64 @@ mod test {
 
         source
             .bind_property("name", &target, "name")
-            .flags(crate::BindingFlags::SYNC_CREATE | crate::BindingFlags::BIDIRECTIONAL)
-            .transform_to(|_binding, value| {
-                let value = value.get::<&str>().unwrap();
-                Some(format!("{} World", value).to_value())
-            })
-            .transform_from(|_binding, value| {
-                let value = value.get::<&str>().unwrap();
-                Some(format!("{} World", value).to_value())
-            })
+            .sync_create()
+            .bidirectional()
+            .transform_to(|_binding, value: &str| Some(format!("{value} World")))
+            .transform_from(|_binding, value: &str| Some(format!("{value} World")))
             .build();
 
         target.set_name("Hello");
         assert_eq!(source.name(), "Hello World");
+    }
+
+    #[test]
+    fn binding_to_transform_with_values_change_type() {
+        let source = TestObject::default();
+        let target = TestObject::default();
+
+        source
+            .bind_property("name", &target, "enabled")
+            .sync_create()
+            .transform_to_with_values(|_binding, value| {
+                let value = value.get::<&str>().unwrap();
+                Some((value == "Hello").to_value())
+            })
+            .transform_from_with_values(|_binding, value| {
+                let value = value.get::<bool>().unwrap();
+                Some((if value { "Hello" } else { "World" }).to_value())
+            })
+            .build();
+
+        source.set_name("Hello");
+        assert!(target.enabled());
+
+        source.set_name("Hello World");
+        assert!(!target.enabled());
+    }
+
+    #[test]
+    fn binding_from_transform_values_change_type() {
+        let source = TestObject::default();
+        let target = TestObject::default();
+
+        source
+            .bind_property("name", &target, "enabled")
+            .sync_create()
+            .bidirectional()
+            .transform_to_with_values(|_binding, value| {
+                let value = value.get::<&str>().unwrap();
+                Some((value == "Hello").to_value())
+            })
+            .transform_from_with_values(|_binding, value| {
+                let value = value.get::<bool>().unwrap();
+                Some((if value { "Hello" } else { "World" }).to_value())
+            })
+            .build();
+
+        target.set_enabled(true);
+        assert_eq!(source.name(), "Hello");
+        target.set_enabled(false);
+        assert_eq!(source.name(), "World");
     }
 
     #[test]
@@ -90,15 +187,9 @@ mod test {
 
         source
             .bind_property("name", &target, "enabled")
-            .flags(crate::BindingFlags::SYNC_CREATE)
-            .transform_to(|_binding, value| {
-                let value = value.get::<&str>().unwrap();
-                Some((value == "Hello").to_value())
-            })
-            .transform_from(|_binding, value| {
-                let value = value.get::<bool>().unwrap();
-                Some((if value { "Hello" } else { "World" }).to_value())
-            })
+            .sync_create()
+            .transform_to(|_binding, value: &str| Some(value == "Hello"))
+            .transform_from(|_binding, value: bool| Some(if value { "Hello" } else { "World" }))
             .build();
 
         source.set_name("Hello");
@@ -115,15 +206,10 @@ mod test {
 
         source
             .bind_property("name", &target, "enabled")
-            .flags(crate::BindingFlags::SYNC_CREATE | crate::BindingFlags::BIDIRECTIONAL)
-            .transform_to(|_binding, value| {
-                let value = value.get::<&str>().unwrap();
-                Some((value == "Hello").to_value())
-            })
-            .transform_from(|_binding, value| {
-                let value = value.get::<bool>().unwrap();
-                Some((if value { "Hello" } else { "World" }).to_value())
-            })
+            .sync_create()
+            .bidirectional()
+            .transform_to(|_binding, value: &str| Some(value == "Hello"))
+            .transform_from(|_binding, value: bool| Some(if value { "Hello" } else { "World" }))
             .build();
 
         target.set_enabled(true);
@@ -133,11 +219,11 @@ mod test {
     }
 
     mod imp {
-        use super::*;
-
-        use once_cell::sync::Lazy;
         use std::cell::RefCell;
 
+        use once_cell::sync::Lazy;
+
+        use super::*;
         use crate as glib;
 
         #[derive(Debug, Default)]
@@ -156,31 +242,19 @@ mod test {
             fn properties() -> &'static [crate::ParamSpec] {
                 static PROPERTIES: Lazy<Vec<crate::ParamSpec>> = Lazy::new(|| {
                     vec![
-                        crate::ParamSpecString::new(
-                            "name",
-                            "name",
-                            "name",
-                            None,
-                            crate::ParamFlags::READWRITE | crate::ParamFlags::EXPLICIT_NOTIFY,
-                        ),
-                        crate::ParamSpecBoolean::new(
-                            "enabled",
-                            "enabled",
-                            "enabled",
-                            false,
-                            crate::ParamFlags::READWRITE | crate::ParamFlags::EXPLICIT_NOTIFY,
-                        ),
+                        crate::ParamSpecString::builder("name")
+                            .explicit_notify()
+                            .build(),
+                        crate::ParamSpecBoolean::builder("enabled")
+                            .explicit_notify()
+                            .build(),
                     ]
                 });
                 PROPERTIES.as_ref()
             }
 
-            fn property(
-                &self,
-                obj: &Self::Type,
-                _id: usize,
-                pspec: &crate::ParamSpec,
-            ) -> crate::Value {
+            fn property(&self, _id: usize, pspec: &crate::ParamSpec) -> crate::Value {
+                let obj = self.obj();
                 match pspec.name() {
                     "name" => obj.name().to_value(),
                     "enabled" => obj.enabled().to_value(),
@@ -188,13 +262,8 @@ mod test {
                 }
             }
 
-            fn set_property(
-                &self,
-                obj: &Self::Type,
-                _id: usize,
-                value: &crate::Value,
-                pspec: &crate::ParamSpec,
-            ) {
+            fn set_property(&self, _id: usize, value: &crate::Value, pspec: &crate::ParamSpec) {
+                let obj = self.obj();
                 match pspec.name() {
                     "name" => obj.set_name(value.get().unwrap()),
                     "enabled" => obj.set_enabled(value.get().unwrap()),
@@ -210,7 +279,7 @@ mod test {
 
     impl Default for TestObject {
         fn default() -> Self {
-            crate::Object::new(&[]).unwrap()
+            crate::Object::new()
         }
     }
 

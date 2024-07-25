@@ -3,14 +3,12 @@
 // DO NOT EDIT
 
 use crate::OutputStream;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GFilterOutputStream")]
@@ -25,23 +23,14 @@ impl FilterOutputStream {
     pub const NONE: Option<&'static FilterOutputStream> = None;
 }
 
-pub trait FilterOutputStreamExt: 'static {
-    #[doc(alias = "g_filter_output_stream_get_base_stream")]
-    #[doc(alias = "get_base_stream")]
-    fn base_stream(&self) -> OutputStream;
-
-    #[doc(alias = "g_filter_output_stream_get_close_base_stream")]
-    #[doc(alias = "get_close_base_stream")]
-    fn closes_base_stream(&self) -> bool;
-
-    #[doc(alias = "g_filter_output_stream_set_close_base_stream")]
-    fn set_close_base_stream(&self, close_base: bool);
-
-    #[doc(alias = "close-base-stream")]
-    fn connect_close_base_stream_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::FilterOutputStream>> Sealed for T {}
 }
 
-impl<O: IsA<FilterOutputStream>> FilterOutputStreamExt for O {
+pub trait FilterOutputStreamExt: IsA<FilterOutputStream> + sealed::Sealed + 'static {
+    #[doc(alias = "g_filter_output_stream_get_base_stream")]
+    #[doc(alias = "get_base_stream")]
     fn base_stream(&self) -> OutputStream {
         unsafe {
             from_glib_none(ffi::g_filter_output_stream_get_base_stream(
@@ -50,6 +39,8 @@ impl<O: IsA<FilterOutputStream>> FilterOutputStreamExt for O {
         }
     }
 
+    #[doc(alias = "g_filter_output_stream_get_close_base_stream")]
+    #[doc(alias = "get_close_base_stream")]
     fn closes_base_stream(&self) -> bool {
         unsafe {
             from_glib(ffi::g_filter_output_stream_get_close_base_stream(
@@ -58,6 +49,7 @@ impl<O: IsA<FilterOutputStream>> FilterOutputStreamExt for O {
         }
     }
 
+    #[doc(alias = "g_filter_output_stream_set_close_base_stream")]
     fn set_close_base_stream(&self, close_base: bool) {
         unsafe {
             ffi::g_filter_output_stream_set_close_base_stream(
@@ -67,6 +59,7 @@ impl<O: IsA<FilterOutputStream>> FilterOutputStreamExt for O {
         }
     }
 
+    #[doc(alias = "close-base-stream")]
     fn connect_close_base_stream_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_close_base_stream_trampoline<
             P: IsA<FilterOutputStream>,
@@ -92,6 +85,8 @@ impl<O: IsA<FilterOutputStream>> FilterOutputStreamExt for O {
         }
     }
 }
+
+impl<O: IsA<FilterOutputStream>> FilterOutputStreamExt for O {}
 
 impl fmt::Display for FilterOutputStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

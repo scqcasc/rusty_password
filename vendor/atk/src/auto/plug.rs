@@ -2,11 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Component;
-use crate::Object;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::translate::*;
+use crate::{Component, Object};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -34,17 +31,20 @@ impl Default for Plug {
     }
 }
 
-pub trait AtkPlugExt: 'static {
-    #[doc(alias = "atk_plug_get_id")]
-    #[doc(alias = "get_id")]
-    fn id(&self) -> Option<glib::GString>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Plug>> Sealed for T {}
 }
 
-impl<O: IsA<Plug>> AtkPlugExt for O {
+pub trait AtkPlugExt: IsA<Plug> + sealed::Sealed + 'static {
+    #[doc(alias = "atk_plug_get_id")]
+    #[doc(alias = "get_id")]
     fn id(&self) -> Option<glib::GString> {
         unsafe { from_glib_full(ffi::atk_plug_get_id(self.as_ref().to_glib_none().0)) }
     }
 }
+
+impl<O: IsA<Plug>> AtkPlugExt for O {}
 
 impl fmt::Display for Plug {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

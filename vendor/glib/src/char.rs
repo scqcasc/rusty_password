@@ -1,10 +1,10 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::translate::FromGlib;
-use crate::translate::IntoGlib;
+use std::{convert::TryFrom, num::TryFromIntError};
+
 use libc::{c_char, c_uchar};
-use std::convert::TryFrom;
-use std::num::TryFromIntError;
+
+use crate::translate::*;
 
 // rustdoc-stripper-ignore-next
 /// Wrapper for values where C functions expect a plain C `char`
@@ -83,6 +83,7 @@ impl From<Char> for u8 {
 
 #[doc(hidden)]
 impl FromGlib<c_char> for Char {
+    #[inline]
     unsafe fn from_glib(value: c_char) -> Self {
         Self(value)
     }
@@ -92,6 +93,7 @@ impl FromGlib<c_char> for Char {
 impl IntoGlib for Char {
     type GlibType = c_char;
 
+    #[inline]
     fn into_glib(self) -> c_char {
         self.0
     }
@@ -136,25 +138,26 @@ impl TryFrom<char> for UChar {
 
 impl From<UChar> for char {
     fn from(c: UChar) -> char {
-        c.0 as char
+        c.0 as _
     }
 }
 
 impl From<u8> for UChar {
     #[allow(clippy::unnecessary_cast)]
     fn from(c: u8) -> UChar {
-        UChar(c as c_uchar)
+        UChar(c as _)
     }
 }
 
 impl From<UChar> for u8 {
     fn from(c: UChar) -> u8 {
-        c.0 as u8
+        c.0 as _
     }
 }
 
 #[doc(hidden)]
 impl FromGlib<c_uchar> for UChar {
+    #[inline]
     unsafe fn from_glib(value: c_uchar) -> Self {
         Self(value)
     }
@@ -164,6 +167,7 @@ impl FromGlib<c_uchar> for UChar {
 impl IntoGlib for UChar {
     type GlibType = c_uchar;
 
+    #[inline]
     fn into_glib(self) -> c_uchar {
         self.0
     }
@@ -172,7 +176,6 @@ impl IntoGlib for UChar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::translate::from_glib;
 
     #[test]
     #[allow(clippy::unnecessary_cast)]

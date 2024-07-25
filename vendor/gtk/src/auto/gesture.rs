@@ -2,18 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::EventController;
-use crate::EventSequenceState;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::mem::transmute;
+use crate::{EventController, EventSequenceState};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GtkGesture")]
@@ -28,115 +23,14 @@ impl Gesture {
     pub const NONE: Option<&'static Gesture> = None;
 }
 
-pub trait GestureExt: 'static {
-    #[doc(alias = "gtk_gesture_get_bounding_box")]
-    #[doc(alias = "get_bounding_box")]
-    fn bounding_box(&self) -> Option<gdk::Rectangle>;
-
-    #[doc(alias = "gtk_gesture_get_bounding_box_center")]
-    #[doc(alias = "get_bounding_box_center")]
-    fn bounding_box_center(&self) -> Option<(f64, f64)>;
-
-    #[doc(alias = "gtk_gesture_get_device")]
-    #[doc(alias = "get_device")]
-    fn device(&self) -> Option<gdk::Device>;
-
-    #[doc(alias = "gtk_gesture_get_group")]
-    #[doc(alias = "get_group")]
-    fn group(&self) -> Vec<Gesture>;
-
-    #[doc(alias = "gtk_gesture_get_last_event")]
-    #[doc(alias = "get_last_event")]
-    fn last_event(&self, sequence: Option<&gdk::EventSequence>) -> Option<gdk::Event>;
-
-    #[doc(alias = "gtk_gesture_get_last_updated_sequence")]
-    #[doc(alias = "get_last_updated_sequence")]
-    fn last_updated_sequence(&self) -> Option<gdk::EventSequence>;
-
-    #[doc(alias = "gtk_gesture_get_point")]
-    #[doc(alias = "get_point")]
-    fn point(&self, sequence: Option<&gdk::EventSequence>) -> Option<(f64, f64)>;
-
-    #[doc(alias = "gtk_gesture_get_sequence_state")]
-    #[doc(alias = "get_sequence_state")]
-    fn sequence_state(&self, sequence: &gdk::EventSequence) -> EventSequenceState;
-
-    #[doc(alias = "gtk_gesture_get_sequences")]
-    #[doc(alias = "get_sequences")]
-    fn sequences(&self) -> Vec<gdk::EventSequence>;
-
-    #[doc(alias = "gtk_gesture_get_window")]
-    #[doc(alias = "get_window")]
-    fn window(&self) -> Option<gdk::Window>;
-
-    #[doc(alias = "gtk_gesture_group")]
-    #[doc(alias = "group")]
-    fn group_with(&self, gesture: &impl IsA<Gesture>);
-
-    #[doc(alias = "gtk_gesture_handles_sequence")]
-    fn handles_sequence(&self, sequence: Option<&gdk::EventSequence>) -> bool;
-
-    #[doc(alias = "gtk_gesture_is_active")]
-    fn is_active(&self) -> bool;
-
-    #[doc(alias = "gtk_gesture_is_grouped_with")]
-    fn is_grouped_with(&self, other: &impl IsA<Gesture>) -> bool;
-
-    #[doc(alias = "gtk_gesture_is_recognized")]
-    fn is_recognized(&self) -> bool;
-
-    #[doc(alias = "gtk_gesture_set_sequence_state")]
-    fn set_sequence_state(&self, sequence: &gdk::EventSequence, state: EventSequenceState) -> bool;
-
-    #[doc(alias = "gtk_gesture_set_state")]
-    fn set_state(&self, state: EventSequenceState) -> bool;
-
-    #[doc(alias = "gtk_gesture_set_window")]
-    fn set_window(&self, window: Option<&gdk::Window>);
-
-    #[doc(alias = "gtk_gesture_ungroup")]
-    fn ungroup(&self);
-
-    #[doc(alias = "n-points")]
-    fn n_points(&self) -> u32;
-
-    #[doc(alias = "begin")]
-    fn connect_begin<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "cancel")]
-    fn connect_cancel<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "end")]
-    fn connect_end<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "sequence-state-changed")]
-    fn connect_sequence_state_changed<
-        F: Fn(&Self, Option<&gdk::EventSequence>, EventSequenceState) + 'static,
-    >(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "update")]
-    fn connect_update<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "window")]
-    fn connect_window_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Gesture>> Sealed for T {}
 }
 
-impl<O: IsA<Gesture>> GestureExt for O {
+pub trait GestureExt: IsA<Gesture> + sealed::Sealed + 'static {
+    #[doc(alias = "gtk_gesture_get_bounding_box")]
+    #[doc(alias = "get_bounding_box")]
     fn bounding_box(&self) -> Option<gdk::Rectangle> {
         unsafe {
             let mut rect = gdk::Rectangle::uninitialized();
@@ -152,6 +46,8 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_bounding_box_center")]
+    #[doc(alias = "get_bounding_box_center")]
     fn bounding_box_center(&self) -> Option<(f64, f64)> {
         unsafe {
             let mut x = mem::MaybeUninit::uninit();
@@ -161,20 +57,22 @@ impl<O: IsA<Gesture>> GestureExt for O {
                 x.as_mut_ptr(),
                 y.as_mut_ptr(),
             ));
-            let x = x.assume_init();
-            let y = y.assume_init();
             if ret {
-                Some((x, y))
+                Some((x.assume_init(), y.assume_init()))
             } else {
                 None
             }
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_device")]
+    #[doc(alias = "get_device")]
     fn device(&self) -> Option<gdk::Device> {
         unsafe { from_glib_none(ffi::gtk_gesture_get_device(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "gtk_gesture_get_group")]
+    #[doc(alias = "get_group")]
     fn group(&self) -> Vec<Gesture> {
         unsafe {
             FromGlibPtrContainer::from_glib_container(ffi::gtk_gesture_get_group(
@@ -183,6 +81,8 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_last_event")]
+    #[doc(alias = "get_last_event")]
     fn last_event(&self, sequence: Option<&gdk::EventSequence>) -> Option<gdk::Event> {
         unsafe {
             from_glib_none(ffi::gtk_gesture_get_last_event(
@@ -192,6 +92,8 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_last_updated_sequence")]
+    #[doc(alias = "get_last_updated_sequence")]
     fn last_updated_sequence(&self) -> Option<gdk::EventSequence> {
         unsafe {
             from_glib_none(ffi::gtk_gesture_get_last_updated_sequence(
@@ -200,6 +102,8 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_point")]
+    #[doc(alias = "get_point")]
     fn point(&self, sequence: Option<&gdk::EventSequence>) -> Option<(f64, f64)> {
         unsafe {
             let mut x = mem::MaybeUninit::uninit();
@@ -210,16 +114,16 @@ impl<O: IsA<Gesture>> GestureExt for O {
                 x.as_mut_ptr(),
                 y.as_mut_ptr(),
             ));
-            let x = x.assume_init();
-            let y = y.assume_init();
             if ret {
-                Some((x, y))
+                Some((x.assume_init(), y.assume_init()))
             } else {
                 None
             }
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_sequence_state")]
+    #[doc(alias = "get_sequence_state")]
     fn sequence_state(&self, sequence: &gdk::EventSequence) -> EventSequenceState {
         unsafe {
             from_glib(ffi::gtk_gesture_get_sequence_state(
@@ -229,6 +133,8 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_sequences")]
+    #[doc(alias = "get_sequences")]
     fn sequences(&self) -> Vec<gdk::EventSequence> {
         unsafe {
             FromGlibPtrContainer::from_glib_container(ffi::gtk_gesture_get_sequences(
@@ -237,10 +143,14 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_get_window")]
+    #[doc(alias = "get_window")]
     fn window(&self) -> Option<gdk::Window> {
         unsafe { from_glib_none(ffi::gtk_gesture_get_window(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "gtk_gesture_group")]
+    #[doc(alias = "group")]
     fn group_with(&self, gesture: &impl IsA<Gesture>) {
         unsafe {
             ffi::gtk_gesture_group(
@@ -250,6 +160,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_handles_sequence")]
     fn handles_sequence(&self, sequence: Option<&gdk::EventSequence>) -> bool {
         unsafe {
             from_glib(ffi::gtk_gesture_handles_sequence(
@@ -259,10 +170,12 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_is_active")]
     fn is_active(&self) -> bool {
         unsafe { from_glib(ffi::gtk_gesture_is_active(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "gtk_gesture_is_grouped_with")]
     fn is_grouped_with(&self, other: &impl IsA<Gesture>) -> bool {
         unsafe {
             from_glib(ffi::gtk_gesture_is_grouped_with(
@@ -272,6 +185,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_is_recognized")]
     fn is_recognized(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_gesture_is_recognized(
@@ -280,6 +194,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_set_sequence_state")]
     fn set_sequence_state(&self, sequence: &gdk::EventSequence, state: EventSequenceState) -> bool {
         unsafe {
             from_glib(ffi::gtk_gesture_set_sequence_state(
@@ -290,6 +205,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_set_state")]
     fn set_state(&self, state: EventSequenceState) -> bool {
         unsafe {
             from_glib(ffi::gtk_gesture_set_state(
@@ -299,22 +215,26 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "gtk_gesture_set_window")]
     fn set_window(&self, window: Option<&gdk::Window>) {
         unsafe {
             ffi::gtk_gesture_set_window(self.as_ref().to_glib_none().0, window.to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_gesture_ungroup")]
     fn ungroup(&self) {
         unsafe {
             ffi::gtk_gesture_ungroup(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "n-points")]
     fn n_points(&self) -> u32 {
-        glib::ObjectExt::property(self.as_ref(), "n-points")
+        ObjectExt::property(self.as_ref(), "n-points")
     }
 
+    #[doc(alias = "begin")]
     fn connect_begin<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
         &self,
         f: F,
@@ -348,6 +268,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "cancel")]
     fn connect_cancel<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
         &self,
         f: F,
@@ -381,6 +302,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "end")]
     fn connect_end<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
         &self,
         f: F,
@@ -414,6 +336,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "sequence-state-changed")]
     fn connect_sequence_state_changed<
         F: Fn(&Self, Option<&gdk::EventSequence>, EventSequenceState) + 'static,
     >(
@@ -451,6 +374,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "update")]
     fn connect_update<F: Fn(&Self, Option<&gdk::EventSequence>) + 'static>(
         &self,
         f: F,
@@ -484,6 +408,7 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 
+    #[doc(alias = "window")]
     fn connect_window_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_window_trampoline<P: IsA<Gesture>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkGesture,
@@ -506,6 +431,8 @@ impl<O: IsA<Gesture>> GestureExt for O {
         }
     }
 }
+
+impl<O: IsA<Gesture>> GestureExt for O {}
 
 impl fmt::Display for Gesture {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

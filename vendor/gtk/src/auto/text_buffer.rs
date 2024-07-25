@@ -2,25 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Clipboard;
-use crate::TargetList;
-use crate::TextChildAnchor;
-use crate::TextIter;
-use crate::TextMark;
-use crate::TextTag;
-use crate::TextTagTable;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use glib::ToValue;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::mem::transmute;
-use std::ptr;
+use crate::{Clipboard, TargetList, TextChildAnchor, TextIter, TextMark, TextTag, TextTagTable};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem, mem::transmute, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GtkTextBuffer")]
@@ -49,379 +37,61 @@ impl TextBuffer {
     ///
     /// This method returns an instance of [`TextBufferBuilder`](crate::builders::TextBufferBuilder) which can be used to create [`TextBuffer`] objects.
     pub fn builder() -> TextBufferBuilder {
-        TextBufferBuilder::default()
+        TextBufferBuilder::new()
     }
 }
 
 impl Default for TextBuffer {
     fn default() -> Self {
-        glib::object::Object::new::<Self>(&[])
-            .expect("Can't construct TextBuffer object with default parameters")
+        glib::object::Object::new::<Self>()
     }
 }
 
-#[derive(Clone, Default)]
 // rustdoc-stripper-ignore-next
 /// A [builder-pattern] type to construct [`TextBuffer`] objects.
 ///
 /// [builder-pattern]: https://doc.rust-lang.org/1.0.0/style/ownership/builders.html
 #[must_use = "The builder must be built to be used"]
 pub struct TextBufferBuilder {
-    tag_table: Option<TextTagTable>,
-    text: Option<String>,
+    builder: glib::object::ObjectBuilder<'static, TextBuffer>,
 }
 
 impl TextBufferBuilder {
-    // rustdoc-stripper-ignore-next
-    /// Create a new [`TextBufferBuilder`].
-    pub fn new() -> Self {
-        Self::default()
+    fn new() -> Self {
+        Self {
+            builder: glib::object::Object::builder(),
+        }
+    }
+
+    pub fn tag_table(self, tag_table: &impl IsA<TextTagTable>) -> Self {
+        Self {
+            builder: self
+                .builder
+                .property("tag-table", tag_table.clone().upcast()),
+        }
+    }
+
+    pub fn text(self, text: impl Into<glib::GString>) -> Self {
+        Self {
+            builder: self.builder.property("text", text.into()),
+        }
     }
 
     // rustdoc-stripper-ignore-next
     /// Build the [`TextBuffer`].
     #[must_use = "Building the object from the builder is usually expensive and is not expected to have side effects"]
     pub fn build(self) -> TextBuffer {
-        let mut properties: Vec<(&str, &dyn ToValue)> = vec![];
-        if let Some(ref tag_table) = self.tag_table {
-            properties.push(("tag-table", tag_table));
-        }
-        if let Some(ref text) = self.text {
-            properties.push(("text", text));
-        }
-        glib::Object::new::<TextBuffer>(&properties)
-            .expect("Failed to create an instance of TextBuffer")
-    }
-
-    pub fn tag_table(mut self, tag_table: &impl IsA<TextTagTable>) -> Self {
-        self.tag_table = Some(tag_table.clone().upcast());
-        self
-    }
-
-    pub fn text(mut self, text: &str) -> Self {
-        self.text = Some(text.to_string());
-        self
+        self.builder.build()
     }
 }
 
-pub trait TextBufferExt: 'static {
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::TextBuffer>> Sealed for T {}
+}
+
+pub trait TextBufferExt: IsA<TextBuffer> + sealed::Sealed + 'static {
     #[doc(alias = "gtk_text_buffer_add_mark")]
-    fn add_mark(&self, mark: &impl IsA<TextMark>, where_: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_add_selection_clipboard")]
-    fn add_selection_clipboard(&self, clipboard: &Clipboard);
-
-    #[doc(alias = "gtk_text_buffer_apply_tag")]
-    fn apply_tag(&self, tag: &impl IsA<TextTag>, start: &TextIter, end: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_apply_tag_by_name")]
-    fn apply_tag_by_name(&self, name: &str, start: &TextIter, end: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_backspace")]
-    fn backspace(&self, iter: &mut TextIter, interactive: bool, default_editable: bool) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_begin_user_action")]
-    fn begin_user_action(&self);
-
-    #[doc(alias = "gtk_text_buffer_copy_clipboard")]
-    fn copy_clipboard(&self, clipboard: &Clipboard);
-
-    #[doc(alias = "gtk_text_buffer_create_child_anchor")]
-    fn create_child_anchor(&self, iter: &mut TextIter) -> Option<TextChildAnchor>;
-
-    #[doc(alias = "gtk_text_buffer_create_mark")]
-    fn create_mark(
-        &self,
-        mark_name: Option<&str>,
-        where_: &TextIter,
-        left_gravity: bool,
-    ) -> Option<TextMark>;
-
-    #[doc(alias = "gtk_text_buffer_cut_clipboard")]
-    fn cut_clipboard(&self, clipboard: &Clipboard, default_editable: bool);
-
-    #[doc(alias = "gtk_text_buffer_delete")]
-    fn delete(&self, start: &mut TextIter, end: &mut TextIter);
-
-    #[doc(alias = "gtk_text_buffer_delete_interactive")]
-    fn delete_interactive(
-        &self,
-        start_iter: &mut TextIter,
-        end_iter: &mut TextIter,
-        default_editable: bool,
-    ) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_delete_mark")]
-    fn delete_mark(&self, mark: &impl IsA<TextMark>);
-
-    #[doc(alias = "gtk_text_buffer_delete_mark_by_name")]
-    fn delete_mark_by_name(&self, name: &str);
-
-    #[doc(alias = "gtk_text_buffer_delete_selection")]
-    fn delete_selection(&self, interactive: bool, default_editable: bool) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_deserialize")]
-    fn deserialize(
-        &self,
-        content_buffer: &impl IsA<TextBuffer>,
-        format: &gdk::Atom,
-        iter: &mut TextIter,
-        data: &[u8],
-    ) -> Result<(), glib::Error>;
-
-    #[doc(alias = "gtk_text_buffer_deserialize_get_can_create_tags")]
-    fn deserialize_get_can_create_tags(&self, format: &gdk::Atom) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_deserialize_set_can_create_tags")]
-    fn deserialize_set_can_create_tags(&self, format: &gdk::Atom, can_create_tags: bool);
-
-    #[doc(alias = "gtk_text_buffer_end_user_action")]
-    fn end_user_action(&self);
-
-    #[doc(alias = "gtk_text_buffer_get_bounds")]
-    #[doc(alias = "get_bounds")]
-    fn bounds(&self) -> (TextIter, TextIter);
-
-    #[doc(alias = "gtk_text_buffer_get_char_count")]
-    #[doc(alias = "get_char_count")]
-    fn char_count(&self) -> i32;
-
-    #[doc(alias = "gtk_text_buffer_get_copy_target_list")]
-    #[doc(alias = "get_copy_target_list")]
-    fn copy_target_list(&self) -> Option<TargetList>;
-
-    #[doc(alias = "gtk_text_buffer_get_deserialize_formats")]
-    #[doc(alias = "get_deserialize_formats")]
-    fn deserialize_formats(&self) -> Vec<gdk::Atom>;
-
-    #[doc(alias = "gtk_text_buffer_get_end_iter")]
-    #[doc(alias = "get_end_iter")]
-    fn end_iter(&self) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_has_selection")]
-    #[doc(alias = "get_has_selection")]
-    fn has_selection(&self) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_get_insert")]
-    fn get_insert(&self) -> Option<TextMark>;
-
-    #[doc(alias = "gtk_text_buffer_get_iter_at_child_anchor")]
-    #[doc(alias = "get_iter_at_child_anchor")]
-    fn iter_at_child_anchor(&self, anchor: &impl IsA<TextChildAnchor>) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_iter_at_line")]
-    #[doc(alias = "get_iter_at_line")]
-    fn iter_at_line(&self, line_number: i32) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_iter_at_line_index")]
-    #[doc(alias = "get_iter_at_line_index")]
-    fn iter_at_line_index(&self, line_number: i32, byte_index: i32) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_iter_at_line_offset")]
-    #[doc(alias = "get_iter_at_line_offset")]
-    fn iter_at_line_offset(&self, line_number: i32, char_offset: i32) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_iter_at_mark")]
-    #[doc(alias = "get_iter_at_mark")]
-    fn iter_at_mark(&self, mark: &impl IsA<TextMark>) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_iter_at_offset")]
-    #[doc(alias = "get_iter_at_offset")]
-    fn iter_at_offset(&self, char_offset: i32) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_line_count")]
-    #[doc(alias = "get_line_count")]
-    fn line_count(&self) -> i32;
-
-    #[doc(alias = "gtk_text_buffer_get_mark")]
-    #[doc(alias = "get_mark")]
-    fn mark(&self, name: &str) -> Option<TextMark>;
-
-    #[doc(alias = "gtk_text_buffer_get_modified")]
-    #[doc(alias = "get_modified")]
-    fn is_modified(&self) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_get_paste_target_list")]
-    #[doc(alias = "get_paste_target_list")]
-    fn paste_target_list(&self) -> Option<TargetList>;
-
-    #[doc(alias = "gtk_text_buffer_get_selection_bound")]
-    #[doc(alias = "get_selection_bound")]
-    fn selection_bound(&self) -> Option<TextMark>;
-
-    #[doc(alias = "gtk_text_buffer_get_selection_bounds")]
-    #[doc(alias = "get_selection_bounds")]
-    fn selection_bounds(&self) -> Option<(TextIter, TextIter)>;
-
-    #[doc(alias = "gtk_text_buffer_get_serialize_formats")]
-    #[doc(alias = "get_serialize_formats")]
-    fn serialize_formats(&self) -> Vec<gdk::Atom>;
-
-    #[doc(alias = "gtk_text_buffer_get_slice")]
-    #[doc(alias = "get_slice")]
-    fn slice(
-        &self,
-        start: &TextIter,
-        end: &TextIter,
-        include_hidden_chars: bool,
-    ) -> Option<glib::GString>;
-
-    #[doc(alias = "gtk_text_buffer_get_start_iter")]
-    #[doc(alias = "get_start_iter")]
-    fn start_iter(&self) -> TextIter;
-
-    #[doc(alias = "gtk_text_buffer_get_tag_table")]
-    #[doc(alias = "get_tag_table")]
-    fn tag_table(&self) -> Option<TextTagTable>;
-
-    #[doc(alias = "gtk_text_buffer_get_text")]
-    #[doc(alias = "get_text")]
-    fn text(
-        &self,
-        start: &TextIter,
-        end: &TextIter,
-        include_hidden_chars: bool,
-    ) -> Option<glib::GString>;
-
-    #[doc(alias = "gtk_text_buffer_insert")]
-    fn insert(&self, iter: &mut TextIter, text: &str);
-
-    #[doc(alias = "gtk_text_buffer_insert_at_cursor")]
-    fn insert_at_cursor(&self, text: &str);
-
-    #[doc(alias = "gtk_text_buffer_insert_child_anchor")]
-    fn insert_child_anchor(&self, iter: &mut TextIter, anchor: &impl IsA<TextChildAnchor>);
-
-    #[doc(alias = "gtk_text_buffer_insert_interactive")]
-    fn insert_interactive(&self, iter: &mut TextIter, text: &str, default_editable: bool) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_insert_interactive_at_cursor")]
-    fn insert_interactive_at_cursor(&self, text: &str, default_editable: bool) -> bool;
-
-    #[doc(alias = "gtk_text_buffer_insert_markup")]
-    fn insert_markup(&self, iter: &mut TextIter, markup: &str);
-
-    #[doc(alias = "gtk_text_buffer_insert_pixbuf")]
-    fn insert_pixbuf(&self, iter: &mut TextIter, pixbuf: &gdk_pixbuf::Pixbuf);
-
-    #[doc(alias = "gtk_text_buffer_insert_range")]
-    fn insert_range(&self, iter: &mut TextIter, start: &TextIter, end: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_insert_range_interactive")]
-    fn insert_range_interactive(
-        &self,
-        iter: &mut TextIter,
-        start: &TextIter,
-        end: &TextIter,
-        default_editable: bool,
-    ) -> bool;
-
-    //#[doc(alias = "gtk_text_buffer_insert_with_tags_by_name")]
-    //fn insert_with_tags_by_name(&self, iter: &mut TextIter, text: &str, first_tag_name: &str, : /*Unknown conversion*//*Unimplemented*/Fundamental: VarArgs);
-
-    #[doc(alias = "gtk_text_buffer_move_mark")]
-    fn move_mark(&self, mark: &impl IsA<TextMark>, where_: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_move_mark_by_name")]
-    fn move_mark_by_name(&self, name: &str, where_: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_paste_clipboard")]
-    fn paste_clipboard(
-        &self,
-        clipboard: &Clipboard,
-        override_location: Option<&TextIter>,
-        default_editable: bool,
-    );
-
-    #[doc(alias = "gtk_text_buffer_place_cursor")]
-    fn place_cursor(&self, where_: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_register_deserialize_tagset")]
-    fn register_deserialize_tagset(&self, tagset_name: Option<&str>) -> gdk::Atom;
-
-    #[doc(alias = "gtk_text_buffer_register_serialize_tagset")]
-    fn register_serialize_tagset(&self, tagset_name: Option<&str>) -> gdk::Atom;
-
-    #[doc(alias = "gtk_text_buffer_remove_all_tags")]
-    fn remove_all_tags(&self, start: &TextIter, end: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_remove_selection_clipboard")]
-    fn remove_selection_clipboard(&self, clipboard: &Clipboard);
-
-    #[doc(alias = "gtk_text_buffer_remove_tag")]
-    fn remove_tag(&self, tag: &impl IsA<TextTag>, start: &TextIter, end: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_remove_tag_by_name")]
-    fn remove_tag_by_name(&self, name: &str, start: &TextIter, end: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_select_range")]
-    fn select_range(&self, ins: &TextIter, bound: &TextIter);
-
-    #[doc(alias = "gtk_text_buffer_serialize")]
-    fn serialize(
-        &self,
-        content_buffer: &impl IsA<TextBuffer>,
-        format: &gdk::Atom,
-        start: &TextIter,
-        end: &TextIter,
-    ) -> Vec<u8>;
-
-    #[doc(alias = "gtk_text_buffer_set_modified")]
-    fn set_modified(&self, setting: bool);
-
-    #[doc(alias = "gtk_text_buffer_set_text")]
-    fn set_text(&self, text: &str);
-
-    #[doc(alias = "gtk_text_buffer_unregister_deserialize_format")]
-    fn unregister_deserialize_format(&self, format: &gdk::Atom);
-
-    #[doc(alias = "gtk_text_buffer_unregister_serialize_format")]
-    fn unregister_serialize_format(&self, format: &gdk::Atom);
-
-    #[doc(alias = "cursor-position")]
-    fn cursor_position(&self) -> i32;
-
-    #[doc(alias = "begin-user-action")]
-    fn connect_begin_user_action<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "changed")]
-    fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "end-user-action")]
-    fn connect_end_user_action<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "mark-deleted")]
-    fn connect_mark_deleted<F: Fn(&Self, &TextMark) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "mark-set")]
-    fn connect_mark_set<F: Fn(&Self, &TextIter, &TextMark) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "modified-changed")]
-    fn connect_modified_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "paste-done")]
-    fn connect_paste_done<F: Fn(&Self, &Clipboard) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "copy-target-list")]
-    fn connect_copy_target_list_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "cursor-position")]
-    fn connect_cursor_position_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "has-selection")]
-    fn connect_has_selection_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "paste-target-list")]
-    fn connect_paste_target_list_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "text")]
-    fn connect_text_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-}
-
-impl<O: IsA<TextBuffer>> TextBufferExt for O {
     fn add_mark(&self, mark: &impl IsA<TextMark>, where_: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_add_mark(
@@ -432,6 +102,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_add_selection_clipboard")]
     fn add_selection_clipboard(&self, clipboard: &Clipboard) {
         unsafe {
             ffi::gtk_text_buffer_add_selection_clipboard(
@@ -441,6 +112,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_apply_tag")]
     fn apply_tag(&self, tag: &impl IsA<TextTag>, start: &TextIter, end: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_apply_tag(
@@ -452,6 +124,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_apply_tag_by_name")]
     fn apply_tag_by_name(&self, name: &str, start: &TextIter, end: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_apply_tag_by_name(
@@ -463,6 +136,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_backspace")]
     fn backspace(&self, iter: &mut TextIter, interactive: bool, default_editable: bool) -> bool {
         unsafe {
             from_glib(ffi::gtk_text_buffer_backspace(
@@ -474,12 +148,14 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_begin_user_action")]
     fn begin_user_action(&self) {
         unsafe {
             ffi::gtk_text_buffer_begin_user_action(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_copy_clipboard")]
     fn copy_clipboard(&self, clipboard: &Clipboard) {
         unsafe {
             ffi::gtk_text_buffer_copy_clipboard(
@@ -489,6 +165,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_create_child_anchor")]
     fn create_child_anchor(&self, iter: &mut TextIter) -> Option<TextChildAnchor> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_create_child_anchor(
@@ -498,6 +175,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_create_mark")]
     fn create_mark(
         &self,
         mark_name: Option<&str>,
@@ -514,6 +192,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_cut_clipboard")]
     fn cut_clipboard(&self, clipboard: &Clipboard, default_editable: bool) {
         unsafe {
             ffi::gtk_text_buffer_cut_clipboard(
@@ -524,6 +203,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_delete")]
     fn delete(&self, start: &mut TextIter, end: &mut TextIter) {
         unsafe {
             ffi::gtk_text_buffer_delete(
@@ -534,6 +214,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_delete_interactive")]
     fn delete_interactive(
         &self,
         start_iter: &mut TextIter,
@@ -550,6 +231,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_delete_mark")]
     fn delete_mark(&self, mark: &impl IsA<TextMark>) {
         unsafe {
             ffi::gtk_text_buffer_delete_mark(
@@ -559,6 +241,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_delete_mark_by_name")]
     fn delete_mark_by_name(&self, name: &str) {
         unsafe {
             ffi::gtk_text_buffer_delete_mark_by_name(
@@ -568,6 +251,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_delete_selection")]
     fn delete_selection(&self, interactive: bool, default_editable: bool) -> bool {
         unsafe {
             from_glib(ffi::gtk_text_buffer_delete_selection(
@@ -578,6 +262,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_deserialize")]
     fn deserialize(
         &self,
         content_buffer: &impl IsA<TextBuffer>,
@@ -585,7 +270,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         iter: &mut TextIter,
         data: &[u8],
     ) -> Result<(), glib::Error> {
-        let length = data.len() as usize;
+        let length = data.len() as _;
         unsafe {
             let mut error = ptr::null_mut();
             let is_ok = ffi::gtk_text_buffer_deserialize(
@@ -597,7 +282,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
                 length,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -606,6 +291,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_deserialize_get_can_create_tags")]
     fn deserialize_get_can_create_tags(&self, format: &gdk::Atom) -> bool {
         unsafe {
             from_glib(ffi::gtk_text_buffer_deserialize_get_can_create_tags(
@@ -615,6 +301,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_deserialize_set_can_create_tags")]
     fn deserialize_set_can_create_tags(&self, format: &gdk::Atom, can_create_tags: bool) {
         unsafe {
             ffi::gtk_text_buffer_deserialize_set_can_create_tags(
@@ -625,12 +312,15 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_end_user_action")]
     fn end_user_action(&self) {
         unsafe {
             ffi::gtk_text_buffer_end_user_action(self.as_ref().to_glib_none().0);
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_bounds")]
+    #[doc(alias = "get_bounds")]
     fn bounds(&self) -> (TextIter, TextIter) {
         unsafe {
             let mut start = TextIter::uninitialized();
@@ -644,10 +334,14 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_char_count")]
+    #[doc(alias = "get_char_count")]
     fn char_count(&self) -> i32 {
         unsafe { ffi::gtk_text_buffer_get_char_count(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_copy_target_list")]
+    #[doc(alias = "get_copy_target_list")]
     fn copy_target_list(&self) -> Option<TargetList> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_get_copy_target_list(
@@ -656,6 +350,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_deserialize_formats")]
+    #[doc(alias = "get_deserialize_formats")]
     fn deserialize_formats(&self) -> Vec<gdk::Atom> {
         unsafe {
             let mut n_formats = mem::MaybeUninit::uninit();
@@ -664,12 +360,14 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
                     self.as_ref().to_glib_none().0,
                     n_formats.as_mut_ptr(),
                 ),
-                n_formats.assume_init() as usize,
+                n_formats.assume_init() as _,
             );
             ret
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_end_iter")]
+    #[doc(alias = "get_end_iter")]
     fn end_iter(&self) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -681,6 +379,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_has_selection")]
+    #[doc(alias = "get_has_selection")]
     fn has_selection(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_text_buffer_get_has_selection(
@@ -689,6 +389,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_insert")]
     fn get_insert(&self) -> Option<TextMark> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_get_insert(
@@ -697,6 +398,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_iter_at_child_anchor")]
+    #[doc(alias = "get_iter_at_child_anchor")]
     fn iter_at_child_anchor(&self, anchor: &impl IsA<TextChildAnchor>) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -709,6 +412,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_iter_at_line")]
+    #[doc(alias = "get_iter_at_line")]
     fn iter_at_line(&self, line_number: i32) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -721,6 +426,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_iter_at_line_index")]
+    #[doc(alias = "get_iter_at_line_index")]
     fn iter_at_line_index(&self, line_number: i32, byte_index: i32) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -734,6 +441,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_iter_at_line_offset")]
+    #[doc(alias = "get_iter_at_line_offset")]
     fn iter_at_line_offset(&self, line_number: i32, char_offset: i32) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -747,6 +456,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_iter_at_mark")]
+    #[doc(alias = "get_iter_at_mark")]
     fn iter_at_mark(&self, mark: &impl IsA<TextMark>) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -759,6 +470,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_iter_at_offset")]
+    #[doc(alias = "get_iter_at_offset")]
     fn iter_at_offset(&self, char_offset: i32) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -771,10 +484,14 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_line_count")]
+    #[doc(alias = "get_line_count")]
     fn line_count(&self) -> i32 {
         unsafe { ffi::gtk_text_buffer_get_line_count(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_mark")]
+    #[doc(alias = "get_mark")]
     fn mark(&self, name: &str) -> Option<TextMark> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_get_mark(
@@ -784,6 +501,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_modified")]
+    #[doc(alias = "get_modified")]
     fn is_modified(&self) -> bool {
         unsafe {
             from_glib(ffi::gtk_text_buffer_get_modified(
@@ -792,6 +511,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_paste_target_list")]
+    #[doc(alias = "get_paste_target_list")]
     fn paste_target_list(&self) -> Option<TargetList> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_get_paste_target_list(
@@ -800,6 +521,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_selection_bound")]
+    #[doc(alias = "get_selection_bound")]
     fn selection_bound(&self) -> Option<TextMark> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_get_selection_bound(
@@ -808,6 +531,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_selection_bounds")]
+    #[doc(alias = "get_selection_bounds")]
     fn selection_bounds(&self) -> Option<(TextIter, TextIter)> {
         unsafe {
             let mut start = TextIter::uninitialized();
@@ -825,6 +550,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_serialize_formats")]
+    #[doc(alias = "get_serialize_formats")]
     fn serialize_formats(&self) -> Vec<gdk::Atom> {
         unsafe {
             let mut n_formats = mem::MaybeUninit::uninit();
@@ -833,12 +560,14 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
                     self.as_ref().to_glib_none().0,
                     n_formats.as_mut_ptr(),
                 ),
-                n_formats.assume_init() as usize,
+                n_formats.assume_init() as _,
             );
             ret
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_slice")]
+    #[doc(alias = "get_slice")]
     fn slice(
         &self,
         start: &TextIter,
@@ -855,6 +584,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_start_iter")]
+    #[doc(alias = "get_start_iter")]
     fn start_iter(&self) -> TextIter {
         unsafe {
             let mut iter = TextIter::uninitialized();
@@ -866,6 +597,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_tag_table")]
+    #[doc(alias = "get_tag_table")]
     fn tag_table(&self) -> Option<TextTagTable> {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_get_tag_table(
@@ -874,6 +607,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_get_text")]
+    #[doc(alias = "get_text")]
     fn text(
         &self,
         start: &TextIter,
@@ -890,8 +625,9 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert")]
     fn insert(&self, iter: &mut TextIter, text: &str) {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             ffi::gtk_text_buffer_insert(
                 self.as_ref().to_glib_none().0,
@@ -902,8 +638,9 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_at_cursor")]
     fn insert_at_cursor(&self, text: &str) {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             ffi::gtk_text_buffer_insert_at_cursor(
                 self.as_ref().to_glib_none().0,
@@ -913,6 +650,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_child_anchor")]
     fn insert_child_anchor(&self, iter: &mut TextIter, anchor: &impl IsA<TextChildAnchor>) {
         unsafe {
             ffi::gtk_text_buffer_insert_child_anchor(
@@ -923,8 +661,9 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_interactive")]
     fn insert_interactive(&self, iter: &mut TextIter, text: &str, default_editable: bool) -> bool {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             from_glib(ffi::gtk_text_buffer_insert_interactive(
                 self.as_ref().to_glib_none().0,
@@ -936,8 +675,9 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_interactive_at_cursor")]
     fn insert_interactive_at_cursor(&self, text: &str, default_editable: bool) -> bool {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             from_glib(ffi::gtk_text_buffer_insert_interactive_at_cursor(
                 self.as_ref().to_glib_none().0,
@@ -948,8 +688,9 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_markup")]
     fn insert_markup(&self, iter: &mut TextIter, markup: &str) {
-        let len = markup.len() as i32;
+        let len = markup.len() as _;
         unsafe {
             ffi::gtk_text_buffer_insert_markup(
                 self.as_ref().to_glib_none().0,
@@ -960,6 +701,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_pixbuf")]
     fn insert_pixbuf(&self, iter: &mut TextIter, pixbuf: &gdk_pixbuf::Pixbuf) {
         unsafe {
             ffi::gtk_text_buffer_insert_pixbuf(
@@ -970,6 +712,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_range")]
     fn insert_range(&self, iter: &mut TextIter, start: &TextIter, end: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_insert_range(
@@ -981,6 +724,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_insert_range_interactive")]
     fn insert_range_interactive(
         &self,
         iter: &mut TextIter,
@@ -999,10 +743,12 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
-    //fn insert_with_tags_by_name(&self, iter: &mut TextIter, text: &str, first_tag_name: &str, : /*Unknown conversion*//*Unimplemented*/Fundamental: VarArgs) {
+    //#[doc(alias = "gtk_text_buffer_insert_with_tags_by_name")]
+    //fn insert_with_tags_by_name(&self, iter: &mut TextIter, text: &str, first_tag_name: &str, : /*Unknown conversion*//*Unimplemented*/Basic: VarArgs) {
     //    unsafe { TODO: call ffi:gtk_text_buffer_insert_with_tags_by_name() }
     //}
 
+    #[doc(alias = "gtk_text_buffer_move_mark")]
     fn move_mark(&self, mark: &impl IsA<TextMark>, where_: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_move_mark(
@@ -1013,6 +759,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_move_mark_by_name")]
     fn move_mark_by_name(&self, name: &str, where_: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_move_mark_by_name(
@@ -1023,6 +770,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_paste_clipboard")]
     fn paste_clipboard(
         &self,
         clipboard: &Clipboard,
@@ -1039,6 +787,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_place_cursor")]
     fn place_cursor(&self, where_: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_place_cursor(
@@ -1048,6 +797,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_register_deserialize_tagset")]
     fn register_deserialize_tagset(&self, tagset_name: Option<&str>) -> gdk::Atom {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_register_deserialize_tagset(
@@ -1057,6 +807,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_register_serialize_tagset")]
     fn register_serialize_tagset(&self, tagset_name: Option<&str>) -> gdk::Atom {
         unsafe {
             from_glib_none(ffi::gtk_text_buffer_register_serialize_tagset(
@@ -1066,6 +817,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_remove_all_tags")]
     fn remove_all_tags(&self, start: &TextIter, end: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_remove_all_tags(
@@ -1076,6 +828,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_remove_selection_clipboard")]
     fn remove_selection_clipboard(&self, clipboard: &Clipboard) {
         unsafe {
             ffi::gtk_text_buffer_remove_selection_clipboard(
@@ -1085,6 +838,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_remove_tag")]
     fn remove_tag(&self, tag: &impl IsA<TextTag>, start: &TextIter, end: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_remove_tag(
@@ -1096,6 +850,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_remove_tag_by_name")]
     fn remove_tag_by_name(&self, name: &str, start: &TextIter, end: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_remove_tag_by_name(
@@ -1107,6 +862,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_select_range")]
     fn select_range(&self, ins: &TextIter, bound: &TextIter) {
         unsafe {
             ffi::gtk_text_buffer_select_range(
@@ -1117,6 +873,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_serialize")]
     fn serialize(
         &self,
         content_buffer: &impl IsA<TextBuffer>,
@@ -1135,20 +892,22 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
                     end.to_glib_none().0,
                     length.as_mut_ptr(),
                 ),
-                length.assume_init() as usize,
+                length.assume_init() as _,
             );
             ret
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_set_modified")]
     fn set_modified(&self, setting: bool) {
         unsafe {
             ffi::gtk_text_buffer_set_modified(self.as_ref().to_glib_none().0, setting.into_glib());
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_set_text")]
     fn set_text(&self, text: &str) {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             ffi::gtk_text_buffer_set_text(
                 self.as_ref().to_glib_none().0,
@@ -1158,6 +917,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_unregister_deserialize_format")]
     fn unregister_deserialize_format(&self, format: &gdk::Atom) {
         unsafe {
             ffi::gtk_text_buffer_unregister_deserialize_format(
@@ -1167,6 +927,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_buffer_unregister_serialize_format")]
     fn unregister_serialize_format(&self, format: &gdk::Atom) {
         unsafe {
             ffi::gtk_text_buffer_unregister_serialize_format(
@@ -1176,10 +937,12 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "cursor-position")]
     fn cursor_position(&self) -> i32 {
-        glib::ObjectExt::property(self.as_ref(), "cursor-position")
+        ObjectExt::property(self.as_ref(), "cursor-position")
     }
 
+    #[doc(alias = "begin-user-action")]
     fn connect_begin_user_action<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn begin_user_action_trampoline<
             P: IsA<TextBuffer>,
@@ -1204,6 +967,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "changed")]
     fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn changed_trampoline<P: IsA<TextBuffer>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkTextBuffer,
@@ -1225,6 +989,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "end-user-action")]
     fn connect_end_user_action<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn end_user_action_trampoline<P: IsA<TextBuffer>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkTextBuffer,
@@ -1246,6 +1011,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "mark-deleted")]
     fn connect_mark_deleted<F: Fn(&Self, &TextMark) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn mark_deleted_trampoline<
             P: IsA<TextBuffer>,
@@ -1274,6 +1040,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "mark-set")]
     fn connect_mark_set<F: Fn(&Self, &TextIter, &TextMark) + 'static>(
         &self,
         f: F,
@@ -1307,6 +1074,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "modified-changed")]
     fn connect_modified_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn modified_changed_trampoline<
             P: IsA<TextBuffer>,
@@ -1331,6 +1099,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "paste-done")]
     fn connect_paste_done<F: Fn(&Self, &Clipboard) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn paste_done_trampoline<
             P: IsA<TextBuffer>,
@@ -1359,6 +1128,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "copy-target-list")]
     fn connect_copy_target_list_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_copy_target_list_trampoline<
             P: IsA<TextBuffer>,
@@ -1384,6 +1154,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "cursor-position")]
     fn connect_cursor_position_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_cursor_position_trampoline<
             P: IsA<TextBuffer>,
@@ -1409,6 +1180,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "has-selection")]
     fn connect_has_selection_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_has_selection_trampoline<
             P: IsA<TextBuffer>,
@@ -1434,6 +1206,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "paste-target-list")]
     fn connect_paste_target_list_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_paste_target_list_trampoline<
             P: IsA<TextBuffer>,
@@ -1459,6 +1232,7 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 
+    #[doc(alias = "text")]
     fn connect_text_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_text_trampoline<P: IsA<TextBuffer>, F: Fn(&P) + 'static>(
             this: *mut ffi::GtkTextBuffer,
@@ -1481,6 +1255,8 @@ impl<O: IsA<TextBuffer>> TextBufferExt for O {
         }
     }
 }
+
+impl<O: IsA<TextBuffer>> TextBufferExt for O {}
 
 impl fmt::Display for TextBuffer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

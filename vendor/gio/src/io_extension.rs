@@ -1,9 +1,8 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use glib::translate::*;
-use glib::Type;
-use std::fmt;
-use std::ptr;
+use std::{fmt, marker::PhantomData, ptr};
+
+use glib::{translate::*, Type};
 
 // rustdoc-stripper-ignore-next
 /// The implementation of an `IOExtensionPoint`.
@@ -30,17 +29,17 @@ impl fmt::Display for IOExtension {
 impl FromGlibPtrNone<*mut ffi::GIOExtension> for IOExtension {
     #[inline]
     unsafe fn from_glib_none(ptr: *mut ffi::GIOExtension) -> Self {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         IOExtension(ptr::NonNull::new_unchecked(ptr))
     }
 }
 
 impl<'a> ToGlibPtr<'a, *mut ffi::GIOExtension> for &'a IOExtension {
-    type Storage = &'a IOExtension;
+    type Storage = PhantomData<&'a IOExtension>;
 
     #[inline]
     fn to_glib_none(&self) -> Stash<'a, *mut ffi::GIOExtension, &'a IOExtension> {
-        Stash(self.0.as_ptr() as *mut ffi::GIOExtension, *self)
+        Stash(self.0.as_ptr() as *mut ffi::GIOExtension, PhantomData)
     }
 }
 

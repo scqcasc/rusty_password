@@ -2,10 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::ptr;
+use glib::{prelude::*, translate::*};
+use std::{fmt, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GMenuAttributeIter")]
@@ -20,13 +18,14 @@ impl MenuAttributeIter {
     pub const NONE: Option<&'static MenuAttributeIter> = None;
 }
 
-pub trait MenuAttributeIterExt: 'static {
-    #[doc(alias = "g_menu_attribute_iter_get_next")]
-    #[doc(alias = "get_next")]
-    fn next(&self) -> Option<(glib::GString, glib::Variant)>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::MenuAttributeIter>> Sealed for T {}
 }
 
-impl<O: IsA<MenuAttributeIter>> MenuAttributeIterExt for O {
+pub trait MenuAttributeIterExt: IsA<MenuAttributeIter> + sealed::Sealed + 'static {
+    #[doc(alias = "g_menu_attribute_iter_get_next")]
+    #[doc(alias = "get_next")]
     fn next(&self) -> Option<(glib::GString, glib::Variant)> {
         unsafe {
             let mut out_name = ptr::null();
@@ -44,6 +43,8 @@ impl<O: IsA<MenuAttributeIter>> MenuAttributeIterExt for O {
         }
     }
 }
+
+impl<O: IsA<MenuAttributeIter>> MenuAttributeIterExt for O {}
 
 impl fmt::Display for MenuAttributeIter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

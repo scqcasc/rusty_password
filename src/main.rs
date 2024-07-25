@@ -3,12 +3,14 @@
 
 extern crate gtk;
 
+use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
     ToolbarStyle, SeparatorToolItem, FileChooserDialog, FileChooserAction, ResponseType};
 use clap::Parser;
 use std::rc::Rc;
 use std::borrow::Borrow;
+
 mod password;
 
 
@@ -62,7 +64,8 @@ impl GWCApp {
 
         win.connect_delete_event(|_, _| {
             gtk::main_quit();
-            Inhibit(false)
+            Propagation::Stop
+            
         });
 
         // The fields must be updated for the helper methods to work as expected.

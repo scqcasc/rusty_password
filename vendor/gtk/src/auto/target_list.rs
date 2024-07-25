@@ -3,8 +3,7 @@
 // DO NOT EDIT
 
 use crate::TextBuffer;
-use glib::object::IsA;
-use glib::translate::*;
+use glib::{prelude::*, translate::*};
 use std::mem;
 
 glib::wrapper! {
@@ -77,9 +76,8 @@ impl TargetList {
                 target.to_glib_none().0,
                 info.as_mut_ptr(),
             ));
-            let info = info.assume_init();
             if ret {
-                Some(info)
+                Some(info.assume_init())
             } else {
                 None
             }

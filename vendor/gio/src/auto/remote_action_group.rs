@@ -3,8 +3,7 @@
 // DO NOT EDIT
 
 use crate::ActionGroup;
-use glib::object::IsA;
-use glib::translate::*;
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -20,25 +19,13 @@ impl RemoteActionGroup {
     pub const NONE: Option<&'static RemoteActionGroup> = None;
 }
 
-pub trait RemoteActionGroupExt: 'static {
-    #[doc(alias = "g_remote_action_group_activate_action_full")]
-    fn activate_action_full(
-        &self,
-        action_name: &str,
-        parameter: Option<&glib::Variant>,
-        platform_data: &glib::Variant,
-    );
-
-    #[doc(alias = "g_remote_action_group_change_action_state_full")]
-    fn change_action_state_full(
-        &self,
-        action_name: &str,
-        value: &glib::Variant,
-        platform_data: &glib::Variant,
-    );
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::RemoteActionGroup>> Sealed for T {}
 }
 
-impl<O: IsA<RemoteActionGroup>> RemoteActionGroupExt for O {
+pub trait RemoteActionGroupExt: IsA<RemoteActionGroup> + sealed::Sealed + 'static {
+    #[doc(alias = "g_remote_action_group_activate_action_full")]
     fn activate_action_full(
         &self,
         action_name: &str,
@@ -55,6 +42,7 @@ impl<O: IsA<RemoteActionGroup>> RemoteActionGroupExt for O {
         }
     }
 
+    #[doc(alias = "g_remote_action_group_change_action_state_full")]
     fn change_action_state_full(
         &self,
         action_name: &str,
@@ -71,6 +59,8 @@ impl<O: IsA<RemoteActionGroup>> RemoteActionGroupExt for O {
         }
     }
 }
+
+impl<O: IsA<RemoteActionGroup>> RemoteActionGroupExt for O {}
 
 impl fmt::Display for RemoteActionGroup {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

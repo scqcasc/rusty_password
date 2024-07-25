@@ -4,43 +4,29 @@ use crate::{Container, Widget};
 use glib::translate::*;
 use glib::{value::FromValue, IsA, ToValue};
 
-pub trait ContainerExtManual: 'static {
-    #[doc(alias = "gtk_container_child_get_property")]
-    fn child_property_value(&self, child: &impl IsA<Widget>, property_name: &str) -> glib::Value;
-
-    #[doc(alias = "gtk_container_child_get_property")]
-    fn child_property<V: for<'b> FromValue<'b> + 'static>(
-        &self,
-        child: &impl IsA<Widget>,
-        property_name: &str,
-    ) -> V;
-
-    #[doc(alias = "gtk_container_child_set_property")]
-    fn child_set_property(
-        &self,
-        child: &impl IsA<Widget>,
-        property_name: &str,
-        value: &dyn ToValue,
-    );
+mod sealed {
+    pub trait Sealed {}
+    impl<T: glib::IsA<crate::Container>> Sealed for T {}
 }
 
-impl<O: IsA<Container>> ContainerExtManual for O {
+pub trait ContainerExtManual: IsA<Container> + sealed::Sealed + 'static {
+    #[doc(alias = "gtk_container_child_get_property")]
     fn child_property_value(&self, child: &impl IsA<Widget>, property_name: &str) -> glib::Value {
         unsafe {
-            let container_class = glib::Class::<Container>::from_type(O::static_type()).unwrap();
+            let container_class = glib::Class::<Container>::from_type(Self::static_type()).unwrap();
             let pspec: Option<glib::ParamSpec> =
                 from_glib_none(ffi::gtk_container_class_find_child_property(
                     container_class.as_ref() as *const _ as *const glib::gobject_ffi::GObjectClass,
                     property_name.to_glib_none().0,
                 ));
             let pspec = pspec.unwrap_or_else(|| {
-                panic!("The Container property '{}' doesn't exists", property_name)
+                panic!("The Container property '{property_name}' doesn't exists")
             });
 
             if !pspec.flags().contains(glib::ParamFlags::READABLE)
                 || !pspec.flags().contains(glib::ParamFlags::READWRITE)
             {
-                panic!("The Container property '{}' is not readable", property_name);
+                panic!("The Container property '{property_name}' is not readable");
             }
 
             let mut value = glib::Value::from_type(pspec.value_type());
@@ -54,6 +40,7 @@ impl<O: IsA<Container>> ContainerExtManual for O {
         }
     }
 
+    #[doc(alias = "gtk_container_child_get_property")]
     fn child_property<V: for<'b> FromValue<'b> + 'static>(
         &self,
         child: &impl IsA<Widget>,
@@ -65,6 +52,7 @@ impl<O: IsA<Container>> ContainerExtManual for O {
             .expect("Failed to get value of container")
     }
 
+    #[doc(alias = "gtk_container_child_set_property")]
     fn child_set_property(
         &self,
         child: &impl IsA<Widget>,
@@ -72,23 +60,20 @@ impl<O: IsA<Container>> ContainerExtManual for O {
         value: &dyn ToValue,
     ) {
         unsafe {
-            let container_class = glib::Class::<Container>::from_type(O::static_type()).unwrap();
+            let container_class = glib::Class::<Container>::from_type(Self::static_type()).unwrap();
             let pspec: Option<glib::ParamSpec> =
                 from_glib_none(ffi::gtk_container_class_find_child_property(
                     container_class.as_ref() as *const _ as *const glib::gobject_ffi::GObjectClass,
                     property_name.to_glib_none().0,
                 ));
             let pspec = pspec.unwrap_or_else(|| {
-                panic!("The Container property '{}' doesn't exists", property_name)
+                panic!("The Container property '{property_name}' doesn't exists")
             });
 
             if !pspec.flags().contains(glib::ParamFlags::WRITABLE)
                 || !pspec.flags().contains(glib::ParamFlags::READWRITE)
             {
-                panic!(
-                    "The Container property '{}' is not writeable",
-                    property_name
-                );
+                panic!("The Container property '{property_name}' is not writeable");
             }
 
             assert!(
@@ -108,3 +93,5 @@ impl<O: IsA<Container>> ContainerExtManual for O {
         }
     }
 }
+
+impl<O: IsA<Container>> ContainerExtManual for O {}

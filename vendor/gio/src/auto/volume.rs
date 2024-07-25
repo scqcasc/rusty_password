@@ -2,25 +2,16 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::Drive;
-use crate::File;
-use crate::Icon;
-use crate::Mount;
-use crate::MountMountFlags;
-use crate::MountOperation;
-use crate::MountUnmountFlags;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
-use std::pin::Pin;
-use std::ptr;
+use crate::{
+    AsyncResult, Cancellable, Drive, File, Icon, Mount, MountMountFlags, MountOperation,
+    MountUnmountFlags,
+};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GVolume")]
@@ -35,100 +26,23 @@ impl Volume {
     pub const NONE: Option<&'static Volume> = None;
 }
 
-pub trait VolumeExt: 'static {
-    #[doc(alias = "g_volume_can_eject")]
-    fn can_eject(&self) -> bool;
-
-    #[doc(alias = "g_volume_can_mount")]
-    fn can_mount(&self) -> bool;
-
-    #[doc(alias = "g_volume_eject_with_operation")]
-    fn eject_with_operation<P: FnOnce(Result<(), glib::Error>) + 'static>(
-        &self,
-        flags: MountUnmountFlags,
-        mount_operation: Option<&impl IsA<MountOperation>>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn eject_with_operation_future(
-        &self,
-        flags: MountUnmountFlags,
-        mount_operation: Option<&(impl IsA<MountOperation> + Clone + 'static)>,
-    ) -> Pin<Box_<dyn std::future::Future<Output = Result<(), glib::Error>> + 'static>>;
-
-    #[doc(alias = "g_volume_enumerate_identifiers")]
-    fn enumerate_identifiers(&self) -> Vec<glib::GString>;
-
-    #[doc(alias = "g_volume_get_activation_root")]
-    #[doc(alias = "get_activation_root")]
-    fn activation_root(&self) -> Option<File>;
-
-    #[doc(alias = "g_volume_get_drive")]
-    #[doc(alias = "get_drive")]
-    fn drive(&self) -> Option<Drive>;
-
-    #[doc(alias = "g_volume_get_icon")]
-    #[doc(alias = "get_icon")]
-    fn icon(&self) -> Icon;
-
-    #[doc(alias = "g_volume_get_identifier")]
-    #[doc(alias = "get_identifier")]
-    fn identifier(&self, kind: &str) -> Option<glib::GString>;
-
-    #[doc(alias = "g_volume_get_mount")]
-    fn get_mount(&self) -> Option<Mount>;
-
-    #[doc(alias = "g_volume_get_name")]
-    #[doc(alias = "get_name")]
-    fn name(&self) -> glib::GString;
-
-    #[doc(alias = "g_volume_get_sort_key")]
-    #[doc(alias = "get_sort_key")]
-    fn sort_key(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g_volume_get_symbolic_icon")]
-    #[doc(alias = "get_symbolic_icon")]
-    fn symbolic_icon(&self) -> Icon;
-
-    #[doc(alias = "g_volume_get_uuid")]
-    #[doc(alias = "get_uuid")]
-    fn uuid(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "g_volume_mount")]
-    fn mount<P: FnOnce(Result<(), glib::Error>) + 'static>(
-        &self,
-        flags: MountMountFlags,
-        mount_operation: Option<&impl IsA<MountOperation>>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn mount_future(
-        &self,
-        flags: MountMountFlags,
-        mount_operation: Option<&(impl IsA<MountOperation> + Clone + 'static)>,
-    ) -> Pin<Box_<dyn std::future::Future<Output = Result<(), glib::Error>> + 'static>>;
-
-    #[doc(alias = "g_volume_should_automount")]
-    fn should_automount(&self) -> bool;
-
-    #[doc(alias = "changed")]
-    fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "removed")]
-    fn connect_removed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Volume>> Sealed for T {}
 }
 
-impl<O: IsA<Volume>> VolumeExt for O {
+pub trait VolumeExt: IsA<Volume> + sealed::Sealed + 'static {
+    #[doc(alias = "g_volume_can_eject")]
     fn can_eject(&self) -> bool {
         unsafe { from_glib(ffi::g_volume_can_eject(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_can_mount")]
     fn can_mount(&self) -> bool {
         unsafe { from_glib(ffi::g_volume_can_mount(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_eject_with_operation")]
     fn eject_with_operation<P: FnOnce(Result<(), glib::Error>) + 'static>(
         &self,
         flags: MountUnmountFlags,
@@ -205,6 +119,7 @@ impl<O: IsA<Volume>> VolumeExt for O {
         ))
     }
 
+    #[doc(alias = "g_volume_enumerate_identifiers")]
     fn enumerate_identifiers(&self) -> Vec<glib::GString> {
         unsafe {
             FromGlibPtrContainer::from_glib_full(ffi::g_volume_enumerate_identifiers(
@@ -213,6 +128,8 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 
+    #[doc(alias = "g_volume_get_activation_root")]
+    #[doc(alias = "get_activation_root")]
     fn activation_root(&self) -> Option<File> {
         unsafe {
             from_glib_full(ffi::g_volume_get_activation_root(
@@ -221,14 +138,20 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 
+    #[doc(alias = "g_volume_get_drive")]
+    #[doc(alias = "get_drive")]
     fn drive(&self) -> Option<Drive> {
         unsafe { from_glib_full(ffi::g_volume_get_drive(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_get_icon")]
+    #[doc(alias = "get_icon")]
     fn icon(&self) -> Icon {
         unsafe { from_glib_full(ffi::g_volume_get_icon(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_get_identifier")]
+    #[doc(alias = "get_identifier")]
     fn identifier(&self, kind: &str) -> Option<glib::GString> {
         unsafe {
             from_glib_full(ffi::g_volume_get_identifier(
@@ -238,18 +161,25 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 
+    #[doc(alias = "g_volume_get_mount")]
     fn get_mount(&self) -> Option<Mount> {
         unsafe { from_glib_full(ffi::g_volume_get_mount(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_get_name")]
+    #[doc(alias = "get_name")]
     fn name(&self) -> glib::GString {
         unsafe { from_glib_full(ffi::g_volume_get_name(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_get_sort_key")]
+    #[doc(alias = "get_sort_key")]
     fn sort_key(&self) -> Option<glib::GString> {
         unsafe { from_glib_none(ffi::g_volume_get_sort_key(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_get_symbolic_icon")]
+    #[doc(alias = "get_symbolic_icon")]
     fn symbolic_icon(&self) -> Icon {
         unsafe {
             from_glib_full(ffi::g_volume_get_symbolic_icon(
@@ -258,10 +188,13 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 
+    #[doc(alias = "g_volume_get_uuid")]
+    #[doc(alias = "get_uuid")]
     fn uuid(&self) -> Option<glib::GString> {
         unsafe { from_glib_full(ffi::g_volume_get_uuid(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_volume_mount")]
     fn mount<P: FnOnce(Result<(), glib::Error>) + 'static>(
         &self,
         flags: MountMountFlags,
@@ -332,6 +265,7 @@ impl<O: IsA<Volume>> VolumeExt for O {
         ))
     }
 
+    #[doc(alias = "g_volume_should_automount")]
     fn should_automount(&self) -> bool {
         unsafe {
             from_glib(ffi::g_volume_should_automount(
@@ -340,6 +274,7 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 
+    #[doc(alias = "changed")]
     fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn changed_trampoline<P: IsA<Volume>, F: Fn(&P) + 'static>(
             this: *mut ffi::GVolume,
@@ -361,6 +296,7 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 
+    #[doc(alias = "removed")]
     fn connect_removed<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn removed_trampoline<P: IsA<Volume>, F: Fn(&P) + 'static>(
             this: *mut ffi::GVolume,
@@ -382,6 +318,8 @@ impl<O: IsA<Volume>> VolumeExt for O {
         }
     }
 }
+
+impl<O: IsA<Volume>> VolumeExt for O {}
 
 impl fmt::Display for Volume {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

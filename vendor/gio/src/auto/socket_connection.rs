@@ -2,19 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::IOStream;
-use crate::Socket;
-use crate::SocketAddress;
-use crate::SocketFamily;
-use crate::SocketType;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::pin::Pin;
-use std::ptr;
+use crate::{AsyncResult, Cancellable, IOStream, Socket, SocketAddress, SocketFamily, SocketType};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GSocketConnection")]
@@ -61,44 +51,13 @@ impl SocketConnection {
     }
 }
 
-pub trait SocketConnectionExt: 'static {
-    #[doc(alias = "g_socket_connection_connect")]
-    fn connect(
-        &self,
-        address: &impl IsA<SocketAddress>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<(), glib::Error>;
-
-    #[doc(alias = "g_socket_connection_connect_async")]
-    fn connect_async<P: FnOnce(Result<(), glib::Error>) + 'static>(
-        &self,
-        address: &impl IsA<SocketAddress>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn connect_future(
-        &self,
-        address: &(impl IsA<SocketAddress> + Clone + 'static),
-    ) -> Pin<Box_<dyn std::future::Future<Output = Result<(), glib::Error>> + 'static>>;
-
-    #[doc(alias = "g_socket_connection_get_local_address")]
-    #[doc(alias = "get_local_address")]
-    fn local_address(&self) -> Result<SocketAddress, glib::Error>;
-
-    #[doc(alias = "g_socket_connection_get_remote_address")]
-    #[doc(alias = "get_remote_address")]
-    fn remote_address(&self) -> Result<SocketAddress, glib::Error>;
-
-    #[doc(alias = "g_socket_connection_get_socket")]
-    #[doc(alias = "get_socket")]
-    fn socket(&self) -> Socket;
-
-    #[doc(alias = "g_socket_connection_is_connected")]
-    fn is_connected(&self) -> bool;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::SocketConnection>> Sealed for T {}
 }
 
-impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
+pub trait SocketConnectionExt: IsA<SocketConnection> + sealed::Sealed + 'static {
+    #[doc(alias = "g_socket_connection_connect")]
     fn connect(
         &self,
         address: &impl IsA<SocketAddress>,
@@ -112,7 +71,7 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
                 cancellable.map(|p| p.as_ref()).to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -121,6 +80,7 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_connection_connect_async")]
     fn connect_async<P: FnOnce(Result<(), glib::Error>) + 'static>(
         &self,
         address: &impl IsA<SocketAddress>,
@@ -186,6 +146,8 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
         ))
     }
 
+    #[doc(alias = "g_socket_connection_get_local_address")]
+    #[doc(alias = "get_local_address")]
     fn local_address(&self) -> Result<SocketAddress, glib::Error> {
         unsafe {
             let mut error = ptr::null_mut();
@@ -201,6 +163,8 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_connection_get_remote_address")]
+    #[doc(alias = "get_remote_address")]
     fn remote_address(&self) -> Result<SocketAddress, glib::Error> {
         unsafe {
             let mut error = ptr::null_mut();
@@ -216,6 +180,8 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_connection_get_socket")]
+    #[doc(alias = "get_socket")]
     fn socket(&self) -> Socket {
         unsafe {
             from_glib_none(ffi::g_socket_connection_get_socket(
@@ -224,6 +190,7 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_connection_is_connected")]
     fn is_connected(&self) -> bool {
         unsafe {
             from_glib(ffi::g_socket_connection_is_connected(
@@ -232,6 +199,8 @@ impl<O: IsA<SocketConnection>> SocketConnectionExt for O {
         }
     }
 }
+
+impl<O: IsA<SocketConnection>> SocketConnectionExt for O {}
 
 impl fmt::Display for SocketConnection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

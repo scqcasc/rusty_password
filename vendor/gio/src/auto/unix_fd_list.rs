@@ -2,8 +2,7 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::object::IsA;
-use glib::translate::*;
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -30,17 +29,20 @@ impl Default for UnixFDList {
     }
 }
 
-pub trait UnixFDListExt: 'static {
-    #[doc(alias = "g_unix_fd_list_get_length")]
-    #[doc(alias = "get_length")]
-    fn length(&self) -> i32;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::UnixFDList>> Sealed for T {}
 }
 
-impl<O: IsA<UnixFDList>> UnixFDListExt for O {
+pub trait UnixFDListExt: IsA<UnixFDList> + sealed::Sealed + 'static {
+    #[doc(alias = "g_unix_fd_list_get_length")]
+    #[doc(alias = "get_length")]
     fn length(&self) -> i32 {
         unsafe { ffi::g_unix_fd_list_get_length(self.as_ref().to_glib_none().0) }
     }
 }
+
+impl<O: IsA<UnixFDList>> UnixFDListExt for O {}
 
 impl fmt::Display for UnixFDList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

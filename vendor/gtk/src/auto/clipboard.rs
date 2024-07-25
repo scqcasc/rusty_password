@@ -2,14 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::SelectionData;
-use crate::TextBuffer;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::ptr;
+use crate::{SelectionData, TextBuffer};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, mem, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GtkClipboard")]
@@ -40,8 +35,6 @@ impl Clipboard {
         unsafe { from_glib_none(ffi::gtk_clipboard_get_owner(self.to_glib_none().0)) }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gtk_clipboard_get_selection")]
     #[doc(alias = "get_selection")]
     pub fn selection(&self) -> Option<gdk::Atom> {
@@ -63,7 +56,7 @@ impl Clipboard {
             let clipboard = from_glib_borrow(clipboard);
             let selection_data = from_glib_borrow(selection_data);
             let callback: Box_<P> = Box_::from_raw(data as *mut _);
-            (*callback)(&clipboard, &selection_data);
+            (*callback)(&clipboard, &selection_data)
         }
         let callback = Some(callback_func::<P> as _);
         let super_callback0: Box_<P> = callback_data;
@@ -93,7 +86,7 @@ impl Clipboard {
             let clipboard = from_glib_borrow(clipboard);
             let pixbuf: Borrowed<Option<gdk_pixbuf::Pixbuf>> = from_glib_borrow(pixbuf);
             let callback: Box_<P> = Box_::from_raw(data as *mut _);
-            (*callback)(&clipboard, pixbuf.as_ref().as_ref());
+            (*callback)(&clipboard, pixbuf.as_ref().as_ref())
         }
         let callback = Some(callback_func::<P> as _);
         let super_callback0: Box_<P> = callback_data;
@@ -126,7 +119,12 @@ impl Clipboard {
             let format = from_glib_borrow(format);
             let text: Borrowed<Option<glib::GString>> = from_glib_borrow(text);
             let callback: Box_<P> = Box_::from_raw(data as *mut _);
-            (*callback)(&clipboard, &format, text.as_ref().as_deref(), length);
+            (*callback)(
+                &clipboard,
+                &format,
+                (*text).as_ref().map(|s| s.as_str()),
+                length,
+            )
         }
         let callback = Some(callback_func::<P> as _);
         let super_callback0: Box_<P> = callback_data;
@@ -151,7 +149,7 @@ impl Clipboard {
             let clipboard = from_glib_borrow(clipboard);
             let text: Borrowed<Option<glib::GString>> = from_glib_borrow(text);
             let callback: Box_<P> = Box_::from_raw(data as *mut _);
-            (*callback)(&clipboard, text.as_ref().as_deref());
+            (*callback)(&clipboard, (*text).as_ref().map(|s| s.as_str()))
         }
         let callback = Some(callback_func::<P> as _);
         let super_callback0: Box_<P> = callback_data;
@@ -173,7 +171,7 @@ impl Clipboard {
 
     #[doc(alias = "gtk_clipboard_set_text")]
     pub fn set_text(&self, text: &str) {
-        let len = text.len() as i32;
+        let len = text.len() as _;
         unsafe {
             ffi::gtk_clipboard_set_text(self.to_glib_none().0, text.to_glib_none().0, len);
         }
@@ -213,7 +211,7 @@ impl Clipboard {
                     format.to_glib_none_mut().0,
                     length.as_mut_ptr(),
                 ),
-                length.assume_init() as usize,
+                length.assume_init() as _,
             );
             (ret, format)
         }
@@ -232,7 +230,7 @@ impl Clipboard {
             if ret {
                 Some(FromGlibContainer::from_glib_container_num(
                     targets,
-                    n_targets.assume_init() as usize,
+                    n_targets.assume_init() as _,
                 ))
             } else {
                 None
@@ -309,6 +307,7 @@ impl Clipboard {
 
     #[doc(alias = "gtk_clipboard_get_default")]
     #[doc(alias = "get_default")]
+    #[allow(clippy::should_implement_trait)]
     pub fn default(display: &gdk::Display) -> Option<Clipboard> {
         assert_initialized_main_thread!();
         unsafe { from_glib_none(ffi::gtk_clipboard_get_default(display.to_glib_none().0)) }

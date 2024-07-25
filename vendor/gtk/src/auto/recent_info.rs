@@ -3,8 +3,7 @@
 // DO NOT EDIT
 
 use glib::translate::*;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 
 glib::wrapper! {
     #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -69,10 +68,12 @@ impl RecentInfo {
                 count.as_mut_ptr(),
                 time_.as_mut_ptr(),
             ));
-            let count = count.assume_init();
-            let time_ = time_.assume_init();
             if ret {
-                Some((from_glib_none(app_exec), count, time_))
+                Some((
+                    from_glib_none(app_exec),
+                    count.assume_init(),
+                    time_.assume_init(),
+                ))
             } else {
                 None
             }
@@ -86,7 +87,7 @@ impl RecentInfo {
             let mut length = mem::MaybeUninit::uninit();
             let ret = FromGlibContainer::from_glib_full_num(
                 ffi::gtk_recent_info_get_applications(self.to_glib_none().0, length.as_mut_ptr()),
-                length.assume_init() as usize,
+                length.assume_init() as _,
             );
             ret
         }
@@ -117,7 +118,7 @@ impl RecentInfo {
             let mut length = mem::MaybeUninit::uninit();
             let ret = FromGlibContainer::from_glib_full_num(
                 ffi::gtk_recent_info_get_groups(self.to_glib_none().0, length.as_mut_ptr()),
-                length.assume_init() as usize,
+                length.assume_init() as _,
             );
             ret
         }

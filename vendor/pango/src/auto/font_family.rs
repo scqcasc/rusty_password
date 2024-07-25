@@ -3,15 +3,12 @@
 // DO NOT EDIT
 
 use crate::FontFace;
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::mem;
-use std::ptr;
+use glib::{prelude::*, translate::*};
+use std::{fmt, mem, ptr};
 
 glib::wrapper! {
     #[doc(alias = "PangoFontFamily")]
-    pub struct FontFamily(Object<ffi::PangoFontFamily, ffi::PangoFontFamilyClass>);
+    pub struct FontFamily(Object<ffi::PangoFontFamily, ffi::PangoFontFamilyClass>) @implements gio::ListModel;
 
     match fn {
         type_ => || ffi::pango_font_family_get_type(),
@@ -22,32 +19,23 @@ impl FontFamily {
     pub const NONE: Option<&'static FontFamily> = None;
 }
 
-pub trait FontFamilyExt: 'static {
-    #[cfg(any(feature = "v1_46", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
-    #[doc(alias = "pango_font_family_get_face")]
-    #[doc(alias = "get_face")]
-    fn face(&self, name: Option<&str>) -> Option<FontFace>;
-
-    #[doc(alias = "pango_font_family_get_name")]
-    #[doc(alias = "get_name")]
-    fn name(&self) -> Option<glib::GString>;
-
-    #[doc(alias = "pango_font_family_is_monospace")]
-    fn is_monospace(&self) -> bool;
-
-    #[cfg(any(feature = "v1_44", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_44")))]
-    #[doc(alias = "pango_font_family_is_variable")]
-    fn is_variable(&self) -> bool;
-
-    #[doc(alias = "pango_font_family_list_faces")]
-    fn list_faces(&self) -> Vec<FontFace>;
+impl fmt::Display for FontFamily {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&FontFamilyExt::name(self))
+    }
 }
 
-impl<O: IsA<FontFamily>> FontFamilyExt for O {
-    #[cfg(any(feature = "v1_46", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::FontFamily>> Sealed for T {}
+}
+
+pub trait FontFamilyExt: IsA<FontFamily> + sealed::Sealed + 'static {
+    #[cfg(feature = "v1_46")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
+    #[doc(alias = "pango_font_family_get_face")]
+    #[doc(alias = "get_face")]
     fn face(&self, name: Option<&str>) -> Option<FontFace> {
         unsafe {
             from_glib_none(ffi::pango_font_family_get_face(
@@ -57,7 +45,9 @@ impl<O: IsA<FontFamily>> FontFamilyExt for O {
         }
     }
 
-    fn name(&self) -> Option<glib::GString> {
+    #[doc(alias = "pango_font_family_get_name")]
+    #[doc(alias = "get_name")]
+    fn name(&self) -> glib::GString {
         unsafe {
             from_glib_none(ffi::pango_font_family_get_name(
                 self.as_ref().to_glib_none().0,
@@ -65,6 +55,7 @@ impl<O: IsA<FontFamily>> FontFamilyExt for O {
         }
     }
 
+    #[doc(alias = "pango_font_family_is_monospace")]
     fn is_monospace(&self) -> bool {
         unsafe {
             from_glib(ffi::pango_font_family_is_monospace(
@@ -73,8 +64,9 @@ impl<O: IsA<FontFamily>> FontFamilyExt for O {
         }
     }
 
-    #[cfg(any(feature = "v1_44", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_44")))]
+    #[cfg(feature = "v1_44")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_44")))]
+    #[doc(alias = "pango_font_family_is_variable")]
     fn is_variable(&self) -> bool {
         unsafe {
             from_glib(ffi::pango_font_family_is_variable(
@@ -83,6 +75,7 @@ impl<O: IsA<FontFamily>> FontFamilyExt for O {
         }
     }
 
+    #[doc(alias = "pango_font_family_list_faces")]
     fn list_faces(&self) -> Vec<FontFace> {
         unsafe {
             let mut faces = ptr::null_mut();
@@ -92,13 +85,9 @@ impl<O: IsA<FontFamily>> FontFamilyExt for O {
                 &mut faces,
                 n_faces.as_mut_ptr(),
             );
-            FromGlibContainer::from_glib_container_num(faces, n_faces.assume_init() as usize)
+            FromGlibContainer::from_glib_container_num(faces, n_faces.assume_init() as _)
         }
     }
 }
 
-impl fmt::Display for FontFamily {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("FontFamily")
-    }
-}
+impl<O: IsA<FontFamily>> FontFamilyExt for O {}

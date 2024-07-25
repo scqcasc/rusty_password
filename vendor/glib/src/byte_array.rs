@@ -11,13 +11,16 @@
 //! assert_eq!(ba, "abc".as_bytes());
 //! ```
 
+use std::{
+    borrow::Borrow,
+    cmp::Ordering,
+    fmt,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    slice,
+};
+
 use crate::translate::*;
-use std::borrow::Borrow;
-use std::cmp::Ordering;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
-use std::slice;
 
 wrapper! {
     #[doc(alias = "GByteArray")]
@@ -33,10 +36,12 @@ wrapper! {
 impl Deref for ByteArray {
     type Target = [u8];
 
+    #[inline]
     fn deref(&self) -> &[u8] {
         unsafe {
-            let ptr = (*self.to_glib_none().0).data;
-            let len = (*self.to_glib_none().0).len as usize;
+            let self_ptr: *const ffi::GByteArray = self.to_glib_none().0;
+            let ptr = (*self_ptr).data;
+            let len = (*self_ptr).len as usize;
             debug_assert!(!ptr.is_null() || len == 0);
             if ptr.is_null() {
                 &[]
@@ -48,8 +53,9 @@ impl Deref for ByteArray {
 }
 
 impl AsRef<[u8]> for ByteArray {
+    #[inline]
     fn as_ref(&self) -> &[u8] {
-        &*self
+        self
     }
 }
 
@@ -131,8 +137,9 @@ impl Hash for ByteArray {
 }
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashSet;
+
+    use super::*;
 
     #[test]
     fn various() {

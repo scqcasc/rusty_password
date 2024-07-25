@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.70"
 name = "gtk"
-version = "0.15.5"
+version = "0.18.1"
 authors = ["The gtk-rs Project Developers"]
 build = "build.rs"
 exclude = ["gir-files/*"]
@@ -33,24 +33,26 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/gtk-rs/gtk3-rs"
+resolver = "1"
 
 [package.metadata.docs.rs]
-features = ["dox"]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "--generate-link-to-definition",
+]
 
 [lib]
 name = "gtk"
 
 [dependencies.atk]
-version = "0.15.1"
-
-[dependencies.bitflags]
-version = "1.0"
+version = "0.18"
 
 [dependencies.cairo-rs]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.ffi]
-version = "0.15.1"
+version = "0.18"
 package = "gtk-sys"
 
 [dependencies.field-offset]
@@ -60,28 +62,25 @@ version = "0.3"
 version = "0.3"
 
 [dependencies.gdk]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.gdk-pixbuf]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.gio]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.glib]
-version = "0.15.5"
+version = "0.18"
 
 [dependencies.gtk3-macros]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.libc]
 version = "0.2"
 
-[dependencies.once_cell]
-version = "1.0"
-
 [dependencies.pango]
-version = "0.15.1"
+version = "0.18"
 
 [dev-dependencies.gir-format-check]
 version = "^0.1"
@@ -90,41 +89,9 @@ version = "^0.1"
 version = "0.3.7"
 
 [features]
-dox = [
-    "gdk/dox",
-    "ffi/dox",
-]
 gio_v2_58 = ["gio/v2_58"]
-v3_20 = ["ffi/v3_20"]
-v3_22 = [
-    "v3_20",
-    "ffi/v3_22",
-    "gdk/v3_22",
-]
-v3_22_20 = [
-    "v3_22",
-    "ffi/v3_22",
-]
-v3_22_26 = [
-    "v3_22_20",
-    "ffi/v3_22_26",
-]
-v3_22_27 = [
-    "v3_22_26",
-    "ffi/v3_22_27",
-]
-v3_22_29 = [
-    "v3_22_27",
-    "ffi/v3_22_29",
-]
-v3_22_30 = [
-    "v3_22_29",
-    "ffi/v3_22_30",
-]
-v3_24 = [
-    "v3_22_30",
-    "ffi/v3_24",
-]
+unsafe-assume-initialized = []
+v3_24 = ["ffi/v3_24"]
 v3_24_1 = [
     "v3_24",
     "ffi/v3_24_1",

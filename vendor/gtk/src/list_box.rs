@@ -5,11 +5,12 @@ use glib::object::IsA;
 use glib::translate::*;
 use std::ptr;
 
-pub trait ListBoxExtManual: 'static {
-    fn unbind_model(&self);
+mod sealed {
+    pub trait Sealed {}
+    impl<T: glib::IsA<crate::ListBox>> Sealed for T {}
 }
 
-impl<O: IsA<ListBox>> ListBoxExtManual for O {
+pub trait ListBoxExtManual: IsA<ListBox> + sealed::Sealed + 'static {
     fn unbind_model(&self) {
         unsafe {
             ffi::gtk_list_box_bind_model(
@@ -22,3 +23,5 @@ impl<O: IsA<ListBox>> ListBoxExtManual for O {
         }
     }
 }
+
+impl<O: IsA<ListBox>> ListBoxExtManual for O {}

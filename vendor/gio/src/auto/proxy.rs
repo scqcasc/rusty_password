@@ -2,16 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::AsyncResult;
-use crate::Cancellable;
-use crate::IOStream;
-use crate::ProxyAddress;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::pin::Pin;
-use std::ptr;
+use crate::{AsyncResult, Cancellable, IOStream, ProxyAddress};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GProxy")]
@@ -36,35 +29,13 @@ impl Proxy {
     }
 }
 
-pub trait ProxyExt: 'static {
-    #[doc(alias = "g_proxy_connect")]
-    fn connect(
-        &self,
-        connection: &impl IsA<IOStream>,
-        proxy_address: &impl IsA<ProxyAddress>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-    ) -> Result<IOStream, glib::Error>;
-
-    #[doc(alias = "g_proxy_connect_async")]
-    fn connect_async<P: FnOnce(Result<IOStream, glib::Error>) + 'static>(
-        &self,
-        connection: &impl IsA<IOStream>,
-        proxy_address: &impl IsA<ProxyAddress>,
-        cancellable: Option<&impl IsA<Cancellable>>,
-        callback: P,
-    );
-
-    fn connect_future(
-        &self,
-        connection: &(impl IsA<IOStream> + Clone + 'static),
-        proxy_address: &(impl IsA<ProxyAddress> + Clone + 'static),
-    ) -> Pin<Box_<dyn std::future::Future<Output = Result<IOStream, glib::Error>> + 'static>>;
-
-    #[doc(alias = "g_proxy_supports_hostname")]
-    fn supports_hostname(&self) -> bool;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Proxy>> Sealed for T {}
 }
 
-impl<O: IsA<Proxy>> ProxyExt for O {
+pub trait ProxyExt: IsA<Proxy> + sealed::Sealed + 'static {
+    #[doc(alias = "g_proxy_connect")]
     fn connect(
         &self,
         connection: &impl IsA<IOStream>,
@@ -88,6 +59,7 @@ impl<O: IsA<Proxy>> ProxyExt for O {
         }
     }
 
+    #[doc(alias = "g_proxy_connect_async")]
     fn connect_async<P: FnOnce(Result<IOStream, glib::Error>) + 'static>(
         &self,
         connection: &impl IsA<IOStream>,
@@ -156,6 +128,7 @@ impl<O: IsA<Proxy>> ProxyExt for O {
         ))
     }
 
+    #[doc(alias = "g_proxy_supports_hostname")]
     fn supports_hostname(&self) -> bool {
         unsafe {
             from_glib(ffi::g_proxy_supports_hostname(
@@ -164,6 +137,8 @@ impl<O: IsA<Proxy>> ProxyExt for O {
         }
     }
 }
+
+impl<O: IsA<Proxy>> ProxyExt for O {}
 
 impl fmt::Display for Proxy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

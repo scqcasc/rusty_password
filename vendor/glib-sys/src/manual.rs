@@ -1,12 +1,11 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
+#[cfg(unix)]
+pub use libc::passwd;
 #[allow(unused_imports)]
 use libc::{c_char, c_int, c_ushort, c_void};
 
-#[cfg(unix)]
-pub use libc::passwd;
-
-#[cfg(all(not(unix), feature = "dox"))]
+#[cfg(all(not(unix), docsrs))]
 #[repr(C)]
 pub struct passwd {
     pw_name: *mut c_char,
@@ -47,13 +46,34 @@ pub use self::win32::*;
 
 #[cfg(target_family = "windows")]
 mod win32 {
-    use crate::gpointer;
-    use libc::c_char;
+    use libc::{c_char, c_int};
+
+    use crate::gboolean;
+
+    pub type GWin32OSType = c_int;
+    pub const G_WIN32_OS_ANY: GWin32OSType = 0;
+    pub const G_WIN32_OS_WORKSTATION: GWin32OSType = 1;
+    pub const G_WIN32_OS_SERVER: GWin32OSType = 2;
 
     extern "C" {
+        pub fn g_win32_check_windows_version(
+            major: c_int,
+            minor: c_int,
+            spver: c_int,
+            os_type: GWin32OSType,
+        ) -> gboolean;
+
+        pub fn g_win32_get_command_line() -> *mut *mut c_char;
+
+        pub fn g_win32_error_message(error: c_int) -> *mut c_char;
+
+        pub fn g_win32_getlocale() -> *mut c_char;
+
         pub fn g_win32_get_package_installation_directory_of_module(
-            hmodule: gpointer,
+            hmodule: std::os::windows::raw::HANDLE,
         ) -> *mut c_char;
+
+        pub fn g_win32_locale_filename_from_utf8(utf8filename: *const c_char) -> *mut c_char;
     }
 }
 

@@ -1,8 +1,7 @@
 #![cfg(all(feature = "parse", feature = "display"))]
-#![allow(dead_code)]
 
 #[derive(Copy, Clone)]
-pub(crate) struct Decoder;
+pub struct Decoder;
 
 impl toml_test_harness::Decoder for Decoder {
     fn name(&self) -> &str {

@@ -2,15 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::IconTheme;
-use crate::StyleContext;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem;
-use std::pin::Pin;
-use std::ptr;
+use crate::{IconTheme, StyleContext};
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, mem, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GtkIconInfo")]
@@ -171,9 +165,8 @@ impl IconInfo {
                 was_symbolic.as_mut_ptr(),
                 &mut error,
             );
-            let was_symbolic = was_symbolic.assume_init();
             if error.is_null() {
-                Ok((from_glib_full(ret), from_glib(was_symbolic)))
+                Ok((from_glib_full(ret), from_glib(was_symbolic.assume_init())))
             } else {
                 Err(from_glib_full(error))
             }
@@ -219,9 +212,8 @@ impl IconInfo {
                 was_symbolic.as_mut_ptr(),
                 &mut error,
             );
-            let was_symbolic = was_symbolic.assume_init();
             let result = if error.is_null() {
-                Ok((from_glib_full(ret), from_glib(was_symbolic)))
+                Ok((from_glib_full(ret), from_glib(was_symbolic.assume_init())))
             } else {
                 Err(from_glib_full(error))
             };
@@ -289,9 +281,8 @@ impl IconInfo {
                 was_symbolic.as_mut_ptr(),
                 &mut error,
             );
-            let was_symbolic = was_symbolic.assume_init();
             if error.is_null() {
-                Ok((from_glib_full(ret), from_glib(was_symbolic)))
+                Ok((from_glib_full(ret), from_glib(was_symbolic.assume_init())))
             } else {
                 Err(from_glib_full(error))
             }
@@ -334,9 +325,8 @@ impl IconInfo {
                 was_symbolic.as_mut_ptr(),
                 &mut error,
             );
-            let was_symbolic = was_symbolic.assume_init();
             let result = if error.is_null() {
-                Ok((from_glib_full(ret), from_glib(was_symbolic)))
+                Ok((from_glib_full(ret), from_glib(was_symbolic.assume_init())))
             } else {
                 Err(from_glib_full(error))
             };

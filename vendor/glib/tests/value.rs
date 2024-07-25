@@ -1,5 +1,6 @@
-use glib::*;
 use std::ops::Deref;
+
+use glib::*;
 
 // FIXME all .get::<i32>() should be replaced with .get(); the compiler is totally able to infer the type itself.
 // But somehow without some tests are failing on Windows because the type inference doesn't work or something.
@@ -9,7 +10,7 @@ use std::ops::Deref;
 pub fn to_value_invariants() {
     // Inverse
     assert_eq!(0i32, 0i32.to_value().get::<i32>().unwrap());
-    assert_eq!(0i32, (&0i32.to_value()).get::<i32>().unwrap());
+    assert_eq!(0i32, 0i32.to_value().get::<i32>().unwrap());
 
     // Idempotence
     assert_eq!(
@@ -27,7 +28,7 @@ pub fn to_value_invariants() {
     );
     assert_eq!(
         0i32,
-        (&0i32.to_value())
+        0i32.to_value()
             .get::<Value>()
             .unwrap()
             .get::<i32>()

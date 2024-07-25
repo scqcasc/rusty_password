@@ -1,10 +1,8 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::prelude::*;
-use crate::{Settings, SettingsBindFlags};
-use glib::translate::{from_glib_borrow, from_glib_none, IntoGlib, ToGlibPtr};
-use glib::variant::FromVariant;
-use glib::{BoolError, IsA, ToVariant};
+use glib::{prelude::*, translate::*, variant::FromVariant, BoolError, IntoStrV, StrV, Variant};
+
+use crate::{prelude::*, Settings, SettingsBindFlags};
 
 #[must_use = "The builder must be built to be used"]
 pub struct BindingBuilder<'a> {
@@ -13,13 +11,64 @@ pub struct BindingBuilder<'a> {
     object: &'a glib::Object,
     property: &'a str,
     flags: SettingsBindFlags,
+    #[allow(clippy::type_complexity)]
     get_mapping: Option<Box<dyn Fn(&glib::Variant, glib::Type) -> Option<glib::Value>>>,
+    #[allow(clippy::type_complexity)]
     set_mapping: Option<Box<dyn Fn(&glib::Value, glib::VariantType) -> Option<glib::Variant>>>,
 }
 
 impl<'a> BindingBuilder<'a> {
     pub fn flags(mut self, flags: SettingsBindFlags) -> Self {
         self.flags = flags;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`GET`][crate::SettingsBindFlags::GET].
+    pub fn get(mut self) -> Self {
+        self.flags |= SettingsBindFlags::GET;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`SET`][crate::SettingsBindFlags::SET].
+    pub fn set(mut self) -> Self {
+        self.flags |= SettingsBindFlags::SET;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Unsets the default [`GET`][crate::SettingsBindFlags::GET] flag.
+    pub fn set_only(mut self) -> Self {
+        self.flags = (self.flags - SettingsBindFlags::GET) | SettingsBindFlags::SET;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Unsets the default [`SET`][crate::SettingsBindFlags::SET] flag.
+    pub fn get_only(mut self) -> Self {
+        self.flags = (self.flags - SettingsBindFlags::SET) | SettingsBindFlags::GET;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`NO_SENSITIVITY`][crate::SettingsBindFlags::NO_SENSITIVITY].
+    pub fn no_sensitivity(mut self) -> Self {
+        self.flags |= SettingsBindFlags::NO_SENSITIVITY;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`GET_NO_CHANGES`][crate::SettingsBindFlags::GET_NO_CHANGES].
+    pub fn get_no_changes(mut self) -> Self {
+        self.flags |= SettingsBindFlags::GET_NO_CHANGES;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`INVERT_BOOLEAN`][crate::SettingsBindFlags::INVERT_BOOLEAN].
+    pub fn invert_boolean(mut self) -> Self {
+        self.flags |= SettingsBindFlags::INVERT_BOOLEAN;
         self
     }
 
@@ -55,7 +104,7 @@ impl<'a> BindingBuilder<'a> {
             let user_data = &*(user_data as *const Mappings);
             let f = user_data.0.as_ref().unwrap();
             let value = &mut *(value as *mut glib::Value);
-            if let Some(v) = f(&*from_glib_borrow(variant), value.type_()) {
+            if let Some(v) = f(&from_glib_borrow(variant), value.type_()) {
                 *value = v;
                 true
             } else {
@@ -71,10 +120,10 @@ impl<'a> BindingBuilder<'a> {
             let user_data = &*(user_data as *const Mappings);
             let f = user_data.1.as_ref().unwrap();
             let value = &*(value as *const glib::Value);
-            f(value, from_glib_none(variant_type)).to_glib_full()
+            f(value, from_glib_none(variant_type)).into_glib_ptr()
         }
         unsafe extern "C" fn destroy_closure(ptr: *mut libc::c_void) {
-            Box::<Mappings>::from_raw(ptr as *mut _);
+            let _ = Box::<Mappings>::from_raw(ptr as *mut _);
         }
 
         if self.get_mapping.is_none() && self.set_mapping.is_none() {
@@ -118,22 +167,12 @@ impl<'a> BindingBuilder<'a> {
     }
 }
 
-pub trait SettingsExtManual {
-    fn get<U: FromVariant>(&self, key: &str) -> U;
-
-    fn set<U: ToVariant>(&self, key: &str, value: &U) -> Result<(), BoolError>;
-
-    #[doc(alias = "g_settings_bind")]
-    #[doc(alias = "g_settings_bind_with_mapping")]
-    fn bind<'a, P: IsA<glib::Object>>(
-        &'a self,
-        key: &'a str,
-        object: &'a P,
-        property: &'a str,
-    ) -> BindingBuilder<'a>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::Settings>> Sealed for T {}
 }
 
-impl<O: IsA<Settings>> SettingsExtManual for O {
+pub trait SettingsExtManual: sealed::Sealed + IsA<Settings> {
     fn get<U: FromVariant>(&self, key: &str) -> U {
         let val = self.value(key);
         FromVariant::from_variant(&val).unwrap_or_else(|| {
@@ -145,10 +184,39 @@ impl<O: IsA<Settings>> SettingsExtManual for O {
         })
     }
 
-    fn set<U: ToVariant>(&self, key: &str, value: &U) -> Result<(), BoolError> {
-        self.set_value(key, &value.to_variant())
+    fn set(&self, key: &str, value: impl Into<Variant>) -> Result<(), BoolError> {
+        self.set_value(key, &value.into())
     }
 
+    #[doc(alias = "g_settings_get_strv")]
+    #[doc(alias = "get_strv")]
+    fn strv(&self, key: &str) -> StrV {
+        unsafe {
+            FromGlibPtrContainer::from_glib_full(ffi::g_settings_get_strv(
+                self.as_ref().to_glib_none().0,
+                key.to_glib_none().0,
+            ))
+        }
+    }
+
+    #[doc(alias = "g_settings_set_strv")]
+    fn set_strv(&self, key: &str, value: impl IntoStrV) -> Result<(), glib::error::BoolError> {
+        unsafe {
+            value.run_with_strv(|value| {
+                glib::result_from_gboolean!(
+                    ffi::g_settings_set_strv(
+                        self.as_ref().to_glib_none().0,
+                        key.to_glib_none().0,
+                        value.as_ptr() as *mut _,
+                    ),
+                    "Can't set readonly key"
+                )
+            })
+        }
+    }
+
+    #[doc(alias = "g_settings_bind")]
+    #[doc(alias = "g_settings_bind_with_mapping")]
     fn bind<'a, P: IsA<glib::Object>>(
         &'a self,
         key: &'a str,
@@ -167,20 +235,20 @@ impl<O: IsA<Settings>> SettingsExtManual for O {
     }
 }
 
+impl<O: IsA<Settings>> SettingsExtManual for O {}
+
 #[cfg(test)]
 mod test {
+    use std::{env::set_var, process::Command, str::from_utf8, sync::Once};
+
     use super::*;
-    use std::env::set_var;
-    use std::process::Command;
-    use std::str::from_utf8;
-    use std::sync::Once;
 
     static INIT: Once = Once::new();
 
     fn set_env() {
         INIT.call_once(|| {
             let output = Command::new("glib-compile-schemas")
-                .args(&[
+                .args([
                     &format!("{}/tests", env!("CARGO_MANIFEST_DIR")),
                     "--targetdir",
                     env!("OUT_DIR"),
@@ -219,7 +287,7 @@ mod test {
     fn bool_set_get() {
         set_env();
         let settings = Settings::new("com.github.gtk-rs.test");
-        settings.set("test-bool", &false).unwrap();
+        settings.set("test-bool", false).unwrap();
         assert!(!settings.get::<bool>("test-bool"));
     }
 

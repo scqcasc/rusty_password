@@ -3,12 +3,8 @@
 // DO NOT EDIT
 
 use crate::Pixbuf;
-use glib::object::IsA;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::pin::Pin;
-use std::ptr;
+use glib::{prelude::*, translate::*};
+use std::{boxed::Box as Box_, fmt, pin::Pin, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GdkPixbufAnimation")]
@@ -141,28 +137,20 @@ impl PixbufAnimation {
     }
 }
 
-pub trait PixbufAnimationExt: 'static {
-    #[doc(alias = "gdk_pixbuf_animation_get_height")]
-    #[doc(alias = "get_height")]
-    fn height(&self) -> i32;
-
-    #[doc(alias = "gdk_pixbuf_animation_get_static_image")]
-    #[doc(alias = "get_static_image")]
-    fn static_image(&self) -> Option<Pixbuf>;
-
-    #[doc(alias = "gdk_pixbuf_animation_get_width")]
-    #[doc(alias = "get_width")]
-    fn width(&self) -> i32;
-
-    #[doc(alias = "gdk_pixbuf_animation_is_static_image")]
-    fn is_static_image(&self) -> bool;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::PixbufAnimation>> Sealed for T {}
 }
 
-impl<O: IsA<PixbufAnimation>> PixbufAnimationExt for O {
+pub trait PixbufAnimationExt: IsA<PixbufAnimation> + sealed::Sealed + 'static {
+    #[doc(alias = "gdk_pixbuf_animation_get_height")]
+    #[doc(alias = "get_height")]
     fn height(&self) -> i32 {
         unsafe { ffi::gdk_pixbuf_animation_get_height(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gdk_pixbuf_animation_get_static_image")]
+    #[doc(alias = "get_static_image")]
     fn static_image(&self) -> Option<Pixbuf> {
         unsafe {
             from_glib_none(ffi::gdk_pixbuf_animation_get_static_image(
@@ -171,10 +159,13 @@ impl<O: IsA<PixbufAnimation>> PixbufAnimationExt for O {
         }
     }
 
+    #[doc(alias = "gdk_pixbuf_animation_get_width")]
+    #[doc(alias = "get_width")]
     fn width(&self) -> i32 {
         unsafe { ffi::gdk_pixbuf_animation_get_width(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gdk_pixbuf_animation_is_static_image")]
     fn is_static_image(&self) -> bool {
         unsafe {
             from_glib(ffi::gdk_pixbuf_animation_is_static_image(
@@ -183,6 +174,8 @@ impl<O: IsA<PixbufAnimation>> PixbufAnimationExt for O {
         }
     }
 }
+
+impl<O: IsA<PixbufAnimation>> PixbufAnimationExt for O {}
 
 impl fmt::Display for PixbufAnimation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

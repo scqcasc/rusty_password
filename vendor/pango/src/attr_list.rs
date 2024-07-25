@@ -1,21 +1,23 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::{AttrList, Attribute};
-use glib::translate::*;
 use std::mem;
+
+use glib::translate::*;
+
+use crate::{AttrList, Attribute};
 
 impl AttrList {
     #[doc(alias = "pango_attr_list_change")]
     pub fn change(&self, attr: impl Into<Attribute>) {
         unsafe {
             let attr = attr.into();
-            ffi::pango_attr_list_change(self.to_glib_none().0, attr.to_glib_none().0 as *mut _);
+            ffi::pango_attr_list_change(self.to_glib_none().0, attr.to_glib_none().0);
             mem::forget(attr); //As attr transferred fully
         }
     }
 
-    #[cfg(any(feature = "v1_46", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v1_46")))]
+    #[cfg(feature = "v1_46")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
     #[doc(alias = "pango_attr_list_equal")]
     fn equal(&self, other_list: &AttrList) -> bool {
         unsafe {
@@ -30,7 +32,7 @@ impl AttrList {
     pub fn insert(&self, attr: impl Into<Attribute>) {
         unsafe {
             let attr = attr.into();
-            ffi::pango_attr_list_insert(self.to_glib_none().0, attr.to_glib_none().0 as *mut _);
+            ffi::pango_attr_list_insert(self.to_glib_none().0, attr.to_glib_none().0);
             mem::forget(attr); //As attr transferred fully
         }
     }
@@ -39,16 +41,14 @@ impl AttrList {
     pub fn insert_before(&self, attr: impl Into<Attribute>) {
         unsafe {
             let attr = attr.into();
-            ffi::pango_attr_list_insert_before(
-                self.to_glib_none().0,
-                attr.to_glib_none().0 as *mut _,
-            );
+            ffi::pango_attr_list_insert_before(self.to_glib_none().0, attr.to_glib_none().0);
             mem::forget(attr); //As attr transferred fully
         }
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 impl PartialEq for AttrList {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -56,10 +56,12 @@ impl PartialEq for AttrList {
     }
 }
 
-#[cfg(any(feature = "v1_46", feature = "dox"))]
+#[cfg(feature = "v1_46")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_46")))]
 impl Eq for AttrList {}
 
-#[cfg(any(feature = "v1_50", feature = "dox"))]
+#[cfg(feature = "v1_50")]
+#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 impl std::str::FromStr for AttrList {
     type Err = glib::BoolError;
 

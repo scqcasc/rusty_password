@@ -2,14 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::translate::*;
-#[cfg(any(feature = "v2_50", feature = "dox"))]
-#[cfg_attr(feature = "dox", doc(cfg(feature = "v2_50")))]
-use crate::Bytes;
-use crate::Error;
-use crate::KeyFileFlags;
-use std::mem;
-use std::ptr;
+use crate::{translate::*, Bytes, Error, KeyFileFlags};
+use std::{mem, ptr};
 
 crate::wrapper! {
     #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -86,25 +80,11 @@ impl KeyFile {
             if error.is_null() {
                 Ok(FromGlibContainer::from_glib_container_num(
                     ret,
-                    length.assume_init() as usize,
+                    length.assume_init() as _,
                 ))
             } else {
                 Err(from_glib_full(error))
             }
-        }
-    }
-
-    #[doc(alias = "g_key_file_get_groups")]
-    #[doc(alias = "get_groups")]
-    pub fn groups(&self) -> (Vec<crate::GString>, usize) {
-        unsafe {
-            let mut length = mem::MaybeUninit::uninit();
-            let ret = FromGlibPtrContainer::from_glib_full(ffi::g_key_file_get_groups(
-                self.to_glib_none().0,
-                length.as_mut_ptr(),
-            ));
-            let length = length.assume_init();
-            (ret, length)
         }
     }
 
@@ -162,7 +142,7 @@ impl KeyFile {
             if error.is_null() {
                 Ok(FromGlibContainer::from_glib_container_num(
                     ret,
-                    length.assume_init() as usize,
+                    length.assume_init() as _,
                 ))
             } else {
                 Err(from_glib_full(error))
@@ -170,29 +150,6 @@ impl KeyFile {
         }
     }
 
-    #[doc(alias = "g_key_file_get_keys")]
-    #[doc(alias = "get_keys")]
-    pub fn keys(&self, group_name: &str) -> Result<(Vec<crate::GString>, usize), crate::Error> {
-        unsafe {
-            let mut length = mem::MaybeUninit::uninit();
-            let mut error = ptr::null_mut();
-            let ret = ffi::g_key_file_get_keys(
-                self.to_glib_none().0,
-                group_name.to_glib_none().0,
-                length.as_mut_ptr(),
-                &mut error,
-            );
-            let length = length.assume_init();
-            if error.is_null() {
-                Ok((FromGlibPtrContainer::from_glib_full(ret), length))
-            } else {
-                Err(from_glib_full(error))
-            }
-        }
-    }
-
-    #[cfg(any(feature = "v2_56", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_56")))]
     #[doc(alias = "g_key_file_get_locale_for_key")]
     #[doc(alias = "get_locale_for_key")]
     pub fn locale_for_key(
@@ -265,8 +222,6 @@ impl KeyFile {
         }
     }
 
-    #[cfg(any(feature = "v2_50", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_50")))]
     #[doc(alias = "g_key_file_load_from_bytes")]
     pub fn load_from_bytes(&self, bytes: &Bytes, flags: KeyFileFlags) -> Result<(), crate::Error> {
         unsafe {
@@ -277,7 +232,7 @@ impl KeyFile {
                 flags.into_glib(),
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -288,7 +243,7 @@ impl KeyFile {
 
     #[doc(alias = "g_key_file_load_from_data")]
     pub fn load_from_data(&self, data: &str, flags: KeyFileFlags) -> Result<(), crate::Error> {
-        let length = data.len() as usize;
+        let length = data.len() as _;
         unsafe {
             let mut error = ptr::null_mut();
             let is_ok = ffi::g_key_file_load_from_data(
@@ -298,7 +253,7 @@ impl KeyFile {
                 flags.into_glib(),
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -321,7 +276,7 @@ impl KeyFile {
                 flags.into_glib(),
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -344,7 +299,7 @@ impl KeyFile {
                 key.to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -362,7 +317,7 @@ impl KeyFile {
                 group_name.to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -381,7 +336,7 @@ impl KeyFile {
                 key.to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -423,7 +378,7 @@ impl KeyFile {
                 comment.to_glib_none().0,
                 &mut error,
             );
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {

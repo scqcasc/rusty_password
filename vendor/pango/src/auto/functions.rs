@@ -2,23 +2,15 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Analysis;
-use crate::AttrIterator;
-use crate::AttrList;
-use crate::Context;
-use crate::Direction;
-use crate::GlyphString;
-use crate::Item;
-use crate::Rectangle;
-use crate::Stretch;
-use crate::Style;
-use crate::Variant;
-use crate::Weight;
+use crate::{
+    Analysis, AttrIterator, AttrList, Context, Direction, GlyphString, Item, Stretch, Style,
+    Variant, Weight,
+};
 use glib::translate::*;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 
 //#[cfg_attr(feature = "v1_44", deprecated = "Since 1.44")]
+//#[allow(deprecated)]
 //#[doc(alias = "pango_break")]
 //#[doc(alias = "break")]
 //pub fn break_(text: &str, analysis: &mut Analysis, attrs: /*Ignored*/&[LogAttr]) {
@@ -30,25 +22,15 @@ use std::ptr;
 //    unsafe { TODO: call ffi:pango_default_break() }
 //}
 
-#[doc(alias = "pango_extents_to_pixels")]
-pub fn extents_to_pixels(inclusive: Option<&Rectangle>, nearest: Option<&Rectangle>) {
-    unsafe {
-        ffi::pango_extents_to_pixels(
-            mut_override(inclusive.to_glib_none().0),
-            mut_override(nearest.to_glib_none().0),
-        );
-    }
-}
-
 #[doc(alias = "pango_find_base_dir")]
 pub fn find_base_dir(text: &str) -> Direction {
-    let length = text.len() as i32;
+    let length = text.len() as _;
     unsafe { from_glib(ffi::pango_find_base_dir(text.to_glib_none().0, length)) }
 }
 
 #[doc(alias = "pango_find_paragraph_boundary")]
 pub fn find_paragraph_boundary(text: &str) -> (i32, i32) {
-    let length = text.len() as i32;
+    let length = text.len() as _;
     unsafe {
         let mut paragraph_delimiter_index = mem::MaybeUninit::uninit();
         let mut next_paragraph_start = mem::MaybeUninit::uninit();
@@ -58,9 +40,10 @@ pub fn find_paragraph_boundary(text: &str) -> (i32, i32) {
             paragraph_delimiter_index.as_mut_ptr(),
             next_paragraph_start.as_mut_ptr(),
         );
-        let paragraph_delimiter_index = paragraph_delimiter_index.assume_init();
-        let next_paragraph_start = next_paragraph_start.assume_init();
-        (paragraph_delimiter_index, next_paragraph_start)
+        (
+            paragraph_delimiter_index.assume_init(),
+            next_paragraph_start.assume_init(),
+        )
     }
 }
 
@@ -119,22 +102,47 @@ pub fn itemize_with_base_dir(
     }
 }
 
-//#[doc(alias = "pango_markup_parser_finish")]
-//pub fn markup_parser_finish(context: /*Ignored*/&glib::MarkupParseContext) -> Result<(AttrList, glib::GString, char), glib::Error> {
-//    unsafe { TODO: call ffi:pango_markup_parser_finish() }
-//}
+#[doc(alias = "pango_markup_parser_finish")]
+pub fn markup_parser_finish(
+    context: &glib::MarkupParseContext,
+) -> Result<(AttrList, glib::GString, char), glib::Error> {
+    unsafe {
+        let mut attr_list = ptr::null_mut();
+        let mut text = ptr::null_mut();
+        let mut accel_char = mem::MaybeUninit::uninit();
+        let mut error = ptr::null_mut();
+        let is_ok = ffi::pango_markup_parser_finish(
+            context.to_glib_none().0,
+            &mut attr_list,
+            &mut text,
+            accel_char.as_mut_ptr(),
+            &mut error,
+        );
+        debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+        if error.is_null() {
+            Ok((
+                from_glib_full(attr_list),
+                from_glib_full(text),
+                std::convert::TryFrom::try_from(accel_char.assume_init())
+                    .expect("conversion from an invalid Unicode value attempted"),
+            ))
+        } else {
+            Err(from_glib_full(error))
+        }
+    }
+}
 
-//#[doc(alias = "pango_markup_parser_new")]
-//pub fn markup_parser_new(accel_marker: char) -> /*Ignored*/Option<glib::MarkupParseContext> {
-//    unsafe { TODO: call ffi:pango_markup_parser_new() }
-//}
+#[doc(alias = "pango_markup_parser_new")]
+pub fn markup_parser_new(accel_marker: char) -> glib::MarkupParseContext {
+    unsafe { from_glib_none(ffi::pango_markup_parser_new(accel_marker.into_glib())) }
+}
 
 #[doc(alias = "pango_parse_markup")]
 pub fn parse_markup(
     markup_text: &str,
     accel_marker: char,
 ) -> Result<(AttrList, glib::GString, char), glib::Error> {
-    let length = markup_text.len() as i32;
+    let length = markup_text.len() as _;
     unsafe {
         let mut attr_list = ptr::null_mut();
         let mut text = ptr::null_mut();
@@ -149,13 +157,12 @@ pub fn parse_markup(
             accel_char.as_mut_ptr(),
             &mut error,
         );
-        let accel_char = accel_char.assume_init();
-        assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+        debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
         if error.is_null() {
             Ok((
                 from_glib_full(attr_list),
                 from_glib_full(text),
-                std::convert::TryFrom::try_from(accel_char)
+                std::convert::TryFrom::try_from(accel_char.assume_init())
                     .expect("conversion from an invalid Unicode value attempted"),
             ))
         } else {
@@ -173,9 +180,8 @@ pub fn parse_stretch(str: &str, warn: bool) -> Option<Stretch> {
             stretch.as_mut_ptr(),
             warn.into_glib(),
         ));
-        let stretch = stretch.assume_init();
         if ret {
-            Some(from_glib(stretch))
+            Some(from_glib(stretch.assume_init()))
         } else {
             None
         }
@@ -191,9 +197,8 @@ pub fn parse_style(str: &str, warn: bool) -> Option<Style> {
             style.as_mut_ptr(),
             warn.into_glib(),
         ));
-        let style = style.assume_init();
         if ret {
-            Some(from_glib(style))
+            Some(from_glib(style.assume_init()))
         } else {
             None
         }
@@ -209,9 +214,8 @@ pub fn parse_variant(str: &str, warn: bool) -> Option<Variant> {
             variant.as_mut_ptr(),
             warn.into_glib(),
         ));
-        let variant = variant.assume_init();
         if ret {
-            Some(from_glib(variant))
+            Some(from_glib(variant.assume_init()))
         } else {
             None
         }
@@ -227,9 +231,8 @@ pub fn parse_weight(str: &str, warn: bool) -> Option<Weight> {
             weight.as_mut_ptr(),
             warn.into_glib(),
         ));
-        let weight = weight.assume_init();
         if ret {
-            Some(from_glib(weight))
+            Some(from_glib(weight.assume_init()))
         } else {
             None
         }
@@ -245,7 +248,7 @@ pub fn quantize_line_geometry(thickness: &mut i32, position: &mut i32) {
 
 #[doc(alias = "pango_shape")]
 pub fn shape(text: &str, analysis: &Analysis, glyphs: &mut GlyphString) {
-    let length = text.len() as i32;
+    let length = text.len() as _;
     unsafe {
         ffi::pango_shape(
             text.to_glib_none().0,
@@ -256,15 +259,15 @@ pub fn shape(text: &str, analysis: &Analysis, glyphs: &mut GlyphString) {
     }
 }
 
-//#[cfg(any(feature = "v1_50", feature = "dox"))]
-//#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_50")))]
+//#[cfg(feature = "v1_50")]
+//#[cfg_attr(docsrs, doc(cfg(feature = "v1_50")))]
 //#[doc(alias = "pango_shape_item")]
 //pub fn shape_item(item: &mut Item, paragraph_text: Option<&str>, log_attrs: /*Ignored*/Option<&mut LogAttr>, glyphs: &mut GlyphString, flags: ShapeFlags) {
 //    unsafe { TODO: call ffi:pango_shape_item() }
 //}
 
-//#[cfg(any(feature = "v1_44", feature = "dox"))]
-//#[cfg_attr(feature = "dox", doc(cfg(feature = "v1_44")))]
+//#[cfg(feature = "v1_44")]
+//#[cfg_attr(docsrs, doc(cfg(feature = "v1_44")))]
 //#[doc(alias = "pango_tailor_break")]
 //pub fn tailor_break(text: &str, analysis: &mut Analysis, offset: i32, attrs: /*Ignored*/&[LogAttr]) {
 //    unsafe { TODO: call ffi:pango_tailor_break() }
@@ -306,6 +309,6 @@ pub fn version_check(
 }
 
 #[doc(alias = "pango_version_string")]
-pub fn version_string() -> Option<glib::GString> {
+pub fn version_string() -> glib::GString {
     unsafe { from_glib_none(ffi::pango_version_string()) }
 }

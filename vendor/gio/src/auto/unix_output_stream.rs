@@ -2,15 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::OutputStream;
-use crate::PollableOutputStream;
-use glib::object::IsA;
-use glib::translate::*;
+use crate::{FileDescriptorBased, OutputStream, PollableOutputStream};
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
     #[doc(alias = "GUnixOutputStream")]
-    pub struct UnixOutputStream(Object<ffi::GUnixOutputStream, ffi::GUnixOutputStreamClass>) @extends OutputStream, @implements PollableOutputStream;
+    pub struct UnixOutputStream(Object<ffi::GUnixOutputStream, ffi::GUnixOutputStreamClass>) @extends OutputStream, @implements FileDescriptorBased, PollableOutputStream;
 
     match fn {
         type_ => || ffi::g_unix_output_stream_get_type(),
@@ -21,13 +19,14 @@ impl UnixOutputStream {
     pub const NONE: Option<&'static UnixOutputStream> = None;
 }
 
-pub trait UnixOutputStreamExt: 'static {
-    #[doc(alias = "g_unix_output_stream_get_close_fd")]
-    #[doc(alias = "get_close_fd")]
-    fn closes_fd(&self) -> bool;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::UnixOutputStream>> Sealed for T {}
 }
 
-impl<O: IsA<UnixOutputStream>> UnixOutputStreamExt for O {
+pub trait UnixOutputStreamExt: IsA<UnixOutputStream> + sealed::Sealed + 'static {
+    #[doc(alias = "g_unix_output_stream_get_close_fd")]
+    #[doc(alias = "get_close_fd")]
     fn closes_fd(&self) -> bool {
         unsafe {
             from_glib(ffi::g_unix_output_stream_get_close_fd(
@@ -36,6 +35,8 @@ impl<O: IsA<UnixOutputStream>> UnixOutputStreamExt for O {
         }
     }
 }
+
+impl<O: IsA<UnixOutputStream>> UnixOutputStreamExt for O {}
 
 impl fmt::Display for UnixOutputStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -3,12 +3,14 @@
 // rustdoc-stripper-ignore-next
 //! `IMPL` Shared (reference counted) wrapper implementation.
 
+use std::{
+    cmp, fmt,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+    ptr,
+};
+
 use crate::translate::*;
-use std::cmp;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
-use std::ptr;
 
 // rustdoc-stripper-ignore-next
 /// Wrapper implementations for shared types. See `wrapper!`.
@@ -30,8 +32,21 @@ macro_rules! glib_shared_wrapper {
         $(#[$attr])*
         #[repr(transparent)]
         $visibility struct $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? {
-            inner: $crate::shared::Shared<$ffi_name, $name $(<$($generic),+>)?>,
-            phantom: std::marker::PhantomData<($($($generic),+)?)>,
+            inner: $crate::shared::Shared<$ffi_name, Self>,
+        }
+
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $name $(<$($generic),+>)? {
+            #[doc = "Return the inner pointer to the underlying C value."]
+            #[inline]
+            pub fn as_ptr(&self) -> *mut $ffi_name {
+                unsafe { *(self as *const Self as *const *const $ffi_name) as *mut $ffi_name }
+            }
+
+            #[doc = "Borrows the underlying C value."]
+            #[inline]
+            pub unsafe fn from_glib_ptr_borrow<'a>(ptr: *const *const $ffi_name) -> &'a Self {
+                &*(ptr as *const Self)
+            }
         }
 
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::clone::Clone for $name $(<$($generic),+>)? {
@@ -39,7 +54,6 @@ macro_rules! glib_shared_wrapper {
             fn clone(&self) -> Self {
                 Self {
                     inner: std::clone::Clone::clone(&self.inner),
-                    phantom: std::marker::PhantomData,
                 }
             }
         }
@@ -64,8 +78,11 @@ macro_rules! glib_shared_wrapper {
         }
 
         #[doc(hidden)]
+        unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::TransparentPtrType for $name $(<$($generic),+>)? {}
+
+        #[doc(hidden)]
         impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibPtr<'a, *mut $ffi_name> for $name $(<$($generic),+>)? {
-            type Storage = &'a $crate::shared::Shared<$ffi_name, $name $(<$($generic),+>)?>;
+            type Storage = std::marker::PhantomData<&'a $crate::shared::Shared<$ffi_name, Self>>;
 
             #[inline]
             fn to_glib_none(&'a self) -> $crate::translate::Stash<'a, *mut $ffi_name, Self> {
@@ -80,40 +97,58 @@ macro_rules! glib_shared_wrapper {
         }
 
         #[doc(hidden)]
-        impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibContainerFromSlice<'a, *mut *mut $ffi_name> for $name $(<$($generic),+>)? {
-            type Storage = (Vec<$crate::translate::Stash<'a, *mut $ffi_name, $name $(<$($generic),+>)?>>, Option<Vec<*mut $ffi_name>>);
+        impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibPtr<'a, *const $ffi_name> for $name $(<$($generic),+>)? {
+            type Storage = std::marker::PhantomData<&'a $crate::shared::Shared<$ffi_name, Self>>;
 
-            fn to_glib_none_from_slice(t: &'a [$name $(<$($generic),+>)?]) -> (*mut *mut $ffi_name, Self::Storage) {
-                let v: Vec<_> = t.iter().map(|s| $crate::translate::ToGlibPtr::to_glib_none(s)).collect();
-                let mut v_ptr: Vec<_> = v.iter().map(|s| s.0).collect();
-                v_ptr.push(std::ptr::null_mut() as *mut $ffi_name);
-
-                (v_ptr.as_ptr() as *mut *mut $ffi_name, (v, Some(v_ptr)))
+            #[inline]
+            fn to_glib_none(&'a self) -> $crate::translate::Stash<'a, *const $ffi_name, Self> {
+                let stash = $crate::translate::ToGlibPtr::to_glib_none(&self.inner);
+                $crate::translate::Stash(stash.0 as *const _, stash.1)
             }
 
-            fn to_glib_container_from_slice(t: &'a [$name $(<$($generic),+>)?]) -> (*mut *mut $ffi_name, Self::Storage) {
-                let v: Vec<_> = t.iter().map(|s| $crate::translate::ToGlibPtr::to_glib_none(s)).collect();
+            #[inline]
+            fn to_glib_full(&self) -> *const $ffi_name {
+                $crate::translate::ToGlibPtr::to_glib_full(&self.inner) as *const _
+            }
+        }
 
+        #[doc(hidden)]
+        impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibContainerFromSlice<'a, *mut *mut $ffi_name> for $name $(<$($generic),+>)? {
+            type Storage = (std::marker::PhantomData<&'a [Self]>, Option<Vec<*mut $ffi_name>>);
+
+            fn to_glib_none_from_slice(t: &'a [Self]) -> (*mut *mut $ffi_name, Self::Storage) {
+                let mut v_ptr = Vec::with_capacity(t.len() + 1);
+                unsafe {
+                    let ptr = v_ptr.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(t.as_ptr() as *mut *mut $ffi_name, ptr, t.len());
+                    std::ptr::write(ptr.add(t.len()), std::ptr::null_mut());
+                    v_ptr.set_len(t.len() + 1);
+                }
+
+                (v_ptr.as_ptr() as *mut *mut $ffi_name, (std::marker::PhantomData, Some(v_ptr)))
+            }
+
+            fn to_glib_container_from_slice(t: &'a [Self]) -> (*mut *mut $ffi_name, Self::Storage) {
                 let v_ptr = unsafe {
-                    let v_ptr = $crate::ffi::g_malloc0(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
+                    let v_ptr = $crate::ffi::g_malloc(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
 
-                    for (i, s) in v.iter().enumerate() {
-                        std::ptr::write(v_ptr.add(i), s.0);
-                    }
+                    std::ptr::copy_nonoverlapping(t.as_ptr() as *mut *mut $ffi_name, v_ptr, t.len());
+                    std::ptr::write(v_ptr.add(t.len()), std::ptr::null_mut());
 
                     v_ptr
                 };
 
-                (v_ptr, (v, None))
+                (v_ptr, (std::marker::PhantomData, None))
             }
 
-            fn to_glib_full_from_slice(t: &[$name $(<$($generic),+>)?]) -> *mut *mut $ffi_name {
+            fn to_glib_full_from_slice(t: &[Self]) -> *mut *mut $ffi_name {
                 unsafe {
-                    let v_ptr = $crate::ffi::g_malloc0(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
+                    let v_ptr = $crate::ffi::g_malloc(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
 
                     for (i, s) in t.iter().enumerate() {
                         std::ptr::write(v_ptr.add(i), $crate::translate::ToGlibPtr::to_glib_full(s));
                     }
+                    std::ptr::write(v_ptr.add(t.len()), std::ptr::null_mut());
 
                     v_ptr
                 }
@@ -122,19 +157,19 @@ macro_rules! glib_shared_wrapper {
 
         #[doc(hidden)]
         impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibContainerFromSlice<'a, *const *mut $ffi_name> for $name $(<$($generic),+>)? {
-            type Storage = (Vec<$crate::translate::Stash<'a, *mut $ffi_name, $name $(<$($generic),+>)?>>, Option<Vec<*mut $ffi_name>>);
+            type Storage = (std::marker::PhantomData<&'a [Self]>, Option<Vec<*mut $ffi_name>>);
 
-            fn to_glib_none_from_slice(t: &'a [$name $(<$($generic),+>)?]) -> (*const *mut $ffi_name, Self::Storage) {
+            fn to_glib_none_from_slice(t: &'a [Self]) -> (*const *mut $ffi_name, Self::Storage) {
                 let (ptr, stash) = $crate::translate::ToGlibContainerFromSlice::<'a, *mut *mut $ffi_name>::to_glib_none_from_slice(t);
                 (ptr as *const *mut $ffi_name, stash)
             }
 
-            fn to_glib_container_from_slice(_: &'a [$name $(<$($generic),+>)?]) -> (*const *mut $ffi_name, Self::Storage) {
+            fn to_glib_container_from_slice(_: &'a [Self]) -> (*const *mut $ffi_name, Self::Storage) {
                 // Can't have consumer free a *const pointer
                 unimplemented!()
             }
 
-            fn to_glib_full_from_slice(_: &[$name $(<$($generic),+>)?]) -> *const *mut $ffi_name {
+            fn to_glib_full_from_slice(_: &[Self]) -> *const *mut $ffi_name {
                 // Can't have consumer free a *const pointer
                 unimplemented!()
             }
@@ -146,7 +181,6 @@ macro_rules! glib_shared_wrapper {
             unsafe fn from_glib_none(ptr: *mut $ffi_name) -> Self {
                 Self {
                     inner: $crate::translate::from_glib_none(ptr),
-                    phantom: std::marker::PhantomData,
                 }
             }
         }
@@ -157,7 +191,6 @@ macro_rules! glib_shared_wrapper {
             unsafe fn from_glib_none(ptr: *const $ffi_name) -> Self {
                 Self {
                     inner: $crate::translate::from_glib_none(ptr),
-                    phantom: std::marker::PhantomData,
                 }
             }
         }
@@ -168,7 +201,6 @@ macro_rules! glib_shared_wrapper {
             unsafe fn from_glib_full(ptr: *mut $ffi_name) -> Self {
                 Self {
                     inner: $crate::translate::from_glib_full(ptr),
-                    phantom: std::marker::PhantomData,
                 }
             }
         }
@@ -180,7 +212,6 @@ macro_rules! glib_shared_wrapper {
                 $crate::translate::Borrowed::new(
                     Self {
                         inner: $crate::translate::from_glib_borrow::<_, $crate::shared::Shared<_, _>>(ptr).into_inner(),
-                        phantom: std::marker::PhantomData,
                     }
                 )
             }
@@ -190,7 +221,7 @@ macro_rules! glib_shared_wrapper {
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::FromGlibPtrBorrow<*const $ffi_name> for $name $(<$($generic),+>)? {
             #[inline]
             unsafe fn from_glib_borrow(ptr: *const $ffi_name) -> $crate::translate::Borrowed<Self> {
-                $crate::translate::from_glib_borrow::<_, $name $(<$($generic),+>)?>(ptr as *mut $ffi_name)
+                $crate::translate::from_glib_borrow::<_, Self>(ptr as *mut $ffi_name)
             }
         }
 
@@ -201,10 +232,12 @@ macro_rules! glib_shared_wrapper {
                     return Vec::new();
                 }
 
-                let mut res = Vec::with_capacity(num);
+                let mut res = Vec::<Self>::with_capacity(num);
+                let res_ptr = res.as_mut_ptr();
                 for i in 0..num {
-                    res.push($crate::translate::from_glib_none(std::ptr::read(ptr.add(i))));
+                    ::std::ptr::write(res_ptr.add(i), $crate::translate::from_glib_none(std::ptr::read(ptr.add(i))));
                 }
+                res.set_len(num);
                 res
             }
 
@@ -221,9 +254,9 @@ macro_rules! glib_shared_wrapper {
                 }
 
                 let mut res = Vec::with_capacity(num);
-                for i in 0..num {
-                    res.push($crate::translate::from_glib_full(std::ptr::read(ptr.add(i))));
-                }
+                let res_ptr = res.as_mut_ptr();
+                ::std::ptr::copy_nonoverlapping(ptr as *mut Self, res_ptr, num);
+                res.set_len(num);
                 $crate::ffi::g_free(ptr as *mut _);
                 res
             }
@@ -277,12 +310,31 @@ macro_rules! glib_shared_wrapper {
                 unimplemented!()
             }
         }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::IntoGlibPtr<*mut $ffi_name> for $name $(<$($generic),+>)? {
+            #[inline]
+            unsafe fn into_glib_ptr(self) -> *mut $ffi_name {
+                let s = std::mem::ManuallyDrop::new(self);
+                $crate::translate::ToGlibPtr::<*const $ffi_name>::to_glib_none(&*s).0 as *mut _
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::IntoGlibPtr<*const $ffi_name> for $name $(<$($generic),+>)? {
+            #[inline]
+            unsafe fn into_glib_ptr(self) -> *const $ffi_name {
+                let s = std::mem::ManuallyDrop::new(self);
+                $crate::translate::ToGlibPtr::<*const $ffi_name>::to_glib_none(&*s).0 as *const _
+            }
+        }
     };
 
     (@value_impl $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty) => { };
 
     (@value_impl $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty, @type_ $get_type_expr:expr) => {
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::types::StaticType for $name $(<$($generic),+>)? {
+            #[inline]
             fn static_type() -> $crate::types::Type {
                 #[allow(unused_unsafe)]
                 unsafe { $crate::translate::from_glib($get_type_expr) }
@@ -291,7 +343,7 @@ macro_rules! glib_shared_wrapper {
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::value::ValueType for $name $(<$($generic),+>)? {
-            type Type = $name $(<$($generic),+>)?;
+            type Type = Self;
         }
 
         #[doc(hidden)]
@@ -301,10 +353,11 @@ macro_rules! glib_shared_wrapper {
         unsafe impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::value::FromValue<'a> for $name $(<$($generic),+>)? {
             type Checker = $crate::value::GenericValueTypeOrNoneChecker<Self>;
 
+            #[inline]
             unsafe fn from_value(value: &'a $crate::Value) -> Self {
                 let ptr = $crate::gobject_ffi::g_value_dup_boxed($crate::translate::ToGlibPtr::to_glib_none(value).0);
-                assert!(!ptr.is_null());
-                <$name $(<$($generic),+>)? as $crate::translate::FromGlibPtrFull<*mut $ffi_name>>::from_glib_full(ptr as *mut $ffi_name)
+                debug_assert!(!ptr.is_null());
+                <Self as $crate::translate::FromGlibPtrFull<*mut $ffi_name>>::from_glib_full(ptr as *mut $ffi_name)
             }
         }
 
@@ -312,20 +365,21 @@ macro_rules! glib_shared_wrapper {
         unsafe impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::value::FromValue<'a> for &'a $name $(<$($generic),+>)? {
             type Checker = $crate::value::GenericValueTypeOrNoneChecker<Self>;
 
+            #[inline]
             unsafe fn from_value(value: &'a $crate::Value) -> Self {
-                assert_eq!(std::mem::size_of::<$name $(<$($generic),+>)?>(), std::mem::size_of::<$crate::ffi::gpointer>());
+                debug_assert_eq!(std::mem::size_of::<Self>(), std::mem::size_of::<$crate::ffi::gpointer>());
                 let value = &*(value as *const $crate::Value as *const $crate::gobject_ffi::GValue);
-                let ptr = &value.data[0].v_pointer as *const $crate::ffi::gpointer as *const *const $ffi_name;
-                assert!(!(*ptr).is_null());
-                &*(ptr as *const $name $(<$($generic),+>)?)
+                debug_assert!(!value.data[0].v_pointer.is_null());
+                <$name $(<$($generic),+>)?>::from_glib_ptr_borrow(&value.data[0].v_pointer as *const $crate::ffi::gpointer as *const *const $ffi_name)
             }
         }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::value::ToValue for $name $(<$($generic),+>)? {
+            #[inline]
             fn to_value(&self) -> $crate::Value {
                 unsafe {
-                    let mut value = $crate::Value::from_type(<$name $(<$($generic),+>)? as $crate::StaticType>::static_type());
+                    let mut value = $crate::Value::from_type_unchecked(<Self as $crate::StaticType>::static_type());
                     $crate::gobject_ffi::g_value_take_boxed(
                         $crate::translate::ToGlibPtrMut::to_glib_none_mut(&mut value).0,
                         $crate::translate::ToGlibPtr::<*mut $ffi_name>::to_glib_full(self) as *mut _,
@@ -334,13 +388,29 @@ macro_rules! glib_shared_wrapper {
                 }
             }
 
+            #[inline]
             fn value_type(&self) -> $crate::Type {
-                <$name $(<$($generic),+>)? as $crate::StaticType>::static_type()
+                <Self as $crate::StaticType>::static_type()
+            }
+        }
+
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::convert::From<$name $(<$($generic),+>)?> for $crate::Value {
+            #[inline]
+            fn from(s: $name $(<$($generic),+>)?) -> Self {
+                unsafe {
+                    let mut value = $crate::Value::from_type_unchecked(<$name $(<$($generic),+>)? as $crate::StaticType>::static_type());
+                    $crate::gobject_ffi::g_value_take_boxed(
+                        $crate::translate::ToGlibPtrMut::to_glib_none_mut(&mut value).0,
+                        $crate::translate::IntoGlibPtr::<*mut $ffi_name>::into_glib_ptr(s) as *mut _,
+                    );
+                    value
+                }
             }
         }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::value::ToValueOptional for $name $(<$($generic),+>)? {
+            #[inline]
             fn to_value_optional(s: Option<&Self>) -> $crate::Value {
                 let mut value = $crate::Value::for_value_type::<Self>();
                 unsafe {
@@ -351,6 +421,16 @@ macro_rules! glib_shared_wrapper {
                 }
 
                 value
+            }
+        }
+
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::HasParamSpec for $name $(<$($generic),+>)? {
+            type ParamSpec = $crate::ParamSpecBoxed;
+            type SetValue = Self;
+            type BuilderFn = fn(&str) -> $crate::ParamSpecBoxedBuilder<Self>;
+
+            fn param_spec_builder() -> Self::BuilderFn {
+                |name| Self::ParamSpec::builder(name)
             }
         }
     };
@@ -379,6 +459,7 @@ pub struct Shared<T, MM: SharedMemoryManager<T>> {
 }
 
 impl<T, MM: SharedMemoryManager<T>> Drop for Shared<T, MM> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             MM::unref(self.inner.as_ptr());
@@ -387,6 +468,7 @@ impl<T, MM: SharedMemoryManager<T>> Drop for Shared<T, MM> {
 }
 
 impl<T, MM: SharedMemoryManager<T>> Clone for Shared<T, MM> {
+    #[inline]
     fn clone(&self) -> Self {
         unsafe {
             MM::ref_(self.inner.as_ptr());
@@ -407,18 +489,21 @@ impl<T, MM: SharedMemoryManager<T>> fmt::Debug for Shared<T, MM> {
 }
 
 impl<T, MM: SharedMemoryManager<T>> PartialOrd for Shared<T, MM> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
+        Some(self.cmp(other))
     }
 }
 
 impl<T, MM: SharedMemoryManager<T>> Ord for Shared<T, MM> {
+    #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.inner.cmp(&other.inner)
     }
 }
 
 impl<T, MM: SharedMemoryManager<T>> PartialEq for Shared<T, MM> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
@@ -427,6 +512,7 @@ impl<T, MM: SharedMemoryManager<T>> PartialEq for Shared<T, MM> {
 impl<T, MM: SharedMemoryManager<T>> Eq for Shared<T, MM> {}
 
 impl<T, MM: SharedMemoryManager<T>> Hash for Shared<T, MM> {
+    #[inline]
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -439,11 +525,11 @@ impl<'a, T: 'static, MM> ToGlibPtr<'a, *mut T> for Shared<T, MM>
 where
     MM: SharedMemoryManager<T> + 'static,
 {
-    type Storage = &'a Self;
+    type Storage = PhantomData<&'a Self>;
 
     #[inline]
     fn to_glib_none(&'a self) -> Stash<'a, *mut T, Self> {
-        Stash(self.inner.as_ptr(), self)
+        Stash(self.inner.as_ptr(), PhantomData)
     }
 
     #[inline]
@@ -458,7 +544,7 @@ where
 impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrNone<*mut T> for Shared<T, MM> {
     #[inline]
     unsafe fn from_glib_none(ptr: *mut T) -> Self {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         MM::ref_(ptr);
         Self {
             inner: ptr::NonNull::new_unchecked(ptr),
@@ -470,7 +556,7 @@ impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrNone<*mut T> for Shared<
 impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrNone<*const T> for Shared<T, MM> {
     #[inline]
     unsafe fn from_glib_none(ptr: *const T) -> Self {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         MM::ref_(ptr as *mut _);
         Self {
             inner: ptr::NonNull::new_unchecked(ptr as *mut _),
@@ -482,7 +568,7 @@ impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrNone<*const T> for Share
 impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrFull<*mut T> for Shared<T, MM> {
     #[inline]
     unsafe fn from_glib_full(ptr: *mut T) -> Self {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         Self {
             inner: ptr::NonNull::new_unchecked(ptr),
             mm: PhantomData,
@@ -493,7 +579,7 @@ impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrFull<*mut T> for Shared<
 impl<T: 'static, MM: SharedMemoryManager<T>> FromGlibPtrBorrow<*mut T> for Shared<T, MM> {
     #[inline]
     unsafe fn from_glib_borrow(ptr: *mut T) -> Borrowed<Self> {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         Borrowed::new(Self {
             inner: ptr::NonNull::new_unchecked(ptr),
             mm: PhantomData,

@@ -3,10 +3,8 @@
 // DO NOT EDIT
 
 use crate::SocketConnectable;
-use glib::object::IsA;
-use glib::translate::*;
-use std::fmt;
-use std::ptr;
+use glib::{prelude::*, translate::*};
+use std::{fmt, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GNetworkAddress")]
@@ -65,21 +63,14 @@ impl NetworkAddress {
 unsafe impl Send for NetworkAddress {}
 unsafe impl Sync for NetworkAddress {}
 
-pub trait NetworkAddressExt: 'static {
-    #[doc(alias = "g_network_address_get_hostname")]
-    #[doc(alias = "get_hostname")]
-    fn hostname(&self) -> glib::GString;
-
-    #[doc(alias = "g_network_address_get_port")]
-    #[doc(alias = "get_port")]
-    fn port(&self) -> u16;
-
-    #[doc(alias = "g_network_address_get_scheme")]
-    #[doc(alias = "get_scheme")]
-    fn scheme(&self) -> Option<glib::GString>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::NetworkAddress>> Sealed for T {}
 }
 
-impl<O: IsA<NetworkAddress>> NetworkAddressExt for O {
+pub trait NetworkAddressExt: IsA<NetworkAddress> + sealed::Sealed + 'static {
+    #[doc(alias = "g_network_address_get_hostname")]
+    #[doc(alias = "get_hostname")]
     fn hostname(&self) -> glib::GString {
         unsafe {
             from_glib_none(ffi::g_network_address_get_hostname(
@@ -88,10 +79,14 @@ impl<O: IsA<NetworkAddress>> NetworkAddressExt for O {
         }
     }
 
+    #[doc(alias = "g_network_address_get_port")]
+    #[doc(alias = "get_port")]
     fn port(&self) -> u16 {
         unsafe { ffi::g_network_address_get_port(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "g_network_address_get_scheme")]
+    #[doc(alias = "get_scheme")]
     fn scheme(&self) -> Option<glib::GString> {
         unsafe {
             from_glib_none(ffi::g_network_address_get_scheme(
@@ -100,6 +95,8 @@ impl<O: IsA<NetworkAddress>> NetworkAddressExt for O {
         }
     }
 }
+
+impl<O: IsA<NetworkAddress>> NetworkAddressExt for O {}
 
 impl fmt::Display for NetworkAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

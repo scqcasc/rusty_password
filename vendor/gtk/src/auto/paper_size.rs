@@ -44,8 +44,6 @@ impl PaperSize {
         }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gtk_paper_size_new_from_gvariant")]
     #[doc(alias = "new_from_gvariant")]
     pub fn from_gvariant(variant: &glib::Variant) -> PaperSize {
@@ -236,8 +234,6 @@ impl PaperSize {
         }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gtk_paper_size_to_gvariant")]
     pub fn to_gvariant(&mut self) -> Option<glib::Variant> {
         unsafe { from_glib_none(ffi::gtk_paper_size_to_gvariant(self.to_glib_none_mut().0)) }
@@ -256,6 +252,7 @@ impl PaperSize {
 
     #[doc(alias = "gtk_paper_size_get_default")]
     #[doc(alias = "get_default")]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Option<glib::GString> {
         assert_initialized_main_thread!();
         unsafe { from_glib_none(ffi::gtk_paper_size_get_default()) }

@@ -9,7 +9,7 @@
     clippy::unreadable_literal,
     clippy::upper_case_acronyms
 )]
-#![cfg_attr(feature = "dox", feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[allow(unused_imports)]
 use libc::{
@@ -127,7 +127,7 @@ pub struct GdkPixbufAnimationClass {
 
 impl ::std::fmt::Debug for GdkPixbufAnimationClass {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufAnimationClass @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufAnimationClass @ {self:p}"))
             .field("parent_class", &self.parent_class)
             .field("is_static_image", &self.is_static_image)
             .field("get_static_image", &self.get_static_image)
@@ -152,7 +152,7 @@ pub struct GdkPixbufAnimationIterClass {
 
 impl ::std::fmt::Debug for GdkPixbufAnimationIterClass {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufAnimationIterClass @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufAnimationIterClass @ {self:p}"))
             .field("parent_class", &self.parent_class)
             .field("get_delay_time", &self.get_delay_time)
             .field("get_pixbuf", &self.get_pixbuf)
@@ -181,7 +181,7 @@ pub struct GdkPixbufFormat {
 
 impl ::std::fmt::Debug for GdkPixbufFormat {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufFormat @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufFormat @ {self:p}"))
             .field("name", &self.name)
             .field("signature", &self.signature)
             .field("domain", &self.domain)
@@ -208,7 +208,7 @@ pub struct GdkPixbufLoaderClass {
 
 impl ::std::fmt::Debug for GdkPixbufLoaderClass {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufLoaderClass @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufLoaderClass @ {self:p}"))
             .field("parent_class", &self.parent_class)
             .field("size_prepared", &self.size_prepared)
             .field("area_prepared", &self.area_prepared)
@@ -242,7 +242,7 @@ pub struct GdkPixbufModule {
 
 impl ::std::fmt::Debug for GdkPixbufModule {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufModule @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufModule @ {self:p}"))
             .field("module_name", &self.module_name)
             .field("module_path", &self.module_path)
             .field("module", &self.module)
@@ -274,7 +274,7 @@ pub struct GdkPixbufModulePattern {
 
 impl ::std::fmt::Debug for GdkPixbufModulePattern {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufModulePattern @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufModulePattern @ {self:p}"))
             .field("prefix", &self.prefix)
             .field("mask", &self.mask)
             .field("relevance", &self.relevance)
@@ -299,7 +299,7 @@ pub struct GdkPixbuf {
 
 impl ::std::fmt::Debug for GdkPixbuf {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbuf @ {:p}", self)).finish()
+        f.debug_struct(&format!("GdkPixbuf @ {self:p}")).finish()
     }
 }
 
@@ -311,7 +311,7 @@ pub struct GdkPixbufAnimation {
 
 impl ::std::fmt::Debug for GdkPixbufAnimation {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufAnimation @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufAnimation @ {self:p}"))
             .field("parent_instance", &self.parent_instance)
             .finish()
     }
@@ -325,7 +325,7 @@ pub struct GdkPixbufAnimationIter {
 
 impl ::std::fmt::Debug for GdkPixbufAnimationIter {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufAnimationIter @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufAnimationIter @ {self:p}"))
             .field("parent_instance", &self.parent_instance)
             .finish()
     }
@@ -340,7 +340,7 @@ pub struct GdkPixbufLoader {
 
 impl ::std::fmt::Debug for GdkPixbufLoader {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufLoader @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufLoader @ {self:p}"))
             .finish()
     }
 }
@@ -353,7 +353,7 @@ pub struct GdkPixbufNonAnim {
 
 impl ::std::fmt::Debug for GdkPixbufNonAnim {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufNonAnim @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufNonAnim @ {self:p}"))
             .finish()
     }
 }
@@ -366,7 +366,7 @@ pub struct GdkPixbufSimpleAnim {
 
 impl ::std::fmt::Debug for GdkPixbufSimpleAnim {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufSimpleAnim @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufSimpleAnim @ {self:p}"))
             .finish()
     }
 }
@@ -379,7 +379,7 @@ pub struct GdkPixbufSimpleAnimIter {
 
 impl ::std::fmt::Debug for GdkPixbufSimpleAnimIter {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_struct(&format!("GdkPixbufSimpleAnimIter @ {:p}", self))
+        f.debug_struct(&format!("GdkPixbufSimpleAnimIter @ {self:p}"))
             .finish()
     }
 }
@@ -425,8 +425,6 @@ extern "C" {
     pub fn gdk_pixbuf_format_get_mime_types(format: *mut GdkPixbufFormat) -> *mut *mut c_char;
     pub fn gdk_pixbuf_format_get_name(format: *mut GdkPixbufFormat) -> *mut c_char;
     pub fn gdk_pixbuf_format_is_disabled(format: *mut GdkPixbufFormat) -> gboolean;
-    #[cfg(any(feature = "v2_36", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_36")))]
     pub fn gdk_pixbuf_format_is_save_option_supported(
         format: *mut GdkPixbufFormat,
         option_key: *const c_char,
@@ -466,23 +464,8 @@ extern "C" {
         destroy_fn: GdkPixbufDestroyNotify,
         destroy_fn_data: gpointer,
     ) -> *mut GdkPixbuf;
-    #[cfg(any(windows, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(windows)))]
-    pub fn gdk_pixbuf_new_from_file_utf8(
-        filename: *const c_char,
-        error: *mut *mut glib::GError,
-    ) -> *mut GdkPixbuf;
     pub fn gdk_pixbuf_new_from_file(
         filename: *const c_char,
-        error: *mut *mut glib::GError,
-    ) -> *mut GdkPixbuf;
-    #[cfg(any(windows, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(windows)))]
-    pub fn gdk_pixbuf_new_from_file_at_scale_utf8(
-        filename: *const c_char,
-        width: c_int,
-        height: c_int,
-        preserve_aspect_ratio: gboolean,
         error: *mut *mut glib::GError,
     ) -> *mut GdkPixbuf;
     pub fn gdk_pixbuf_new_from_file_at_scale(
@@ -490,14 +473,6 @@ extern "C" {
         width: c_int,
         height: c_int,
         preserve_aspect_ratio: gboolean,
-        error: *mut *mut glib::GError,
-    ) -> *mut GdkPixbuf;
-    #[cfg(any(windows, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(windows)))]
-    pub fn gdk_pixbuf_new_from_file_at_size_utf8(
-        filename: *const c_char,
-        width: c_int,
-        height: c_int,
         error: *mut *mut glib::GError,
     ) -> *mut GdkPixbuf;
     pub fn gdk_pixbuf_new_from_file_at_size(
@@ -541,8 +516,6 @@ extern "C" {
         error: *mut *mut glib::GError,
     ) -> *mut GdkPixbuf;
     pub fn gdk_pixbuf_new_from_xpm_data(data: *mut *const c_char) -> *mut GdkPixbuf;
-    #[cfg(any(feature = "v2_36_8", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_36_8")))]
     pub fn gdk_pixbuf_calculate_rowstride(
         colorspace: GdkColorspace,
         has_alpha: gboolean,
@@ -568,8 +541,8 @@ extern "C" {
         error: *mut *mut glib::GError,
     ) -> *mut GdkPixbufFormat;
     pub fn gdk_pixbuf_get_formats() -> *mut glib::GSList;
-    #[cfg(any(feature = "v2_40", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_40")))]
+    #[cfg(feature = "v2_40")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "v2_40")))]
     pub fn gdk_pixbuf_init_modules(path: *const c_char, error: *mut *mut glib::GError) -> gboolean;
     pub fn gdk_pixbuf_new_from_stream_async(
         stream: *mut gio::GInputStream,
@@ -652,8 +625,6 @@ extern "C" {
         dest_x: c_int,
         dest_y: c_int,
     );
-    #[cfg(any(feature = "v2_36", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_36")))]
     pub fn gdk_pixbuf_copy_options(
         src_pixbuf: *mut GdkPixbuf,
         dest_pixbuf: *mut GdkPixbuf,
@@ -685,8 +656,6 @@ extern "C" {
     pub fn gdk_pixbuf_read_pixel_bytes(pixbuf: *const GdkPixbuf) -> *mut glib::GBytes;
     pub fn gdk_pixbuf_read_pixels(pixbuf: *const GdkPixbuf) -> *const u8;
     pub fn gdk_pixbuf_ref(pixbuf: *mut GdkPixbuf) -> *mut GdkPixbuf;
-    #[cfg(any(feature = "v2_36", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_36")))]
     pub fn gdk_pixbuf_remove_option(pixbuf: *mut GdkPixbuf, key: *const c_char) -> gboolean;
     pub fn gdk_pixbuf_rotate_simple(
         src: *const GdkPixbuf,
@@ -698,15 +667,6 @@ extern "C" {
         saturation: c_float,
         pixelate: gboolean,
     );
-    #[cfg(any(windows, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(windows)))]
-    pub fn gdk_pixbuf_save_utf8(
-        pixbuf: *mut GdkPixbuf,
-        filename: *const c_char,
-        type_: *const c_char,
-        error: *mut *mut glib::GError,
-        ...
-    ) -> gboolean;
     pub fn gdk_pixbuf_save(
         pixbuf: *mut GdkPixbuf,
         filename: *const c_char,
@@ -765,8 +725,6 @@ extern "C" {
         user_data: gpointer,
         ...
     );
-    #[cfg(any(feature = "v2_36", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_36")))]
     pub fn gdk_pixbuf_save_to_streamv(
         pixbuf: *mut GdkPixbuf,
         stream: *mut gio::GOutputStream,
@@ -776,8 +734,6 @@ extern "C" {
         cancellable: *mut gio::GCancellable,
         error: *mut *mut glib::GError,
     ) -> gboolean;
-    #[cfg(any(feature = "v2_36", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v2_36")))]
     pub fn gdk_pixbuf_save_to_streamv_async(
         pixbuf: *mut GdkPixbuf,
         stream: *mut gio::GOutputStream,
@@ -788,16 +744,6 @@ extern "C" {
         callback: gio::GAsyncReadyCallback,
         user_data: gpointer,
     );
-    #[cfg(any(windows, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(windows)))]
-    pub fn gdk_pixbuf_savev_utf8(
-        pixbuf: *mut GdkPixbuf,
-        filename: *const c_char,
-        type_: *const c_char,
-        option_keys: *mut *mut c_char,
-        option_values: *mut *mut c_char,
-        error: *mut *mut glib::GError,
-    ) -> gboolean;
     pub fn gdk_pixbuf_savev(
         pixbuf: *mut GdkPixbuf,
         filename: *const c_char,
@@ -836,12 +782,6 @@ extern "C" {
     // GdkPixbufAnimation
     //=========================================================================
     pub fn gdk_pixbuf_animation_get_type() -> GType;
-    #[cfg(any(windows, feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(windows)))]
-    pub fn gdk_pixbuf_animation_new_from_file_utf8(
-        filename: *const c_char,
-        error: *mut *mut glib::GError,
-    ) -> *mut GdkPixbufAnimation;
     pub fn gdk_pixbuf_animation_new_from_file(
         filename: *const c_char,
         error: *mut *mut glib::GError,

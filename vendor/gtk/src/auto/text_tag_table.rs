@@ -2,16 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Buildable;
-use crate::TextTag;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{Buildable, TextTag};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GtkTextTagTable")]
@@ -38,34 +35,13 @@ impl Default for TextTagTable {
     }
 }
 
-pub trait TextTagTableExt: 'static {
-    #[doc(alias = "gtk_text_tag_table_add")]
-    fn add(&self, tag: &impl IsA<TextTag>) -> bool;
-
-    #[doc(alias = "gtk_text_tag_table_foreach")]
-    fn foreach<P: FnMut(&TextTag)>(&self, func: P);
-
-    #[doc(alias = "gtk_text_tag_table_get_size")]
-    #[doc(alias = "get_size")]
-    fn size(&self) -> i32;
-
-    #[doc(alias = "gtk_text_tag_table_lookup")]
-    fn lookup(&self, name: &str) -> Option<TextTag>;
-
-    #[doc(alias = "gtk_text_tag_table_remove")]
-    fn remove(&self, tag: &impl IsA<TextTag>);
-
-    #[doc(alias = "tag-added")]
-    fn connect_tag_added<F: Fn(&Self, &TextTag) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "tag-changed")]
-    fn connect_tag_changed<F: Fn(&Self, &TextTag, bool) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "tag-removed")]
-    fn connect_tag_removed<F: Fn(&Self, &TextTag) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::TextTagTable>> Sealed for T {}
 }
 
-impl<O: IsA<TextTagTable>> TextTagTableExt for O {
+pub trait TextTagTableExt: IsA<TextTagTable> + sealed::Sealed + 'static {
+    #[doc(alias = "gtk_text_tag_table_add")]
     fn add(&self, tag: &impl IsA<TextTag>) -> bool {
         unsafe {
             from_glib(ffi::gtk_text_tag_table_add(
@@ -75,6 +51,7 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_tag_table_foreach")]
     fn foreach<P: FnMut(&TextTag)>(&self, func: P) {
         let func_data: P = func;
         unsafe extern "C" fn func_func<P: FnMut(&TextTag)>(
@@ -83,7 +60,7 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         ) {
             let tag = from_glib_borrow(tag);
             let callback: *mut P = data as *const _ as usize as *mut P;
-            (*callback)(&tag);
+            (*callback)(&tag)
         }
         let func = Some(func_func::<P> as _);
         let super_callback0: &P = &func_data;
@@ -96,10 +73,13 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_tag_table_get_size")]
+    #[doc(alias = "get_size")]
     fn size(&self) -> i32 {
         unsafe { ffi::gtk_text_tag_table_get_size(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "gtk_text_tag_table_lookup")]
     fn lookup(&self, name: &str) -> Option<TextTag> {
         unsafe {
             from_glib_none(ffi::gtk_text_tag_table_lookup(
@@ -109,6 +89,7 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 
+    #[doc(alias = "gtk_text_tag_table_remove")]
     fn remove(&self, tag: &impl IsA<TextTag>) {
         unsafe {
             ffi::gtk_text_tag_table_remove(
@@ -118,6 +99,7 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 
+    #[doc(alias = "tag-added")]
     fn connect_tag_added<F: Fn(&Self, &TextTag) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn tag_added_trampoline<
             P: IsA<TextTagTable>,
@@ -146,6 +128,7 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 
+    #[doc(alias = "tag-changed")]
     fn connect_tag_changed<F: Fn(&Self, &TextTag, bool) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn tag_changed_trampoline<
             P: IsA<TextTagTable>,
@@ -176,6 +159,7 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 
+    #[doc(alias = "tag-removed")]
     fn connect_tag_removed<F: Fn(&Self, &TextTag) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn tag_removed_trampoline<
             P: IsA<TextTagTable>,
@@ -204,6 +188,8 @@ impl<O: IsA<TextTagTable>> TextTagTableExt for O {
         }
     }
 }
+
+impl<O: IsA<TextTagTable>> TextTagTableExt for O {}
 
 impl fmt::Display for TextTagTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

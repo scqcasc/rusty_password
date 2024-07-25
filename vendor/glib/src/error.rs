@@ -3,15 +3,9 @@
 // rustdoc-stripper-ignore-next
 //! `Error` binding and helper trait.
 
-use crate::translate::*;
-use crate::Quark;
-use std::borrow::Cow;
-use std::convert::Infallible;
-use std::error;
-use std::ffi::CStr;
-use std::fmt;
-use std::mem;
-use std::str;
+use std::{borrow::Cow, convert::Infallible, error, ffi::CStr, fmt, str};
+
+use crate::{translate::*, Quark};
 
 wrapper! {
     // rustdoc-stripper-ignore-next
@@ -101,13 +95,6 @@ impl Error {
                 .unwrap_or_else(|err| str::from_utf8(&bytes[..err.valid_up_to()]).unwrap())
         }
     }
-
-    // rustdoc-stripper-ignore-next
-    /// Consumes the `Error` and returns the corresponding `GError` pointer.
-    pub fn into_raw(self) -> *mut ffi::GError {
-        let mut e = mem::ManuallyDrop::new(self);
-        e.to_glib_none_mut().0
-    }
 }
 
 impl fmt::Display for Error {
@@ -166,30 +153,46 @@ pub trait ErrorDomain: Copy {
 #[macro_export]
 macro_rules! bool_error(
 // Plain strings
-    ($msg:expr) =>  {
-        $crate::BoolError::new($msg, file!(), module_path!(), line!())
-    };
+    ($msg:expr) => {{
+        $crate::BoolError::new(
+            $msg,
+            file!(),
+            $crate::function_name!(),
+            line!(),
+        )
+    }};
 
 // Format strings
-    ($($msg:tt)*) =>  { {
-        $crate::BoolError::new(format!($($msg)*), file!(), module_path!(), line!())
+    ($($msg:tt)*) =>  {{
+        $crate::BoolError::new(
+            format!($($msg)*),
+            file!(),
+            $crate::function_name!(),
+            line!(),
+        )
     }};
 );
 
 #[macro_export]
 macro_rules! result_from_gboolean(
 // Plain strings
-    ($ffi_bool:expr, $msg:expr) =>  {
-        $crate::BoolError::from_glib($ffi_bool, $msg, file!(), module_path!(), line!())
-    };
+    ($ffi_bool:expr, $msg:expr) => {{
+        $crate::BoolError::from_glib(
+            $ffi_bool,
+            $msg,
+            file!(),
+            $crate::function_name!(),
+            line!(),
+        )
+    }};
 
 // Format strings
-    ($ffi_bool:expr, $($msg:tt)*) =>  { {
+    ($ffi_bool:expr, $($msg:tt)*) =>  {{
         $crate::BoolError::from_glib(
             $ffi_bool,
             format!($($msg)*),
             file!(),
-            module_path!(),
+            $crate::function_name!(),
             line!(),
         )
     }};
@@ -207,8 +210,8 @@ pub struct BoolError {
 }
 
 impl BoolError {
-    pub fn new<Msg: Into<Cow<'static, str>>>(
-        message: Msg,
+    pub fn new(
+        message: impl Into<Cow<'static, str>>,
         filename: &'static str,
         function: &'static str,
         line: u32,
@@ -221,9 +224,9 @@ impl BoolError {
         }
     }
 
-    pub fn from_glib<Msg: Into<Cow<'static, str>>>(
+    pub fn from_glib(
         b: ffi::gboolean,
-        message: Msg,
+        message: impl Into<Cow<'static, str>>,
         filename: &'static str,
         function: &'static str,
         line: u32,
@@ -245,9 +248,10 @@ impl error::Error for BoolError {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::ToValue;
     use std::ffi::CString;
+
+    use super::*;
+    use crate::prelude::*;
 
     #[test]
     fn test_error_matches() {
@@ -266,8 +270,9 @@ mod tests {
 
     #[test]
     fn test_into_raw() {
-        let e = Error::new(crate::FileError::Failed, "Failed").into_raw();
         unsafe {
+            let e: *mut ffi::GError =
+                Error::new(crate::FileError::Failed, "Failed").into_glib_ptr();
             assert_eq!((*e).domain, ffi::g_file_error_quark());
             assert_eq!((*e).code, ffi::G_FILE_ERROR_FAILED);
             assert_eq!(

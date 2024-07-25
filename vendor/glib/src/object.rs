@@ -3,35 +3,18 @@
 // rustdoc-stripper-ignore-next
 //! `IMPL` Object wrapper implementation and `Object` binding.
 
-use crate::types::StaticType;
-use crate::PtrSlice;
-use crate::{quark::Quark, subclass::signal::SignalQuery};
-use crate::{translate::*, value::FromValue};
-use std::cmp;
-use std::fmt;
-use std::hash;
-use std::marker::PhantomData;
-use std::mem;
-use std::ops;
-use std::pin::Pin;
-use std::ptr;
+use std::{cmp, fmt, hash, marker::PhantomData, mem, mem::ManuallyDrop, ops, pin::Pin, ptr};
 
-use crate::closure::TryFromClosureReturnValue;
-use crate::subclass::{prelude::ObjectSubclass, SignalId};
-use crate::value::ToValue;
-use crate::BoolError;
-use crate::SignalHandlerId;
-use crate::Type;
-use crate::Value;
-use crate::{Closure, RustClosure};
-
-use crate::thread_guard::thread_id;
-
-#[doc(hidden)]
-pub use gobject_ffi::GObject;
-
-#[doc(hidden)]
-pub use gobject_ffi::GObjectClass;
+use crate::{
+    closure::TryFromClosureReturnValue,
+    prelude::*,
+    quark::Quark,
+    subclass::{prelude::*, signal::SignalQuery, SignalId},
+    thread_guard::thread_id,
+    translate::*,
+    value::FromValue,
+    Closure, IntoGStr, PtrSlice, RustClosure, SignalHandlerId, Type, Value,
+};
 
 // rustdoc-stripper-ignore-next
 /// Implemented by types representing `glib::Object` and subclasses of it.
@@ -51,6 +34,7 @@ pub unsafe trait ObjectType:
     + crate::value::ToValueOptional
     + crate::value::FromValueOptional<'static>
     + for<'a> ToGlibPtr<'a, *mut <Self as ObjectType>::GlibType>
+    + IntoGlibPtr<*mut <Self as ObjectType>::GlibType>
     + 'static
 {
     // rustdoc-stripper-ignore-next
@@ -62,6 +46,8 @@ pub unsafe trait ObjectType:
 
     fn as_object_ref(&self) -> &ObjectRef;
     fn as_ptr(&self) -> *mut Self::GlibType;
+
+    unsafe fn from_glib_ptr_borrow<'a>(ptr: *const *const Self::GlibType) -> &'a Self;
 }
 
 // rustdoc-stripper-ignore-next
@@ -76,7 +62,10 @@ pub unsafe trait ObjectType:
 ///
 /// The trait can only be implemented if the appropriate `ToGlibPtr`
 /// implementations exist.
-pub unsafe trait IsA<T: ObjectType>: ObjectType + AsRef<T> + 'static {}
+pub unsafe trait IsA<T: ObjectType>:
+    ObjectType + Into<T> + AsRef<T> + std::borrow::Borrow<T>
+{
+}
 
 // rustdoc-stripper-ignore-next
 /// Upcasting and downcasting support.
@@ -133,10 +122,9 @@ pub trait Cast: ObjectType {
     /// Returns `Ok(T)` if the object is an instance of `T` and `Err(self)`
     /// otherwise.
     ///
-    /// *NOTE*: This statically checks at compile-time if casting is possible. It is not always
-    /// known at compile-time, whether a specific object implements an interface or not, in which case
-    /// `upcast` would fail to compile. `dynamic_cast` can be used in these circumstances, which
-    /// is checking the types at runtime.
+    /// *NOTE*: This will check at compile-time if `T` is lower down the
+    /// inheritance tree of `Self`, but also check at runtime if downcasting
+    /// is indeed possible.
     ///
     /// # Example
     ///
@@ -148,7 +136,7 @@ pub trait Cast: ObjectType {
     #[inline]
     fn downcast<T: ObjectType>(self) -> Result<T, Self>
     where
-        Self: CanDowncast<T>,
+        Self: MayDowncastTo<T>,
     {
         if self.is::<T>() {
             Ok(unsafe { self.unsafe_cast() })
@@ -163,10 +151,9 @@ pub trait Cast: ObjectType {
     /// Returns `Some(T)` if the object is an instance of `T` and `None`
     /// otherwise.
     ///
-    /// *NOTE*: This statically checks at compile-time if casting is possible. It is not always
-    /// known at compile-time, whether a specific object implements an interface or not, in which case
-    /// `upcast` would fail to compile. `dynamic_cast` can be used in these circumstances, which
-    /// is checking the types at runtime.
+    /// *NOTE*: This will check at compile-time if `T` is lower down the
+    /// inheritance tree of `Self`, but also check at runtime if downcasting
+    /// is indeed possible.
     ///
     /// # Example
     ///
@@ -178,7 +165,7 @@ pub trait Cast: ObjectType {
     #[inline]
     fn downcast_ref<T: ObjectType>(&self) -> Option<&T>
     where
-        Self: CanDowncast<T>,
+        Self: MayDowncastTo<T>,
     {
         if self.is::<T>() {
             Some(unsafe { self.unsafe_cast_ref() })
@@ -190,7 +177,9 @@ pub trait Cast: ObjectType {
     // rustdoc-stripper-ignore-next
     /// Tries to cast to an object of type `T`. This handles upcasting, downcasting
     /// and casting between interface and interface implementors. All checks are performed at
-    /// runtime, while `downcast` and `upcast` will do many checks at compile-time already.
+    /// runtime, while `upcast` will do many checks at compile-time already. `downcast` will
+    /// perform the same checks at runtime as `dynamic_cast`, but will also ensure some amount of
+    /// compile-time safety.
     ///
     /// It is not always known at compile-time, whether a specific object implements an interface or
     /// not, and checking has to be performed at runtime.
@@ -260,6 +249,8 @@ pub trait Cast: ObjectType {
     ///
     /// If not running with `debug_assertions` enabled, the caller is responsible
     /// for ensuring that the instance implements `T`
+    #[track_caller]
+    #[inline]
     unsafe fn unsafe_cast<T: ObjectType>(self) -> T {
         debug_assert!(self.is::<T>());
         T::unsafe_from(self.into())
@@ -276,6 +267,8 @@ pub trait Cast: ObjectType {
     ///
     /// If not running with `debug_assertions` enabled, the caller is responsible
     /// for ensuring that the instance implements `T`
+    #[track_caller]
+    #[inline]
     unsafe fn unsafe_cast_ref<T: ObjectType>(&self) -> &T {
         debug_assert!(self.is::<T>());
         // This cast is safe because all our wrapper types have the
@@ -289,18 +282,101 @@ pub trait Cast: ObjectType {
 impl<T: ObjectType> Cast for T {}
 
 // rustdoc-stripper-ignore-next
-/// Marker trait for the statically known possibility of downcasting from `Self` to `T`.
-pub trait CanDowncast<T> {}
+/// Convenience trait mirroring `Cast`, implemented on `Option<Object>` types.
+///
+/// # Warning
+/// Inveitably this trait will discard informations about a downcast failure:
+/// you don't know if the object was not of the expected type, or if it was `None`.
+/// If you need to handle the downcast error, use `Cast` over a `glib::Object`.
+///
+/// # Example
+/// ```ignore
+/// let widget: Option<Widget> = list_item.child();
+///
+/// // Without using `CastNone`
+/// let label = widget.unwrap().downcast::<gtk::Label>().unwrap();
+///
+/// // Using `CastNone` we can avoid the first `unwrap()` call
+/// let label = widget.and_downcast::<gtk::Label>().unwrap();
+/// ````
+pub trait CastNone: Sized {
+    type Inner;
+    fn and_downcast<T: ObjectType>(self) -> Option<T>
+    where
+        Self::Inner: MayDowncastTo<T>;
+    fn and_downcast_ref<T: ObjectType>(&self) -> Option<&T>
+    where
+        Self::Inner: MayDowncastTo<T>;
+    fn and_upcast<T: ObjectType>(self) -> Option<T>
+    where
+        Self::Inner: IsA<T>;
+    fn and_upcast_ref<T: ObjectType>(&self) -> Option<&T>
+    where
+        Self::Inner: IsA<T>;
+    fn and_dynamic_cast<T: ObjectType>(self) -> Result<T, Self>;
+    fn and_dynamic_cast_ref<T: ObjectType>(&self) -> Option<&T>;
+}
+impl<I: ObjectType + Sized> CastNone for Option<I> {
+    type Inner = I;
 
-impl<Super: IsA<Super>, Sub: IsA<Super>> CanDowncast<Sub> for Super {}
+    #[inline]
+    fn and_downcast<T: ObjectType>(self) -> Option<T>
+    where
+        Self::Inner: MayDowncastTo<T>,
+    {
+        self.and_then(|i| i.downcast().ok())
+    }
+
+    #[inline]
+    fn and_downcast_ref<T: ObjectType>(&self) -> Option<&T>
+    where
+        Self::Inner: MayDowncastTo<T>,
+    {
+        self.as_ref().and_then(|i| i.downcast_ref())
+    }
+
+    #[inline]
+    fn and_upcast<T: ObjectType>(self) -> Option<T>
+    where
+        Self::Inner: IsA<T>,
+    {
+        self.map(|i| i.upcast())
+    }
+
+    #[inline]
+    fn and_upcast_ref<T: ObjectType>(&self) -> Option<&T>
+    where
+        Self::Inner: IsA<T>,
+    {
+        self.as_ref().map(|i| i.upcast_ref())
+    }
+
+    #[inline]
+    fn and_dynamic_cast<T: ObjectType>(self) -> Result<T, Self> {
+        self.ok_or(None)
+            .and_then(|i| i.dynamic_cast().map_err(|e| Some(e)))
+    }
+
+    #[inline]
+    fn and_dynamic_cast_ref<T: ObjectType>(&self) -> Option<&T> {
+        self.as_ref().and_then(|i| i.dynamic_cast_ref())
+    }
+}
+
+// rustdoc-stripper-ignore-next
+/// Marker trait for the statically known possibility of downcasting from `Self` to `T`.
+pub trait MayDowncastTo<T> {}
+
+impl<Super: IsA<Super>, Sub: IsA<Super>> MayDowncastTo<Sub> for Super {}
 
 // Manual implementation of glib_shared_wrapper! because of special cases
 #[repr(transparent)]
 pub struct ObjectRef {
-    inner: ptr::NonNull<GObject>,
+    inner: ptr::NonNull<gobject_ffi::GObject>,
 }
 
 impl Clone for ObjectRef {
+    #[inline]
     fn clone(&self) -> Self {
         unsafe {
             Self {
@@ -311,6 +387,7 @@ impl Clone for ObjectRef {
 }
 
 impl Drop for ObjectRef {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             gobject_ffi::g_object_unref(self.inner.as_ptr());
@@ -333,18 +410,21 @@ impl fmt::Debug for ObjectRef {
 }
 
 impl PartialOrd for ObjectRef {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for ObjectRef {
+    #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.inner.cmp(&other.inner)
     }
 }
 
 impl PartialEq for ObjectRef {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
@@ -353,6 +433,7 @@ impl PartialEq for ObjectRef {
 impl Eq for ObjectRef {}
 
 impl hash::Hash for ObjectRef {
+    #[inline]
     fn hash<H>(&self, state: &mut H)
     where
         H: hash::Hasher,
@@ -363,100 +444,30 @@ impl hash::Hash for ObjectRef {
 
 #[doc(hidden)]
 impl GlibPtrDefault for ObjectRef {
-    type GlibType = *mut GObject;
+    type GlibType = *mut gobject_ffi::GObject;
 }
 
 #[doc(hidden)]
-impl<'a> ToGlibPtr<'a, *mut GObject> for ObjectRef {
-    type Storage = &'a ObjectRef;
+impl<'a> ToGlibPtr<'a, *mut gobject_ffi::GObject> for ObjectRef {
+    type Storage = PhantomData<&'a ObjectRef>;
 
     #[inline]
-    fn to_glib_none(&'a self) -> Stash<'a, *mut GObject, Self> {
-        Stash(self.inner.as_ptr(), self)
+    fn to_glib_none(&'a self) -> Stash<'a, *mut gobject_ffi::GObject, Self> {
+        Stash(self.inner.as_ptr(), PhantomData)
     }
 
     #[inline]
-    fn to_glib_full(&self) -> *mut GObject {
+    fn to_glib_full(&self) -> *mut gobject_ffi::GObject {
         unsafe { gobject_ffi::g_object_ref(self.inner.as_ptr()) }
     }
 }
 
 #[doc(hidden)]
-impl<'a> ToGlibContainerFromSlice<'a, *mut *mut GObject> for ObjectRef {
-    type Storage = (
-        Vec<Stash<'a, *mut GObject, ObjectRef>>,
-        Option<Vec<*mut GObject>>,
-    );
-
-    fn to_glib_none_from_slice(t: &'a [ObjectRef]) -> (*mut *mut GObject, Self::Storage) {
-        let v: Vec<_> = t.iter().map(|s| s.to_glib_none()).collect();
-        let mut v_ptr: Vec<_> = v.iter().map(|s| s.0).collect();
-        v_ptr.push(ptr::null_mut() as *mut GObject);
-
-        (v_ptr.as_ptr() as *mut *mut GObject, (v, Some(v_ptr)))
-    }
-
-    fn to_glib_container_from_slice(t: &'a [ObjectRef]) -> (*mut *mut GObject, Self::Storage) {
-        let v: Vec<_> = t.iter().map(|s| s.to_glib_none()).collect();
-
-        let v_ptr = unsafe {
-            let v_ptr =
-                ffi::g_malloc0(mem::size_of::<*mut GObject>() * (t.len() + 1)) as *mut *mut GObject;
-
-            for (i, s) in v.iter().enumerate() {
-                ptr::write(v_ptr.add(i), s.0);
-            }
-
-            v_ptr
-        };
-
-        (v_ptr, (v, None))
-    }
-
-    fn to_glib_full_from_slice(t: &[ObjectRef]) -> *mut *mut GObject {
-        unsafe {
-            let v_ptr = ffi::g_malloc0(std::mem::size_of::<*mut GObject>() * (t.len() + 1))
-                as *mut *mut GObject;
-
-            for (i, s) in t.iter().enumerate() {
-                ptr::write(v_ptr.add(i), s.to_glib_full());
-            }
-
-            v_ptr
-        }
-    }
-}
-
-#[doc(hidden)]
-impl<'a> ToGlibContainerFromSlice<'a, *const *mut GObject> for ObjectRef {
-    type Storage = (
-        Vec<Stash<'a, *mut GObject, ObjectRef>>,
-        Option<Vec<*mut GObject>>,
-    );
-
-    fn to_glib_none_from_slice(t: &'a [ObjectRef]) -> (*const *mut GObject, Self::Storage) {
-        let (ptr, stash) =
-            ToGlibContainerFromSlice::<'a, *mut *mut GObject>::to_glib_none_from_slice(t);
-        (ptr as *const *mut GObject, stash)
-    }
-
-    fn to_glib_container_from_slice(_: &'a [ObjectRef]) -> (*const *mut GObject, Self::Storage) {
-        // Can't have consumer free a *const pointer
-        unimplemented!()
-    }
-
-    fn to_glib_full_from_slice(_: &[ObjectRef]) -> *const *mut GObject {
-        // Can't have consumer free a *const pointer
-        unimplemented!()
-    }
-}
-
-#[doc(hidden)]
-impl FromGlibPtrNone<*mut GObject> for ObjectRef {
+impl FromGlibPtrNone<*mut gobject_ffi::GObject> for ObjectRef {
     #[inline]
-    unsafe fn from_glib_none(ptr: *mut GObject) -> Self {
-        assert!(!ptr.is_null());
-        assert_ne!((*ptr).ref_count, 0);
+    unsafe fn from_glib_none(ptr: *mut gobject_ffi::GObject) -> Self {
+        debug_assert!(!ptr.is_null());
+        debug_assert_ne!((*ptr).ref_count, 0);
 
         // Attention: This takes ownership of floating references!
         Self {
@@ -466,20 +477,20 @@ impl FromGlibPtrNone<*mut GObject> for ObjectRef {
 }
 
 #[doc(hidden)]
-impl FromGlibPtrNone<*const GObject> for ObjectRef {
+impl FromGlibPtrNone<*const gobject_ffi::GObject> for ObjectRef {
     #[inline]
-    unsafe fn from_glib_none(ptr: *const GObject) -> Self {
+    unsafe fn from_glib_none(ptr: *const gobject_ffi::GObject) -> Self {
         // Attention: This takes ownership of floating references!
-        from_glib_none(ptr as *mut GObject)
+        from_glib_none(ptr as *mut gobject_ffi::GObject)
     }
 }
 
 #[doc(hidden)]
-impl FromGlibPtrFull<*mut GObject> for ObjectRef {
+impl FromGlibPtrFull<*mut gobject_ffi::GObject> for ObjectRef {
     #[inline]
-    unsafe fn from_glib_full(ptr: *mut GObject) -> Self {
-        assert!(!ptr.is_null());
-        assert_ne!((*ptr).ref_count, 0);
+    unsafe fn from_glib_full(ptr: *mut gobject_ffi::GObject) -> Self {
+        debug_assert!(!ptr.is_null());
+        debug_assert_ne!((*ptr).ref_count, 0);
 
         Self {
             inner: ptr::NonNull::new_unchecked(ptr),
@@ -488,11 +499,11 @@ impl FromGlibPtrFull<*mut GObject> for ObjectRef {
 }
 
 #[doc(hidden)]
-impl FromGlibPtrBorrow<*mut GObject> for ObjectRef {
+impl FromGlibPtrBorrow<*mut gobject_ffi::GObject> for ObjectRef {
     #[inline]
-    unsafe fn from_glib_borrow(ptr: *mut GObject) -> Borrowed<Self> {
-        assert!(!ptr.is_null());
-        assert_ne!((*ptr).ref_count, 0);
+    unsafe fn from_glib_borrow(ptr: *mut gobject_ffi::GObject) -> Borrowed<Self> {
+        debug_assert!(!ptr.is_null());
+        debug_assert_ne!((*ptr).ref_count, 0);
 
         Borrowed::new(Self {
             inner: ptr::NonNull::new_unchecked(ptr),
@@ -501,112 +512,115 @@ impl FromGlibPtrBorrow<*mut GObject> for ObjectRef {
 }
 
 #[doc(hidden)]
-impl FromGlibPtrBorrow<*const GObject> for ObjectRef {
+impl FromGlibPtrBorrow<*const gobject_ffi::GObject> for ObjectRef {
     #[inline]
-    unsafe fn from_glib_borrow(ptr: *const GObject) -> Borrowed<Self> {
-        from_glib_borrow(ptr as *mut GObject)
+    unsafe fn from_glib_borrow(ptr: *const gobject_ffi::GObject) -> Borrowed<Self> {
+        from_glib_borrow(ptr as *mut gobject_ffi::GObject)
     }
 }
 
-#[doc(hidden)]
-impl FromGlibContainerAsVec<*mut GObject, *mut *mut GObject> for ObjectRef {
-    unsafe fn from_glib_none_num_as_vec(ptr: *mut *mut GObject, num: usize) -> Vec<Self> {
-        if num == 0 || ptr.is_null() {
-            return Vec::new();
+#[repr(transparent)]
+pub struct TypedObjectRef<T, P> {
+    inner: ObjectRef,
+    imp: PhantomData<T>,
+    parent: PhantomData<P>,
+}
+
+impl<T, P> TypedObjectRef<T, P> {
+    #[inline]
+    pub unsafe fn new(obj: ObjectRef) -> Self {
+        Self {
+            inner: obj,
+            imp: PhantomData,
+            parent: PhantomData,
         }
+    }
 
-        // Attention: This takes ownership of floating references!
-        let mut res = Vec::with_capacity(num);
-        for i in 0..num {
-            res.push(from_glib_none(ptr::read(ptr.add(i))));
+    #[inline]
+    pub fn into_inner(self) -> ObjectRef {
+        self.inner
+    }
+}
+
+impl<T, P> Clone for TypedObjectRef<T, P> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            imp: PhantomData,
+            parent: PhantomData,
         }
-        res
-    }
-
-    unsafe fn from_glib_container_num_as_vec(ptr: *mut *mut GObject, num: usize) -> Vec<Self> {
-        // Attention: This takes ownership of floating references!
-        let res = FromGlibContainerAsVec::from_glib_none_num_as_vec(ptr, num);
-        ffi::g_free(ptr as *mut _);
-        res
-    }
-
-    unsafe fn from_glib_full_num_as_vec(ptr: *mut *mut GObject, num: usize) -> Vec<Self> {
-        if num == 0 || ptr.is_null() {
-            ffi::g_free(ptr as *mut _);
-            return Vec::new();
-        }
-
-        let mut res = Vec::with_capacity(num);
-        for i in 0..num {
-            res.push(from_glib_full(ptr::read(ptr.add(i))));
-        }
-        ffi::g_free(ptr as *mut _);
-        res
     }
 }
 
-#[doc(hidden)]
-impl FromGlibPtrArrayContainerAsVec<*mut GObject, *mut *mut GObject> for ObjectRef {
-    unsafe fn from_glib_none_as_vec(ptr: *mut *mut GObject) -> Vec<Self> {
-        // Attention: This takes ownership of floating references!
-        FromGlibContainerAsVec::from_glib_none_num_as_vec(ptr, c_ptr_array_len(ptr))
-    }
+impl<T, P> ops::Deref for TypedObjectRef<T, P> {
+    type Target = ObjectRef;
 
-    unsafe fn from_glib_container_as_vec(ptr: *mut *mut GObject) -> Vec<Self> {
-        // Attention: This takes ownership of floating references!
-        FromGlibContainerAsVec::from_glib_container_num_as_vec(ptr, c_ptr_array_len(ptr))
-    }
-
-    unsafe fn from_glib_full_as_vec(ptr: *mut *mut GObject) -> Vec<Self> {
-        FromGlibContainerAsVec::from_glib_full_num_as_vec(ptr, c_ptr_array_len(ptr))
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
-#[doc(hidden)]
-impl FromGlibContainerAsVec<*mut GObject, *const *mut GObject> for ObjectRef {
-    unsafe fn from_glib_none_num_as_vec(ptr: *const *mut GObject, num: usize) -> Vec<Self> {
-        // Attention: This takes ownership of floating references!
-        FromGlibContainerAsVec::from_glib_none_num_as_vec(ptr as *mut *mut _, num)
-    }
+impl<T, P> fmt::Debug for TypedObjectRef<T, P> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let type_ = unsafe {
+            let klass = (*self.inner.inner.as_ptr()).g_type_instance.g_class as *const ObjectClass;
+            (*klass).type_()
+        };
 
-    unsafe fn from_glib_container_num_as_vec(_: *const *mut GObject, _: usize) -> Vec<Self> {
-        // Can't free a *const
-        unimplemented!()
-    }
-
-    unsafe fn from_glib_full_num_as_vec(_: *const *mut GObject, _: usize) -> Vec<Self> {
-        // Can't free a *const
-        unimplemented!()
+        f.debug_struct("TypedObjectRef")
+            .field("inner", &self.inner.inner)
+            .field("type", &type_)
+            .finish()
     }
 }
 
-#[doc(hidden)]
-impl FromGlibPtrArrayContainerAsVec<*mut GObject, *const *mut GObject> for ObjectRef {
-    unsafe fn from_glib_none_as_vec(ptr: *const *mut GObject) -> Vec<Self> {
-        // Attention: This takes ownership of floating references!
-        FromGlibPtrArrayContainerAsVec::from_glib_none_as_vec(ptr as *mut *mut _)
-    }
-
-    unsafe fn from_glib_container_as_vec(_: *const *mut GObject) -> Vec<Self> {
-        // Can't free a *const
-        unimplemented!()
-    }
-
-    unsafe fn from_glib_full_as_vec(_: *const *mut GObject) -> Vec<Self> {
-        // Can't free a *const
-        unimplemented!()
+impl<T, P> PartialOrd for TypedObjectRef<T, P> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
+
+impl<T, P> Ord for TypedObjectRef<T, P> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.inner.cmp(&other.inner)
+    }
+}
+
+impl<T, P> PartialEq for TypedObjectRef<T, P> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<T, P> Eq for TypedObjectRef<T, P> {}
+
+impl<T, P> hash::Hash for TypedObjectRef<T, P> {
+    #[inline]
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: hash::Hasher,
+    {
+        self.inner.hash(state)
+    }
+}
+
+unsafe impl<T: Send + Sync, P: Send + Sync> Send for TypedObjectRef<T, P> {}
+unsafe impl<T: Send + Sync, P: Send + Sync> Sync for TypedObjectRef<T, P> {}
 
 // rustdoc-stripper-ignore-next
 /// ObjectType implementations for Object types. See `wrapper!`.
 #[macro_export]
 macro_rules! glib_object_wrapper {
-    (@generic_impl [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty, $ffi_class_name:ty, @type_ $get_type_expr:expr) => {
+    (@generic_impl [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $impl_type:ty, $parent_type:ty, $ffi_name:ty, $ffi_class_name:ty, @type_ $get_type_expr:expr) => {
         $(#[$attr])*
         #[repr(transparent)]
         $visibility struct $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? {
-            inner: $crate::object::ObjectRef,
+            inner: $crate::object::TypedObjectRef<$impl_type, $parent_type>,
             phantom: std::marker::PhantomData<($($($generic),+)?)>,
         }
 
@@ -640,7 +654,7 @@ macro_rules! glib_object_wrapper {
         impl<OT: $crate::object::ObjectType $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> std::cmp::PartialEq<OT> for $name $(<$($generic),+>)? {
             #[inline]
             fn eq(&self, other: &OT) -> bool {
-                std::cmp::PartialEq::eq(&self.inner, $crate::object::ObjectType::as_object_ref(other))
+                std::cmp::PartialEq::eq(&*self.inner, $crate::object::ObjectType::as_object_ref(other))
             }
         }
 
@@ -649,16 +663,17 @@ macro_rules! glib_object_wrapper {
         impl<OT: $crate::object::ObjectType $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> std::cmp::PartialOrd<OT> for $name $(<$($generic),+>)? {
             #[inline]
             fn partial_cmp(&self, other: &OT) -> Option<std::cmp::Ordering> {
-                std::cmp::PartialOrd::partial_cmp(&self.inner, $crate::object::ObjectType::as_object_ref(other))
+                std::cmp::PartialOrd::partial_cmp(&*self.inner, $crate::object::ObjectType::as_object_ref(other))
             }
         }
 
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::cmp::Ord for $name $(<$($generic),+>)? {
             #[inline]
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                std::cmp::Ord::cmp(&self.inner, $crate::object::ObjectType::as_object_ref(other))
+                std::cmp::Ord::cmp(&*self.inner, $crate::object::ObjectType::as_object_ref(other))
             }
         }
+
 
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::fmt::Debug for $name $(<$($generic),+>)? {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -668,16 +683,18 @@ macro_rules! glib_object_wrapper {
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? From<$name $(<$($generic),+>)?> for $crate::object::ObjectRef {
+            #[inline]
             fn from(s: $name $(<$($generic),+>)?) -> $crate::object::ObjectRef {
-                s.inner
+                s.inner.into_inner()
             }
         }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::UnsafeFrom<$crate::object::ObjectRef> for $name $(<$($generic),+>)? {
+            #[inline]
             unsafe fn unsafe_from(t: $crate::object::ObjectRef) -> Self {
                 $name {
-                    inner: t,
+                    inner: $crate::object::TypedObjectRef::new(t),
                     phantom: std::marker::PhantomData,
                 }
             }
@@ -689,39 +706,53 @@ macro_rules! glib_object_wrapper {
         }
 
         #[doc(hidden)]
+        unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::TransparentPtrType for $name $(<$($generic),+>)? {}
+
+        #[doc(hidden)]
         unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::ObjectType for $name $(<$($generic),+>)? {
             type GlibType = $ffi_name;
             type GlibClassType = $ffi_class_name;
 
+            #[inline]
             fn as_object_ref(&self) -> &$crate::object::ObjectRef {
                 &self.inner
             }
 
+            #[inline]
             fn as_ptr(&self) -> *mut Self::GlibType {
-                $crate::translate::ToGlibPtr::to_glib_none(&self.inner).0 as *mut _
+                unsafe { *(self as *const Self as *const *const $ffi_name) as *mut $ffi_name }
+            }
+
+            #[inline]
+            unsafe fn from_glib_ptr_borrow<'a>(ptr: *const *const Self::GlibType) -> &'a Self {
+                &*(ptr as *const Self)
             }
         }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? AsRef<$crate::object::ObjectRef> for $name $(<$($generic),+>)? {
+            #[inline]
             fn as_ref(&self) -> &$crate::object::ObjectRef {
                 &self.inner
             }
         }
 
         #[doc(hidden)]
-        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? AsRef<$name $(<$($generic),+>)?> for $name $(<$($generic),+>)? {
-            fn as_ref(&self) -> &$name $(<$($generic),+>)? {
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? AsRef<Self> for $name $(<$($generic),+>)? {
+            #[inline]
+            fn as_ref(&self) -> &Self {
                 self
             }
         }
 
         #[doc(hidden)]
-        unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::IsA<$name $(<$($generic),+>)?> for $name $(<$($generic),+>)? { }
+        unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::IsA<Self> for $name $(<$($generic),+>)? { }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::subclass::types::FromObject for $name $(<$($generic),+>)? {
-            type FromObjectType = $name $(<$($generic),+>)?;
+            type FromObjectType = Self;
+
+            #[inline]
             fn from_object(obj: &Self::FromObjectType) -> &Self {
                 obj
             }
@@ -730,72 +761,92 @@ macro_rules! glib_object_wrapper {
         #[doc(hidden)]
         impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibPtr<'a, *const $ffi_name> for $name $(<$($generic),+>)? {
             type Storage = <$crate::object::ObjectRef as
-                $crate::translate::ToGlibPtr<'a, *mut $crate::object::GObject>>::Storage;
+                $crate::translate::ToGlibPtr<'a, *mut $crate::gobject_ffi::GObject>>::Storage;
 
             #[inline]
             fn to_glib_none(&'a self) -> $crate::translate::Stash<'a, *const $ffi_name, Self> {
-                let stash = $crate::translate::ToGlibPtr::to_glib_none(&self.inner);
+                let stash = $crate::translate::ToGlibPtr::to_glib_none(&*self.inner);
                 $crate::translate::Stash(stash.0 as *const _, stash.1)
             }
 
             #[inline]
             fn to_glib_full(&self) -> *const $ffi_name {
-                $crate::translate::ToGlibPtr::to_glib_full(&self.inner) as *const _
+                $crate::translate::ToGlibPtr::to_glib_full(&*self.inner) as *const _
             }
         }
 
         #[doc(hidden)]
         impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibPtr<'a, *mut $ffi_name> for $name $(<$($generic),+>)? {
             type Storage = <$crate::object::ObjectRef as
-                $crate::translate::ToGlibPtr<'a, *mut $crate::object::GObject>>::Storage;
+                $crate::translate::ToGlibPtr<'a, *mut $crate::gobject_ffi::GObject>>::Storage;
 
             #[inline]
             fn to_glib_none(&'a self) -> $crate::translate::Stash<'a, *mut $ffi_name, Self> {
-                let stash = $crate::translate::ToGlibPtr::to_glib_none(&self.inner);
+                let stash = $crate::translate::ToGlibPtr::to_glib_none(&*self.inner);
                 $crate::translate::Stash(stash.0 as *mut _, stash.1)
             }
 
             #[inline]
             fn to_glib_full(&self) -> *mut $ffi_name {
-                $crate::translate::ToGlibPtr::to_glib_full(&self.inner) as *mut _
+                $crate::translate::ToGlibPtr::to_glib_full(&*self.inner) as *mut _
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::IntoGlibPtr<*mut $ffi_name> for $name $(<$($generic),+>)? {
+            #[inline]
+            unsafe fn into_glib_ptr(self) -> *mut $ffi_name {
+                let s = std::mem::ManuallyDrop::new(self);
+                $crate::translate::ToGlibPtr::<*const $ffi_name>::to_glib_none(&*s).0 as *mut _
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::translate::IntoGlibPtr<*const $ffi_name> for $name $(<$($generic),+>)? {
+            #[inline]
+            unsafe fn into_glib_ptr(self) -> *const $ffi_name {
+                let s = std::mem::ManuallyDrop::new(self);
+                $crate::translate::ToGlibPtr::<*const $ffi_name>::to_glib_none(&*s).0 as *const _
             }
         }
 
         #[doc(hidden)]
         impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibContainerFromSlice<'a, *mut *mut $ffi_name> for $name $(<$($generic),+>)? {
-            type Storage = (Vec<$crate::translate::Stash<'a, *mut $ffi_name, $name $(<$($generic),+>)?>>, Option<Vec<*mut $ffi_name>>);
+            type Storage = (std::marker::PhantomData<&'a [Self]>, Option<Vec<*mut $ffi_name>>);
 
-            fn to_glib_none_from_slice(t: &'a [$name $(<$($generic),+>)?]) -> (*mut *mut $ffi_name, Self::Storage) {
-                let v: Vec<_> = t.iter().map(|s| $crate::translate::ToGlibPtr::to_glib_none(s)).collect();
-                let mut v_ptr: Vec<_> = v.iter().map(|s| s.0).collect();
-                v_ptr.push(std::ptr::null_mut() as *mut $ffi_name);
+            fn to_glib_none_from_slice(t: &'a [Self]) -> (*mut *mut $ffi_name, Self::Storage) {
+                let mut v_ptr = Vec::with_capacity(t.len() + 1);
+                unsafe {
+                    let ptr = v_ptr.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(t.as_ptr() as *mut *mut $ffi_name, ptr, t.len());
+                    std::ptr::write(ptr.add(t.len()), std::ptr::null_mut());
+                    v_ptr.set_len(t.len() + 1);
+                }
 
-                (v_ptr.as_ptr() as *mut *mut $ffi_name, (v, Some(v_ptr)))
+                (v_ptr.as_ptr() as *mut *mut $ffi_name, (std::marker::PhantomData, Some(v_ptr)))
             }
 
-            fn to_glib_container_from_slice(t: &'a [$name $(<$($generic),+>)?]) -> (*mut *mut $ffi_name, Self::Storage) {
-                let v: Vec<_> = t.iter().map(|s| $crate::translate::ToGlibPtr::to_glib_none(s)).collect();
-
+            fn to_glib_container_from_slice(t: &'a [Self]) -> (*mut *mut $ffi_name, Self::Storage) {
                 let v_ptr = unsafe {
-                    let v_ptr = $crate::ffi::g_malloc0(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
+                    let v_ptr = $crate::ffi::g_malloc(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
 
-                    for (i, s) in v.iter().enumerate() {
-                        std::ptr::write(v_ptr.add(i), s.0);
-                    }
+                    std::ptr::copy_nonoverlapping(t.as_ptr() as *mut *mut $ffi_name, v_ptr, t.len());
+                    std::ptr::write(v_ptr.add(t.len()), std::ptr::null_mut());
 
                     v_ptr
                 };
 
-                (v_ptr, (v, None))
+                (v_ptr, (std::marker::PhantomData, None))
             }
 
-            fn to_glib_full_from_slice(t: &[$name $(<$($generic),+>)?]) -> *mut *mut $ffi_name {
+            fn to_glib_full_from_slice(t: &[Self]) -> *mut *mut $ffi_name {
                 unsafe {
-                    let v_ptr = $crate::ffi::g_malloc0(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
+                    let v_ptr = $crate::ffi::g_malloc(std::mem::size_of::<*mut $ffi_name>() * (t.len() + 1)) as *mut *mut $ffi_name;
 
                     for (i, s) in t.iter().enumerate() {
                         std::ptr::write(v_ptr.add(i), $crate::translate::ToGlibPtr::to_glib_full(s));
                     }
+                    std::ptr::write(v_ptr.add(t.len()), std::ptr::null_mut());
 
                     v_ptr
                 }
@@ -804,19 +855,19 @@ macro_rules! glib_object_wrapper {
 
         #[doc(hidden)]
         impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::translate::ToGlibContainerFromSlice<'a, *const *mut $ffi_name> for $name $(<$($generic),+>)? {
-            type Storage = (Vec<$crate::translate::Stash<'a, *mut $ffi_name, $name $(<$($generic),+>)?>>, Option<Vec<*mut $ffi_name>>);
+            type Storage = (std::marker::PhantomData<&'a [Self]>, Option<Vec<*mut $ffi_name>>);
 
-            fn to_glib_none_from_slice(t: &'a [$name $(<$($generic),+>)?]) -> (*const *mut $ffi_name, Self::Storage) {
+            fn to_glib_none_from_slice(t: &'a [Self]) -> (*const *mut $ffi_name, Self::Storage) {
                 let (ptr, stash) = $crate::translate::ToGlibContainerFromSlice::<'a, *mut *mut $ffi_name>::to_glib_none_from_slice(t);
                 (ptr as *const *mut $ffi_name, stash)
             }
 
-            fn to_glib_container_from_slice(_: &'a [$name $(<$($generic),+>)?]) -> (*const *mut $ffi_name, Self::Storage) {
+            fn to_glib_container_from_slice(_: &'a [Self]) -> (*const *mut $ffi_name, Self::Storage) {
                 // Can't have consumer free a *const pointer
                 unimplemented!()
             }
 
-            fn to_glib_full_from_slice(_: &[$name $(<$($generic),+>)?]) -> *const *mut $ffi_name {
+            fn to_glib_full_from_slice(_: &[Self]) -> *const *mut $ffi_name {
                 // Can't have consumer free a *const pointer
                 unimplemented!()
             }
@@ -827,9 +878,10 @@ macro_rules! glib_object_wrapper {
             #[inline]
             #[allow(clippy::cast_ptr_alignment)]
             unsafe fn from_glib_none(ptr: *mut $ffi_name) -> Self {
+                debug_assert!(!ptr.is_null());
                 debug_assert!($crate::types::instance_of::<Self>(ptr as *const _));
                 $name {
-                    inner: $crate::translate::from_glib_none(ptr as *mut _),
+                    inner: $crate::object::TypedObjectRef::new($crate::translate::from_glib_none(ptr as *mut _)),
                     phantom: std::marker::PhantomData,
                 }
             }
@@ -840,9 +892,10 @@ macro_rules! glib_object_wrapper {
             #[inline]
             #[allow(clippy::cast_ptr_alignment)]
             unsafe fn from_glib_none(ptr: *const $ffi_name) -> Self {
+                debug_assert!(!ptr.is_null());
                 debug_assert!($crate::types::instance_of::<Self>(ptr as *const _));
                 $name {
-                    inner: $crate::translate::from_glib_none(ptr as *mut _),
+                    inner: $crate::object::TypedObjectRef::new($crate::translate::from_glib_none(ptr as *mut _)),
                     phantom: std::marker::PhantomData,
                 }
             }
@@ -853,9 +906,10 @@ macro_rules! glib_object_wrapper {
             #[inline]
             #[allow(clippy::cast_ptr_alignment)]
             unsafe fn from_glib_full(ptr: *mut $ffi_name) -> Self {
+                debug_assert!(!ptr.is_null());
                 debug_assert!($crate::types::instance_of::<Self>(ptr as *const _));
                 $name {
-                    inner: $crate::translate::from_glib_full(ptr as *mut _),
+                    inner: $crate::object::TypedObjectRef::new($crate::translate::from_glib_full(ptr as *mut _)),
                     phantom: std::marker::PhantomData,
                 }
             }
@@ -866,10 +920,11 @@ macro_rules! glib_object_wrapper {
             #[inline]
             #[allow(clippy::cast_ptr_alignment)]
             unsafe fn from_glib_borrow(ptr: *mut $ffi_name) -> $crate::translate::Borrowed<Self> {
+                debug_assert!(!ptr.is_null());
                 debug_assert!($crate::types::instance_of::<Self>(ptr as *const _));
                 $crate::translate::Borrowed::new(
                     $name {
-                        inner: $crate::translate::from_glib_borrow::<_, $crate::object::ObjectRef>(ptr as *mut _).into_inner(),
+                        inner: $crate::object::TypedObjectRef::new($crate::translate::from_glib_borrow::<_, $crate::object::ObjectRef>(ptr as *mut _).into_inner()),
                         phantom: std::marker::PhantomData,
                     }
                 )
@@ -881,7 +936,7 @@ macro_rules! glib_object_wrapper {
             #[inline]
             #[allow(clippy::cast_ptr_alignment)]
             unsafe fn from_glib_borrow(ptr: *const $ffi_name) -> $crate::translate::Borrowed<Self> {
-                $crate::translate::from_glib_borrow::<_, $name $(<$($generic),+>)?>(ptr as *mut $ffi_name)
+                $crate::translate::from_glib_borrow::<_, Self>(ptr as *mut $ffi_name)
             }
         }
 
@@ -892,10 +947,12 @@ macro_rules! glib_object_wrapper {
                     return Vec::new();
                 }
 
-                let mut res = Vec::with_capacity(num);
+                let mut res = Vec::<Self>::with_capacity(num);
+                let res_ptr = res.as_mut_ptr();
                 for i in 0..num {
-                    res.push($crate::translate::from_glib_none(std::ptr::read(ptr.add(i))));
+                    ::std::ptr::write(res_ptr.add(i), $crate::translate::from_glib_none(std::ptr::read(ptr.add(i))));
                 }
+                res.set_len(num);
                 res
             }
 
@@ -912,9 +969,9 @@ macro_rules! glib_object_wrapper {
                 }
 
                 let mut res = Vec::with_capacity(num);
-                for i in 0..num {
-                    res.push($crate::translate::from_glib_full(std::ptr::read(ptr.add(i))));
-                }
+                let res_ptr = res.as_mut_ptr();
+                ::std::ptr::copy_nonoverlapping(ptr as *mut Self, res_ptr, num);
+                res.set_len(num);
                 $crate::ffi::g_free(ptr as *mut _);
                 res
             }
@@ -970,6 +1027,7 @@ macro_rules! glib_object_wrapper {
         }
 
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::types::StaticType for $name $(<$($generic),+>)? {
+            #[inline]
             fn static_type() -> $crate::types::Type {
                 #[allow(unused_unsafe)]
                 unsafe { $crate::translate::from_glib($get_type_expr) }
@@ -988,11 +1046,12 @@ macro_rules! glib_object_wrapper {
         unsafe impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::value::FromValue<'a> for $name $(<$($generic),+>)? {
             type Checker = $crate::object::ObjectValueTypeChecker<Self>;
 
+            #[inline]
             unsafe fn from_value(value: &'a $crate::Value) -> Self {
                 let ptr = $crate::gobject_ffi::g_value_dup_object($crate::translate::ToGlibPtr::to_glib_none(value).0);
-                assert!(!ptr.is_null());
-                assert_ne!((*ptr).ref_count, 0);
-                <$name $(<$($generic),+>)? as $crate::translate::FromGlibPtrFull<*mut $ffi_name>>::from_glib_full(ptr as *mut $ffi_name)
+                debug_assert!(!ptr.is_null());
+                debug_assert_ne!((*ptr).ref_count, 0);
+                <Self as $crate::translate::FromGlibPtrFull<*mut $ffi_name>>::from_glib_full(ptr as *mut $ffi_name)
             }
         }
 
@@ -1000,21 +1059,22 @@ macro_rules! glib_object_wrapper {
         unsafe impl<'a $(, $($generic $(: $bound $(+ $bound2)*)?),+)?> $crate::value::FromValue<'a> for &'a $name $(<$($generic),+>)? {
             type Checker = $crate::object::ObjectValueTypeChecker<Self>;
 
+            #[inline]
             unsafe fn from_value(value: &'a $crate::Value) -> Self {
-                assert_eq!(std::mem::size_of::<$name $(<$($generic),+>)?>(), std::mem::size_of::<$crate::ffi::gpointer>());
+                debug_assert_eq!(std::mem::size_of::<Self>(), std::mem::size_of::<$crate::ffi::gpointer>());
                 let value = &*(value as *const $crate::Value as *const $crate::gobject_ffi::GValue);
-                let ptr = &value.data[0].v_pointer as *const $crate::ffi::gpointer as *const *const $ffi_name;
-                assert!(!(*ptr).is_null());
-                assert_ne!((**(ptr as *const *const $crate::gobject_ffi::GObject)).ref_count, 0);
-                &*(ptr as *const $name $(<$($generic),+>)?)
+                debug_assert!(!value.data[0].v_pointer.is_null());
+                debug_assert_ne!((*(value.data[0].v_pointer as *const $crate::gobject_ffi::GObject)).ref_count, 0);
+                <$name $(<$($generic),+>)? as $crate::object::ObjectType>::from_glib_ptr_borrow(&value.data[0].v_pointer as *const $crate::ffi::gpointer as *const *const $ffi_name)
             }
         }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::value::ToValue for $name $(<$($generic),+>)? {
+            #[inline]
             fn to_value(&self) -> $crate::Value {
                 unsafe {
-                    let mut value = $crate::Value::from_type(<$name $(<$($generic),+>)? as $crate::StaticType>::static_type());
+                    let mut value = $crate::Value::from_type_unchecked(<Self as $crate::StaticType>::static_type());
                     $crate::gobject_ffi::g_value_take_object(
                         $crate::translate::ToGlibPtrMut::to_glib_none_mut(&mut value).0,
                         $crate::translate::ToGlibPtr::<*mut $ffi_name>::to_glib_full(self) as *mut _,
@@ -1023,13 +1083,30 @@ macro_rules! glib_object_wrapper {
                 }
             }
 
+            #[inline]
             fn value_type(&self) -> $crate::Type {
-                <$name $(<$($generic),+>)? as $crate::StaticType>::static_type()
+                <Self as $crate::StaticType>::static_type()
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? ::std::convert::From<$name $(<$($generic),+>)?> for $crate::Value {
+            #[inline]
+            fn from(o: $name $(<$($generic),+>)?) -> Self {
+                unsafe {
+                    let mut value = $crate::Value::from_type_unchecked(<$name $(<$($generic),+>)? as $crate::StaticType>::static_type());
+                    $crate::gobject_ffi::g_value_take_object(
+                        $crate::translate::ToGlibPtrMut::to_glib_none_mut(&mut value).0,
+                        $crate::translate::IntoGlibPtr::<*mut $ffi_name>::into_glib_ptr(o) as *mut _,
+                    );
+                    value
+                }
             }
         }
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::value::ToValueOptional for $name $(<$($generic),+>)? {
+            #[inline]
             fn to_value_optional(s: Option<&Self>) -> $crate::Value {
                 let mut value = $crate::Value::for_value_type::<Self>();
                 unsafe {
@@ -1044,6 +1121,16 @@ macro_rules! glib_object_wrapper {
         }
 
         $crate::glib_object_wrapper!(@weak_impl $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?);
+
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::HasParamSpec for $name $(<$($generic),+>)? {
+            type ParamSpec = $crate::ParamSpecObject;
+            type SetValue = Self;
+            type BuilderFn = fn(&str) -> $crate::ParamSpecObjectBuilder<Self>;
+
+            fn param_spec_builder() -> Self::BuilderFn {
+                |name| Self::ParamSpec::builder(name)
+            }
+        }
     };
 
     (@weak_impl $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?) => {
@@ -1051,6 +1138,7 @@ macro_rules! glib_object_wrapper {
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::clone::Downgrade for $name $(<$($generic),+>)? {
             type Weak = $crate::object::WeakRef<Self>;
 
+            #[inline]
             fn downgrade(&self) -> Self::Weak {
                 <Self as $crate::object::ObjectExt>::downgrade(&self)
             }
@@ -1063,8 +1151,25 @@ macro_rules! glib_object_wrapper {
         unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::IsA<$super_name> for $name $(<$($generic),+>)? { }
 
         #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? From<$name $(<$($generic),+>)?> for $super_name {
+            #[inline]
+            fn from(v: $name $(<$($generic),+>)?) -> Self {
+                <$name $(::<$($generic),+>)? as $crate::Cast>::upcast(v)
+            }
+        }
+
+        #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? AsRef<$super_name> for $name $(<$($generic),+>)? {
+            #[inline]
             fn as_ref(&self) -> &$super_name {
+                $crate::object::Cast::upcast_ref(self)
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::borrow::Borrow<$super_name> for $name $(<$($generic),+>)? {
+            #[inline]
+            fn borrow(&self) -> &$super_name {
                 $crate::object::Cast::upcast_ref(self)
             }
         }
@@ -1102,27 +1207,27 @@ macro_rules! glib_object_wrapper {
 
     // This case is only for glib::Object itself below. All other cases have glib::Object in its
     // parent class list
-    (@object [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty, @ffi_class $ffi_class_name:ty, @type_ $get_type_expr:expr) => {
+    (@object [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $impl_type:ty, $parent_type:ty, $ffi_name:ty, @ffi_class $ffi_class_name:ty, @type_ $get_type_expr:expr) => {
         $crate::glib_object_wrapper!(
-            @generic_impl [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $ffi_name, $ffi_class_name,
+            @generic_impl [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $impl_type, $parent_type, $ffi_name, $ffi_class_name,
             @type_ $get_type_expr);
 
         #[doc(hidden)]
         unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::IsClass for $name $(<$($generic),+>)? { }
     };
 
-    (@object [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty,
+    (@object [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $impl_type:ty, $parent_type:ty, $ffi_name:ty,
      @type_ $get_type_expr:expr, @extends [$($extends:tt)*], @implements [$($implements:tt)*]) => {
         $crate::glib_object_wrapper!(
-            @object [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $ffi_name, @ffi_class std::os::raw::c_void,
+            @object [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $impl_type, $parent_type, $ffi_name, @ffi_class std::os::raw::c_void,
             @type_ $get_type_expr, @extends [$($extends)*], @implements [$($implements)*]
         );
     };
 
-    (@object [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty, @ffi_class $ffi_class_name:ty,
+    (@object [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $impl_type:ty, $parent_type:ty, $ffi_name:ty, @ffi_class $ffi_class_name:ty,
      @type_ $get_type_expr:expr, @extends [$($extends:tt)*], @implements [$($implements:tt)*]) => {
         $crate::glib_object_wrapper!(
-            @generic_impl [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $ffi_name, $ffi_class_name,
+            @generic_impl [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $impl_type, $parent_type, $ffi_name, $ffi_class_name,
             @type_ $get_type_expr
         );
 
@@ -1132,8 +1237,25 @@ macro_rules! glib_object_wrapper {
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? AsRef<$crate::object::Object> for $name $(<$($generic),+>)? {
+            #[inline]
             fn as_ref(&self) -> &$crate::object::Object {
                 $crate::object::Cast::upcast_ref(self)
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::borrow::Borrow<$crate::object::Object> for $name $(<$($generic),+>)? {
+            #[inline]
+            fn borrow(&self) -> &$crate::object::Object {
+                $crate::object::Cast::upcast_ref(self)
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? From<$name $(<$($generic),+>)?> for $crate::object::Object {
+            #[inline]
+            fn from(v: $name $(<$($generic),+>)?) -> Self {
+                <$name $(::<$($generic),+>)? as $crate::Cast>::upcast(v)
             }
         }
 
@@ -1144,10 +1266,29 @@ macro_rules! glib_object_wrapper {
         unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::IsClass for $name $(<$($generic),+>)? { }
     };
 
+    // FIXME: Workaround for `glib::Object` not being `Send+Sync` but subclasses of it being both
+    // if the impl struct is.
     (@object_subclass [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $subclass:ty,
-     @extends [$($extends:tt)*], @implements [$($implements:tt)*]) => {
+     @extends [], @implements [$($implements:tt)*]) => {
         $crate::glib_object_wrapper!(
             @object [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?,
+            $subclass, (),
+            <$subclass as $crate::subclass::types::ObjectSubclass>::Instance,
+            @ffi_class <$subclass as $crate::subclass::types::ObjectSubclass>::Class,
+            @type_ $crate::translate::IntoGlib::into_glib(<$subclass as $crate::subclass::types::ObjectSubclassType>::type_()),
+            @extends [], @implements [$($implements)*]
+        );
+
+        unsafe impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? $crate::object::ObjectSubclassIs for $name $(<$($generic),+>)? {
+            type Subclass = $subclass;
+        }
+    };
+
+    (@object_subclass [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $subclass:ty,
+     @extends [$($extends:tt)+], @implements [$($implements:tt)*]) => {
+        $crate::glib_object_wrapper!(
+            @object [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?,
+            $subclass, <$subclass as $crate::subclass::types::ObjectSubclass>::ParentType,
             <$subclass as $crate::subclass::types::ObjectSubclass>::Instance,
             @ffi_class <$subclass as $crate::subclass::types::ObjectSubclass>::Class,
             @type_ $crate::translate::IntoGlib::into_glib(<$subclass as $crate::subclass::types::ObjectSubclassType>::type_()),
@@ -1159,26 +1300,43 @@ macro_rules! glib_object_wrapper {
         }
     };
 
-    (@interface [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty,
+    (@interface [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $impl_type:ty, $ffi_name:ty,
      @type_ $get_type_expr:expr, @requires [$($requires:tt)*]) => {
         $crate::glib_object_wrapper!(
-            @interface [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $ffi_name, @ffi_class std::os::raw::c_void,
+            @interface [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $impl_type, $ffi_name, @ffi_class std::os::raw::c_void,
             @type_ $get_type_expr, @requires [$($requires)*]
         );
     };
 
-    (@interface [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $ffi_name:ty, @ffi_class $ffi_class_name:ty,
+    (@interface [$($attr:meta)*] $visibility:vis $name:ident $(<$($generic:ident $(: $bound:tt $(+ $bound2:tt)*)?),+>)?, $impl_type:ty, $ffi_name:ty, @ffi_class $ffi_class_name:ty,
      @type_ $get_type_expr:expr, @requires [$($requires:tt)*]) => {
         $crate::glib_object_wrapper!(
-            @generic_impl [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $ffi_name, $ffi_class_name,
+            @generic_impl [$($attr)*] $visibility $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $impl_type, (), $ffi_name, $ffi_class_name,
             @type_ $get_type_expr
         );
         $crate::glib_object_wrapper!(@munch_impls $name $(<$($generic $(: $bound $(+ $bound2)*)?),+>)?, $($requires)*);
 
         #[doc(hidden)]
         impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? AsRef<$crate::object::Object> for $name $(<$($generic),+>)? {
+            #[inline]
             fn as_ref(&self) -> &$crate::object::Object {
                 $crate::object::Cast::upcast_ref(self)
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? std::borrow::Borrow<$crate::object::Object> for $name $(<$($generic),+>)? {
+            #[inline]
+            fn borrow(&self) -> &$crate::object::Object {
+                $crate::object::Cast::upcast_ref(self)
+            }
+        }
+
+        #[doc(hidden)]
+        impl $(<$($generic $(: $bound $(+ $bound2)*)?),+>)? From<$name $(<$($generic),+>)?> for $crate::object::Object {
+            #[inline]
+            fn from(v: $name $(<$($generic),+>)?) -> Self {
+                <$name $(::<$($generic),+>)? as $crate::Cast>::upcast(v)
             }
         }
 
@@ -1192,7 +1350,7 @@ macro_rules! glib_object_wrapper {
 
 glib_object_wrapper!(@object
     [doc = "The base class in the object hierarchy."]
-    pub Object, GObject, @ffi_class GObjectClass, @type_ gobject_ffi::g_object_get_type()
+    pub Object, *mut std::os::raw::c_void, (), gobject_ffi::GObject, @ffi_class gobject_ffi::GObjectClass, @type_ gobject_ffi::g_object_get_type()
 );
 pub type ObjectClass = Class<Object>;
 
@@ -1200,91 +1358,69 @@ impl Object {
     pub const NONE: Option<&'static Object> = None;
 
     // rustdoc-stripper-ignore-next
-    /// Create a new instance of an object with the given properties.
+    /// Create a new instance of an object with the default property values.
     ///
-    /// This fails if the object is not instantiable, doesn't have all the given properties or
-    /// property values of the wrong type are provided.
+    /// # Panics
+    ///
+    /// This panics if the object is not instantiable.
+    #[track_caller]
     #[allow(clippy::new_ret_no_self)]
-    pub fn new<T: IsA<Object> + IsClass>(
-        properties: &[(&str, &dyn ToValue)],
-    ) -> Result<T, BoolError> {
-        Ok(Object::with_type(T::static_type(), properties)?
-            .downcast()
-            .unwrap())
+    pub fn new<T: IsA<Object> + IsClass>() -> T {
+        let object = Object::with_type(T::static_type());
+        unsafe { object.unsafe_cast() }
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Create a new instance of an object with the default property values.
+    ///
+    /// # Panics
+    ///
+    /// This panics if the object is not instantiable.
+    #[track_caller]
+    pub fn with_type(type_: Type) -> Object {
+        Object::with_mut_values(type_, &mut [])
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Create a new instance of an object of the given type with the given properties as mutable
+    /// values.
+    ///
+    /// # Panics
+    ///
+    /// This panics if the object is not instantiable, doesn't have all the given properties or
+    /// property values of the wrong type are provided.
+    #[track_caller]
+    pub fn with_mut_values(type_: Type, properties: &mut [(&str, Value)]) -> Object {
+        #[cfg(feature = "gio")]
+        unsafe {
+            let iface_type = from_glib(gio_ffi::g_initable_get_type());
+            if type_.is_a(iface_type) {
+                panic!("Can't instantiate type '{type_}' implementing `gio::Initable`. Use `gio::Initable::new()`");
+            }
+            let iface_type = from_glib(gio_ffi::g_async_initable_get_type());
+            if type_.is_a(iface_type) {
+                panic!("Can't instantiate type '{type_}' implementing `gio::AsyncInitable`. Use `gio::AsyncInitable::new()`");
+            }
+        }
+
+        unsafe { Object::new_internal(type_, properties) }
     }
 
     // rustdoc-stripper-ignore-next
     /// Create a new instance of an object of the given type with the given properties.
     ///
-    /// This fails if the object is not instantiable, doesn't have all the given properties or
-    /// property values of the wrong type are provided.
-    pub fn with_type(
-        type_: Type,
-        properties: &[(&str, &dyn ToValue)],
-    ) -> Result<Object, BoolError> {
-        let params = if !properties.is_empty() {
-            let klass = ObjectClass::from_type(type_)
-                .ok_or_else(|| bool_error!("Can't retrieve class for type '{}'", type_))?;
-            let pspecs = klass.list_properties();
-
-            properties
-                .iter()
-                .map(|(name, value)| {
-                    let pspec = pspecs.iter().find(|p| p.name() == *name).ok_or_else(|| {
-                        bool_error!("Can't find property '{}' for type '{}'", name, type_)
-                    })?;
-
-                    let mut value = value.to_value();
-                    validate_property_type(type_, true, pspec, &mut value)?;
-                    Ok((pspec.name().as_ptr(), value))
-                })
-                .collect::<Result<smallvec::SmallVec<[_; 10]>, _>>()?
-        } else {
-            smallvec::SmallVec::new()
-        };
-
-        unsafe { Object::new_internal(type_, &params) }
-    }
-
-    // rustdoc-stripper-ignore-next
-    /// Create a new instance of an object of the given type with the given properties.
+    /// # Panics
     ///
-    /// This fails if the object is not instantiable, doesn't have all the given properties or
+    /// This panics if the object is not instantiable, doesn't have all the given properties or
     /// property values of the wrong type are provided.
-    pub fn with_values(type_: Type, properties: &[(&str, Value)]) -> Result<Object, BoolError> {
-        let params = if !properties.is_empty() {
-            let klass = ObjectClass::from_type(type_)
-                .ok_or_else(|| bool_error!("Can't retrieve class for type '{}'", type_))?;
-            let pspecs = klass.list_properties();
-
-            properties
-                .iter()
-                .map(|(name, value)| {
-                    let pspec = pspecs.iter().find(|p| p.name() == *name).ok_or_else(|| {
-                        bool_error!("Can't find property '{}' for type '{}'", name, type_)
-                    })?;
-
-                    let mut value = value.clone();
-                    validate_property_type(type_, true, pspec, &mut value)?;
-                    Ok((pspec.name().as_ptr(), value))
-                })
-                .collect::<Result<smallvec::SmallVec<[_; 10]>, _>>()?
-        } else {
-            smallvec::SmallVec::new()
-        };
-
-        unsafe { Object::new_internal(type_, &params) }
-    }
-
-    unsafe fn new_internal(
-        type_: Type,
-        params: &[(*const u8, Value)],
-    ) -> Result<Object, BoolError> {
+    ///
+    /// Unlike the other constructors this does not panic if the object is implementing
+    /// `gio::Initable` or `gio::AsyncInitable` and it might be unsafe to use the returned object
+    /// without using the API of those interfaces first.
+    #[track_caller]
+    pub unsafe fn new_internal(type_: Type, properties: &mut [(&str, Value)]) -> Object {
         if !type_.is_a(Object::static_type()) {
-            return Err(bool_error!(
-                "Can't instantiate non-GObject type '{}'",
-                type_
-            ));
+            panic!("Can't instantiate non-GObject type '{type_}'");
         }
 
         if gobject_ffi::g_type_test_flags(
@@ -1292,35 +1428,62 @@ impl Object {
             gobject_ffi::G_TYPE_FLAG_INSTANTIATABLE,
         ) == ffi::GFALSE
         {
-            return Err(bool_error!("Can't instantiate type '{}'", type_));
+            panic!("Can't instantiate type '{type_}'");
         }
 
         if gobject_ffi::g_type_test_flags(type_.into_glib(), gobject_ffi::G_TYPE_FLAG_ABSTRACT)
             != ffi::GFALSE
         {
-            return Err(bool_error!("Can't instantiate abstract type '{}'", type_));
+            panic!("Can't instantiate abstract type '{type_}'");
         }
 
-        let params_c = params
-            .iter()
-            .map(|&(name, ref value)| gobject_ffi::GParameter {
-                name: name as *const _,
-                value: *value.to_glib_none().0,
-            })
-            .collect::<smallvec::SmallVec<[_; 10]>>();
+        let mut property_names = smallvec::SmallVec::<[_; 16]>::with_capacity(properties.len());
+        let mut property_values = smallvec::SmallVec::<[_; 16]>::with_capacity(properties.len());
 
-        let ptr = gobject_ffi::g_object_newv(
+        if !properties.is_empty() {
+            let klass = ObjectClass::from_type(type_)
+                .unwrap_or_else(|| panic!("Can't retrieve class for type '{type_}'"));
+            let pspecs = klass.list_properties();
+
+            for (idx, (name, value)) in properties.iter_mut().enumerate() {
+                let pspec = pspecs
+                    .iter()
+                    .find(|p| p.name() == *name)
+                    .unwrap_or_else(|| panic!("Can't find property '{name}' for type '{type_}'"));
+
+                if (pspec.flags().contains(crate::ParamFlags::CONSTRUCT)
+                    || pspec.flags().contains(crate::ParamFlags::CONSTRUCT_ONLY))
+                    && property_names[0..idx]
+                        .iter()
+                        .any(|other_name| pspec.name().as_ptr() == *other_name)
+                {
+                    panic!("Can't set construct property '{name}' for type '{type_}' twice");
+                }
+
+                // FIXME: With GLib 2.74 and GParamSpecClass::value_is_valid() it is possible to
+                // not require mutable values here except for when LAX_VALIDATION is provided and a
+                // change is needed, or a GObject value needs it's GType changed.
+                validate_property_type(type_, true, pspec, value);
+
+                property_names.push(pspec.name().as_ptr());
+                property_values.push(*value.to_glib_none().0);
+            }
+        }
+
+        let ptr = gobject_ffi::g_object_new_with_properties(
             type_.into_glib(),
-            params_c.len() as u32,
-            mut_override(params_c.as_ptr()),
+            properties.len() as u32,
+            mut_override(property_names.as_ptr() as *const *const _),
+            property_values.as_ptr(),
         );
+
         if ptr.is_null() {
-            Err(bool_error!("Can't instantiate object for type '{}'", type_))
+            panic!("Can't instantiate object for type '{type_}'");
         } else if type_.is_a(InitiallyUnowned::static_type()) {
             // Attention: This takes ownership of the floating reference
-            Ok(from_glib_none(ptr))
+            from_glib_none(ptr)
         } else {
-            Ok(from_glib_full(ptr))
+            from_glib_full(ptr)
         }
     }
 
@@ -1340,28 +1503,37 @@ impl Object {
 #[must_use = "builder doesn't do anything unless built"]
 pub struct ObjectBuilder<'a, O> {
     type_: Type,
-    properties: Vec<(&'a str, Value)>,
+    properties: smallvec::SmallVec<[(&'a str, Value); 16]>,
     phantom: PhantomData<O>,
 }
 
 impl<'a, O: IsA<Object> + IsClass> ObjectBuilder<'a, O> {
+    #[inline]
     fn new(type_: Type) -> Self {
         ObjectBuilder {
             type_,
-            properties: vec![],
+            properties: smallvec::SmallVec::new(),
             phantom: PhantomData,
         }
     }
 
     // rustdoc-stripper-ignore-next
+    /// Gets the type of this builder.
+    #[inline]
+    pub fn type_(&self) -> Type {
+        self.type_
+    }
+
+    // rustdoc-stripper-ignore-next
     /// Set property `name` to the given value `value`.
-    pub fn property<T: ToValue + 'a>(self, name: &'a str, value: T) -> Self {
+    #[inline]
+    pub fn property(self, name: &'a str, value: impl Into<Value>) -> Self {
         let ObjectBuilder {
             type_,
             mut properties,
             ..
         } = self;
-        properties.push((name, value.to_value()));
+        properties.push((name, value.into()));
 
         ObjectBuilder {
             type_,
@@ -1373,10 +1545,15 @@ impl<'a, O: IsA<Object> + IsClass> ObjectBuilder<'a, O> {
     // rustdoc-stripper-ignore-next
     /// Build the object with the provided properties.
     ///
-    /// This fails if the object is not instantiable, doesn't have all the given properties or
+    /// # Panics
+    ///
+    /// This panics if the object is not instantiable, doesn't have all the given properties or
     /// property values of the wrong type are provided.
-    pub fn build(self) -> Result<O, BoolError> {
-        Object::with_values(self.type_, &self.properties).map(|o| unsafe { o.unsafe_cast::<O>() })
+    #[track_caller]
+    #[inline]
+    pub fn build(mut self) -> O {
+        let object = Object::with_mut_values(self.type_, &mut self.properties);
+        unsafe { object.unsafe_cast::<O>() }
     }
 }
 
@@ -1385,6 +1562,7 @@ pub struct PropertyNotificationFreezeGuard(ObjectRef);
 
 impl Drop for PropertyNotificationFreezeGuard {
     #[doc(alias = "g_object_thaw_notify")]
+    #[inline]
     fn drop(&mut self) {
         unsafe { gobject_ffi::g_object_thaw_notify(self.0.to_glib_none().0) }
     }
@@ -1428,11 +1606,6 @@ pub trait ObjectExt: ObjectType {
     fn interface<T: IsInterface>(&self) -> Option<InterfaceRef<T>>;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::set_property`] but fails instead of panicking.
-    #[doc(alias = "g_object_set_property")]
-    fn try_set_property<V: ToValue>(&self, property_name: &str, value: V) -> Result<(), BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Sets the property `property_name` of the object to value `value`.
     ///
     /// # Panics
@@ -1440,16 +1613,7 @@ pub trait ObjectExt: ObjectType {
     /// If the property does not exist, if the type of the property is different than
     /// the provided value, or if the property is not writable.
     #[doc(alias = "g_object_set_property")]
-    fn set_property<V: ToValue>(&self, property_name: &str, value: V);
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::set_property`] but fails instead of panicking.
-    #[doc(alias = "g_object_set_property")]
-    fn try_set_property_from_value(
-        &self,
-        property_name: &str,
-        value: &Value,
-    ) -> Result<(), BoolError>;
+    fn set_property(&self, property_name: &str, value: impl Into<Value>);
 
     // rustdoc-stripper-ignore-next
     /// Sets the property `property_name` of the object to value `value`.
@@ -1462,12 +1626,6 @@ pub trait ObjectExt: ObjectType {
     fn set_property_from_value(&self, property_name: &str, value: &Value);
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::set_properties`] but fails instead of panicking.
-    #[doc(alias = "g_object_set")]
-    fn try_set_properties(&self, property_values: &[(&str, &dyn ToValue)])
-        -> Result<(), BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Sets multiple properties of the object at once.
     ///
     /// # Panics
@@ -1476,14 +1634,6 @@ pub trait ObjectExt: ObjectType {
     /// type are provided, or if any of the properties is not writable.
     #[doc(alias = "g_object_set")]
     fn set_properties(&self, property_values: &[(&str, &dyn ToValue)]);
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::set_properties_from_value`] but fails instead of panicking.
-    #[doc(alias = "g_object_set")]
-    fn try_set_properties_from_value(
-        &self,
-        property_values: &[(&str, Value)],
-    ) -> Result<(), BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Sets multiple properties of the object at once.
@@ -1496,15 +1646,6 @@ pub trait ObjectExt: ObjectType {
     fn set_properties_from_value(&self, property_values: &[(&str, Value)]);
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::property`] but fails instead of panicking.
-    #[doc(alias = "get_property")]
-    #[doc(alias = "g_object_get_property")]
-    fn try_property<V: for<'b> FromValue<'b> + 'static>(
-        &self,
-        property_name: &str,
-    ) -> Result<V, BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Gets the property `property_name` of the object and cast it to the type V.
     ///
     /// # Panics
@@ -1513,12 +1654,6 @@ pub trait ObjectExt: ObjectType {
     #[doc(alias = "get_property")]
     #[doc(alias = "g_object_get_property")]
     fn property<V: for<'b> FromValue<'b> + 'static>(&self, property_name: &str) -> V;
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::property_value`] but fails instead of panicking.
-    #[doc(alias = "get_property")]
-    #[doc(alias = "g_object_get_property")]
-    fn try_property_value(&self, property_name: &str) -> Result<Value, BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Gets the property `property_name` of the object.
@@ -1641,17 +1776,6 @@ pub trait ObjectExt: ObjectType {
     fn stop_signal_emission_by_name(&self, signal_name: &str);
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::connect`] but fails instead of panicking.
-    fn try_connect<F>(
-        &self,
-        signal_name: &str,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static;
-
-    // rustdoc-stripper-ignore-next
     /// Connect to the signal `signal_name` on this object.
     ///
     /// If `after` is set to `true` then the callback will be called after the default class
@@ -1661,18 +1785,6 @@ pub trait ObjectExt: ObjectType {
     ///
     /// If the signal does not exist.
     fn connect<F>(&self, signal_name: &str, after: bool, callback: F) -> SignalHandlerId
-    where
-        F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static;
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::connect_id`] but fails instead of panicking.
-    fn try_connect_id<F>(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
     where
         F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static;
 
@@ -1698,17 +1810,6 @@ pub trait ObjectExt: ObjectType {
         F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::connect_local`] but fails instead of panicking.
-    fn try_connect_local<F>(
-        &self,
-        signal_name: &str,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value> + 'static;
-
-    // rustdoc-stripper-ignore-next
     /// Connect to the signal `signal_name` on this object.
     ///
     /// If `after` is set to `true` then the callback will be called after the default class
@@ -1721,17 +1822,6 @@ pub trait ObjectExt: ObjectType {
     ///
     /// If the signal does not exist.
     fn connect_local<F>(&self, signal_name: &str, after: bool, callback: F) -> SignalHandlerId
-    where
-        F: Fn(&[Value]) -> Option<Value> + 'static;
-
-    /// Similar to [`Self::connect_local_id`] but fails instead of panicking.
-    fn try_connect_local_id<F>(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
     where
         F: Fn(&[Value]) -> Option<Value> + 'static;
 
@@ -1758,17 +1848,6 @@ pub trait ObjectExt: ObjectType {
         F: Fn(&[Value]) -> Option<Value> + 'static;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::connect_unsafe`] but fails instead of panicking.
-    unsafe fn try_connect_unsafe<F>(
-        &self,
-        signal_name: &str,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value>;
-
-    // rustdoc-stripper-ignore-next
     /// Connect to the signal `signal_name` on this object.
     ///
     /// If `after` is set to `true` then the callback will be called after the default class
@@ -1791,18 +1870,6 @@ pub trait ObjectExt: ObjectType {
         after: bool,
         callback: F,
     ) -> SignalHandlerId
-    where
-        F: Fn(&[Value]) -> Option<Value>;
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::connect_unsafe_id`] but fails instead of panicking.
-    unsafe fn try_connect_unsafe_id<F>(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
     where
         F: Fn(&[Value]) -> Option<Value>;
 
@@ -1835,15 +1902,6 @@ pub trait ObjectExt: ObjectType {
         F: Fn(&[Value]) -> Option<Value>;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::connect_closure`] but fails instead of panicking.
-    fn try_connect_closure(
-        &self,
-        signal_name: &str,
-        after: bool,
-        closure: RustClosure,
-    ) -> Result<SignalHandlerId, BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Connect a closure to the signal `signal_name` on this object.
     ///
     /// If `after` is set to `true` then the callback will be called after the default class
@@ -1865,15 +1923,6 @@ pub trait ObjectExt: ObjectType {
         after: bool,
         closure: RustClosure,
     ) -> SignalHandlerId;
-
-    /// Similar to [`Self::connect_closure_id`] but fails instead of panicking.
-    fn try_connect_closure_id(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        closure: RustClosure,
-    ) -> Result<SignalHandlerId, BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Connect a closure to the signal `signal_id` on this object.
@@ -1898,18 +1947,10 @@ pub trait ObjectExt: ObjectType {
     /// Limits the lifetime of `closure` to the lifetime of the object. When
     /// the object's reference count drops to zero, the closure will be
     /// invalidated. An invalidated closure will ignore any calls to
-    /// [`Closure::invoke`](crate::Closure::invoke).
+    /// [`invoke_with_values`](crate::closure::Closure::invoke_with_values), or
+    /// [`invoke`](crate::closure::RustClosure::invoke) when using Rust closures.
     #[doc(alias = "g_object_watch_closure")]
     fn watch_closure(&self, closure: &impl AsRef<Closure>);
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit`] but fails instead of panicking.
-    #[doc(alias = "g_signal_emitv")]
-    fn try_emit<R: TryFromClosureReturnValue>(
-        &self,
-        signal_id: SignalId,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Emit signal by signal id.
@@ -1924,25 +1965,8 @@ pub trait ObjectExt: ObjectType {
     fn emit<R: TryFromClosureReturnValue>(&self, signal_id: SignalId, args: &[&dyn ToValue]) -> R;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_with_values`] but fails instead of panicking.
-    fn try_emit_with_values(
-        &self,
-        signal_id: SignalId,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Same as [`Self::emit`] but takes `Value` for the arguments.
     fn emit_with_values(&self, signal_id: SignalId, args: &[Value]) -> Option<Value>;
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_by_name`] but fails instead of panicking.
-    #[doc(alias = "g_signal_emit_by_name")]
-    fn try_emit_by_name<R: TryFromClosureReturnValue>(
-        &self,
-        signal_name: &str,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Emit signal by its name.
@@ -1961,14 +1985,6 @@ pub trait ObjectExt: ObjectType {
     ) -> R;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_by_name_with_values`] but fails instead of panicking.
-    fn try_emit_by_name_with_values(
-        &self,
-        signal_name: &str,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Emit signal by its name.
     ///
     /// If the signal has a return value then this is returned here.
@@ -1978,15 +1994,6 @@ pub trait ObjectExt: ObjectType {
     /// If the signal does not exist, the wrong number of arguments is provided, or
     /// arguments of the wrong types were provided.
     fn emit_by_name_with_values(&self, signal_name: &str, args: &[Value]) -> Option<Value>;
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_by_name_with_details`] but fails instead of panicking.
-    fn try_emit_by_name_with_details<R: TryFromClosureReturnValue>(
-        &self,
-        signal_name: &str,
-        details: Quark,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Emit signal by its name with details.
@@ -2005,15 +2012,6 @@ pub trait ObjectExt: ObjectType {
     ) -> R;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_by_name_with_details_and_values`] but fails instead of panicking.
-    fn try_emit_by_name_with_details_and_values(
-        &self,
-        signal_name: &str,
-        details: Quark,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Emit signal by its name with details.
     ///
     /// If the signal has a return value then this is returned here.
@@ -2030,15 +2028,6 @@ pub trait ObjectExt: ObjectType {
     ) -> Option<Value>;
 
     // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_with_details`] but fails instead of panicking.
-    fn try_emit_with_details<R: TryFromClosureReturnValue>(
-        &self,
-        signal_id: SignalId,
-        details: Quark,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError>;
-
-    // rustdoc-stripper-ignore-next
     /// Emit signal by signal id with details.
     ///
     /// If the signal has a return value then this is returned here.
@@ -2053,15 +2042,6 @@ pub trait ObjectExt: ObjectType {
         details: Quark,
         args: &[&dyn ToValue],
     ) -> R;
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to [`Self::emit_with_details_and_values`] but fails instead of panicking.
-    fn try_emit_with_details_and_values(
-        &self,
-        signal_id: SignalId,
-        details: Quark,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError>;
 
     // rustdoc-stripper-ignore-next
     /// Emit signal by signal id with details.
@@ -2147,33 +2127,65 @@ pub trait ObjectExt: ObjectType {
     fn downgrade(&self) -> WeakRef<Self>;
 
     // rustdoc-stripper-ignore-next
+    /// Add a callback to be notified when the Object is disposed.
+    #[doc(alias = "g_object_weak_ref")]
+    #[doc(alias = "connect_drop")]
+    fn add_weak_ref_notify<F: FnOnce() + Send + 'static>(&self, f: F) -> WeakRefNotify<Self>;
+
+    // rustdoc-stripper-ignore-next
+    /// Add a callback to be notified when the Object is disposed.
+    ///
+    /// This is like [`add_weak_ref_notify`][`ObjectExt::add_weak_ref_notify`] but doesn't require the closure to be [`Send`].
+    /// Object dispose will panic if the object is disposed from the wrong thread.
+    #[doc(alias = "g_object_weak_ref")]
+    #[doc(alias = "connect_drop")]
+    fn add_weak_ref_notify_local<F: FnOnce() + 'static>(&self, f: F) -> WeakRefNotify<Self>;
+
+    // rustdoc-stripper-ignore-next
     /// Bind property `source_property` on this object to the `target_property` on the `target` object.
     ///
     /// This allows keeping the properties of both objects in sync.
     ///
     /// The binding can be unidirectional or bidirectional and optionally it is possible to
     /// transform the property values before they're passed to the other object.
-    fn bind_property<'a, O: ObjectType>(
+    fn bind_property<'a, 'f, 't, O: ObjectType>(
         &'a self,
         source_property: &'a str,
         target: &'a O,
         target_property: &'a str,
-    ) -> BindingBuilder<'a>;
+    ) -> BindingBuilder<'a, 'f, 't>;
 
     // rustdoc-stripper-ignore-next
     /// Returns the strong reference count of this object.
     fn ref_count(&self) -> u32;
+
+    // rustdoc-stripper-ignore-next
+    /// Runs the dispose mechanism of the object.
+    ///
+    /// This will dispose of any references the object has to other objects, and among other things
+    /// will disconnect all signal handlers.
+    ///
+    /// # Safety
+    ///
+    /// Theoretically this is safe to run and afterwards the object is simply in a non-functional
+    /// state, however many object implementations in C end up with memory safety issues if the
+    /// object is used after disposal.
+    #[doc(alias = "g_object_run_dispose")]
+    unsafe fn run_dispose(&self);
 }
 
 impl<T: ObjectType> ObjectExt for T {
+    #[inline]
     fn is<U: StaticType>(&self) -> bool {
         self.type_().is_a(U::static_type())
     }
 
+    #[inline]
     fn type_(&self) -> Type {
         self.object_class().type_()
     }
 
+    #[inline]
     fn object_class(&self) -> &ObjectClass {
         unsafe {
             let obj: *mut gobject_ffi::GObject = self.as_object_ref().to_glib_none().0;
@@ -2182,6 +2194,7 @@ impl<T: ObjectType> ObjectExt for T {
         }
     }
 
+    #[inline]
     fn class(&self) -> &Class<Self>
     where
         Self: IsClass,
@@ -2193,6 +2206,7 @@ impl<T: ObjectType> ObjectExt for T {
         }
     }
 
+    #[inline]
     fn class_of<U: IsClass>(&self) -> Option<&Class<U>> {
         if !self.is::<U>() {
             return None;
@@ -2205,24 +2219,22 @@ impl<T: ObjectType> ObjectExt for T {
         }
     }
 
+    #[inline]
     fn interface<U: IsInterface>(&self) -> Option<InterfaceRef<U>> {
         Interface::from_class(self.object_class())
     }
 
-    fn try_set_property<V: ToValue>(&self, property_name: &str, value: V) -> Result<(), BoolError> {
-        let pspec = match self.find_property(property_name) {
-            Some(pspec) => pspec,
-            None => {
-                return Err(bool_error!(
-                    "property '{}' of type '{}' not found",
-                    property_name,
-                    self.type_()
-                ));
-            }
-        };
+    #[track_caller]
+    fn set_property(&self, property_name: &str, value: impl Into<Value>) {
+        let pspec = self.find_property(property_name).unwrap_or_else(|| {
+            panic!(
+                "property '{property_name}' of type '{}' not found",
+                self.type_()
+            )
+        });
 
-        let mut property_value = value.to_value();
-        validate_property_type(self.type_(), false, &pspec, &mut property_value)?;
+        let mut property_value = value.into();
+        validate_property_type(self.type_(), false, &pspec, &mut property_value);
         unsafe {
             gobject_ffi::g_object_set_property(
                 self.as_object_ref().to_glib_none().0,
@@ -2230,66 +2242,50 @@ impl<T: ObjectType> ObjectExt for T {
                 property_value.to_glib_none().0,
             );
         }
-
-        Ok(())
     }
 
-    fn set_property<V: ToValue>(&self, property_name: &str, value: V) {
-        self.try_set_property(property_name, value).unwrap()
-    }
-
-    fn try_set_property_from_value(
-        &self,
-        property_name: &str,
-        value: &Value,
-    ) -> Result<(), BoolError> {
-        let pspec = match self.find_property(property_name) {
-            Some(pspec) => pspec,
-            None => {
-                return Err(bool_error!(
-                    "property '{}' of type '{}' not found",
-                    property_name,
-                    self.type_()
-                ));
-            }
-        };
-
-        let mut property_value = value.clone();
-        validate_property_type(self.type_(), false, &pspec, &mut property_value)?;
-        unsafe {
-            gobject_ffi::g_object_set_property(
-                self.as_object_ref().to_glib_none().0,
-                pspec.name().as_ptr() as *const _,
-                property_value.to_glib_none().0,
-            );
-        }
-
-        Ok(())
-    }
-
+    #[track_caller]
     fn set_property_from_value(&self, property_name: &str, value: &Value) {
-        self.try_set_property_from_value(property_name, value)
-            .unwrap()
+        let pspec = match self.find_property(property_name) {
+            Some(pspec) => pspec,
+            None => {
+                panic!(
+                    "property '{property_name}' of type '{}' not found",
+                    self.type_()
+                );
+            }
+        };
+
+        // FIXME: With GLib 2.74 and GParamSpecClass::value_is_valid() it is possible to
+        // not require mutable values here except for when LAX_VALIDATION is provided and a
+        // change is needed, or a GObject value needs it's GType changed.
+        let mut property_value = value.clone();
+        validate_property_type(self.type_(), false, &pspec, &mut property_value);
+        unsafe {
+            gobject_ffi::g_object_set_property(
+                self.as_object_ref().to_glib_none().0,
+                pspec.name().as_ptr() as *const _,
+                property_value.to_glib_none().0,
+            );
+        }
     }
 
-    fn try_set_properties(
-        &self,
-        property_values: &[(&str, &dyn ToValue)],
-    ) -> Result<(), BoolError> {
+    #[track_caller]
+    fn set_properties(&self, property_values: &[(&str, &dyn ToValue)]) {
         let pspecs = self.list_properties();
 
         let params = property_values
             .iter()
             .map(|&(name, value)| {
-                let pspec = pspecs.iter().find(|p| p.name() == name).ok_or_else(|| {
-                    bool_error!("Can't find property '{}' for type '{}'", name, self.type_())
-                })?;
+                let pspec = pspecs.iter().find(|p| p.name() == name).unwrap_or_else(|| {
+                    panic!("Can't find property '{name}' for type '{}'", self.type_());
+                });
 
                 let mut value = value.to_value();
-                validate_property_type(self.type_(), false, pspec, &mut value)?;
-                Ok((pspec.name().as_ptr(), value))
+                validate_property_type(self.type_(), false, pspec, &mut value);
+                (pspec.name().as_ptr(), value)
             })
-            .collect::<Result<smallvec::SmallVec<[_; 10]>, _>>()?;
+            .collect::<smallvec::SmallVec<[_; 10]>>();
 
         for (name, value) in params {
             unsafe {
@@ -2300,32 +2296,27 @@ impl<T: ObjectType> ObjectExt for T {
                 );
             }
         }
-
-        Ok(())
     }
 
-    fn set_properties(&self, property_values: &[(&str, &dyn ToValue)]) {
-        self.try_set_properties(property_values).unwrap()
-    }
-
-    fn try_set_properties_from_value(
-        &self,
-        property_values: &[(&str, Value)],
-    ) -> Result<(), BoolError> {
+    #[track_caller]
+    fn set_properties_from_value(&self, property_values: &[(&str, Value)]) {
         let pspecs = self.list_properties();
 
         let params = property_values
             .iter()
             .map(|(name, value)| {
-                let pspec = pspecs.iter().find(|p| p.name() == *name).ok_or_else(|| {
-                    bool_error!("Can't find property '{}' for type '{}'", name, self.type_())
-                })?;
+                let pspec = pspecs
+                    .iter()
+                    .find(|p| p.name() == *name)
+                    .unwrap_or_else(|| {
+                        panic!("Can't find property '{name}' for type '{}'", self.type_());
+                    });
 
                 let mut value = value.clone();
-                validate_property_type(self.type_(), false, pspec, &mut value)?;
-                Ok((pspec.name().as_ptr(), value))
+                validate_property_type(self.type_(), false, pspec, &mut value);
+                (pspec.name().as_ptr(), value)
             })
-            .collect::<Result<smallvec::SmallVec<[_; 10]>, _>>()?;
+            .collect::<smallvec::SmallVec<[_; 10]>>();
 
         for (name, value) in params {
             unsafe {
@@ -2336,51 +2327,36 @@ impl<T: ObjectType> ObjectExt for T {
                 );
             }
         }
-
-        Ok(())
     }
 
-    fn set_properties_from_value(&self, property_values: &[(&str, Value)]) {
-        self.try_set_properties_from_value(property_values).unwrap()
-    }
-
-    fn try_property<V: for<'b> FromValue<'b> + 'static>(
-        &self,
-        property_name: &str,
-    ) -> Result<V, BoolError> {
-        let prop = self.try_property_value(property_name)?;
-        let v = prop.get_owned::<V>().map_err(|e| {
-            crate::bool_error!("Failed to get cast value to a different type {}", e)
-        })?;
-        Ok(v)
-    }
-
+    #[track_caller]
     fn property<V: for<'b> FromValue<'b> + 'static>(&self, property_name: &str) -> V {
-        self.try_property(property_name).unwrap()
+        let prop = self.property_value(property_name);
+        let v = prop
+            .get_owned::<V>()
+            .unwrap_or_else(|e| panic!("Failed to get cast value to a different type {e}"));
+
+        v
     }
 
-    fn try_property_value(&self, property_name: &str) -> Result<Value, BoolError> {
-        let pspec = match self.find_property(property_name) {
-            Some(pspec) => pspec,
-            None => {
-                return Err(bool_error!(
-                    "property '{}' of type '{}' not found",
-                    property_name,
-                    self.type_()
-                ));
-            }
-        };
+    #[track_caller]
+    fn property_value(&self, property_name: &str) -> Value {
+        let pspec = self.find_property(property_name).unwrap_or_else(|| {
+            panic!(
+                "property '{property_name}' of type '{}' not found",
+                self.type_()
+            )
+        });
 
         if !pspec.flags().contains(crate::ParamFlags::READABLE) {
-            return Err(bool_error!(
-                "property '{}' of type '{}' is not readable",
-                property_name,
+            panic!(
+                "property '{property_name}' of type '{}' is not readable",
                 self.type_()
-            ));
+            );
         }
 
         unsafe {
-            let mut value = Value::from_type(pspec.value_type());
+            let mut value = Value::from_type_unchecked(pspec.value_type());
             gobject_ffi::g_object_get_property(
                 self.as_object_ref().to_glib_none().0,
                 pspec.name().as_ptr() as *const _,
@@ -2388,18 +2364,15 @@ impl<T: ObjectType> ObjectExt for T {
             );
 
             // This can't really happen unless something goes wrong inside GObject
-            Some(value).filter(|v| v.type_().is_valid()).ok_or_else(|| {
-                bool_error!(
-                    "Failed to get property value for property '{}' of type '{}'",
-                    property_name,
+            if !value.type_().is_valid() {
+                panic!(
+                    "Failed to get property value for property '{property_name}' of type '{}'",
                     self.type_()
                 )
-            })
-        }
-    }
+            }
 
-    fn property_value(&self, property_name: &str) -> Value {
-        self.try_property_value(property_name).unwrap()
+            value
+        }
     }
 
     fn has_property(&self, property_name: &str, type_: Option<Type>) -> bool {
@@ -2418,6 +2391,7 @@ impl<T: ObjectType> ObjectExt for T {
         self.object_class().list_properties()
     }
 
+    #[inline]
     fn freeze_notify(&self) -> PropertyNotificationFreezeGuard {
         unsafe { gobject_ffi::g_object_freeze_notify(self.as_object_ref().to_glib_none().0) };
         PropertyNotificationFreezeGuard(self.as_object_ref().clone())
@@ -2501,45 +2475,24 @@ impl<T: ObjectType> ObjectExt for T {
 
     fn stop_signal_emission_by_name(&self, signal_name: &str) {
         unsafe {
-            gobject_ffi::g_signal_stop_emission_by_name(
-                self.as_object_ref().to_glib_none().0,
-                signal_name.to_glib_none().0,
-            );
+            signal_name.run_with_gstr(|signal_name| {
+                gobject_ffi::g_signal_stop_emission_by_name(
+                    self.as_object_ref().to_glib_none().0,
+                    signal_name.as_ptr(),
+                )
+            });
         }
     }
 
-    fn try_connect<F>(
-        &self,
-        signal_name: &str,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static,
-    {
-        unsafe { self.try_connect_unsafe(signal_name, after, callback) }
-    }
-
+    #[track_caller]
     fn connect<F>(&self, signal_name: &str, after: bool, callback: F) -> SignalHandlerId
     where
         F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static,
     {
-        self.try_connect(signal_name, after, callback).unwrap()
+        unsafe { self.connect_unsafe(signal_name, after, callback) }
     }
 
-    fn try_connect_id<F>(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static,
-    {
-        unsafe { self.try_connect_unsafe_id(signal_id, details, after, callback) }
-    }
-
+    #[track_caller]
     fn connect_id<F>(
         &self,
         signal_id: SignalId,
@@ -2550,55 +2503,24 @@ impl<T: ObjectType> ObjectExt for T {
     where
         F: Fn(&[Value]) -> Option<Value> + Send + Sync + 'static,
     {
-        self.try_connect_id(signal_id, details, after, callback)
-            .unwrap()
+        unsafe { self.connect_unsafe_id(signal_id, details, after, callback) }
     }
 
-    fn try_connect_local<F>(
-        &self,
-        signal_name: &str,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value> + 'static,
-    {
-        let callback = crate::thread_guard::ThreadGuard::new(callback);
-
-        unsafe {
-            self.try_connect_unsafe(signal_name, after, move |values| {
-                (callback.get_ref())(values)
-            })
-        }
-    }
-
+    #[track_caller]
     fn connect_local<F>(&self, signal_name: &str, after: bool, callback: F) -> SignalHandlerId
     where
         F: Fn(&[Value]) -> Option<Value> + 'static,
     {
-        self.try_connect_local(signal_name, after, callback)
-            .unwrap()
-    }
-
-    fn try_connect_local_id<F>(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value> + 'static,
-    {
         let callback = crate::thread_guard::ThreadGuard::new(callback);
 
         unsafe {
-            self.try_connect_unsafe_id(signal_id, details, after, move |values| {
+            self.connect_unsafe(signal_name, after, move |values| {
                 (callback.get_ref())(values)
             })
         }
     }
 
+    #[track_caller]
     fn connect_local_id<F>(
         &self,
         signal_id: SignalId,
@@ -2609,25 +2531,16 @@ impl<T: ObjectType> ObjectExt for T {
     where
         F: Fn(&[Value]) -> Option<Value> + 'static,
     {
-        self.try_connect_local_id(signal_id, details, after, callback)
-            .unwrap()
+        let callback = crate::thread_guard::ThreadGuard::new(callback);
+
+        unsafe {
+            self.connect_unsafe_id(signal_id, details, after, move |values| {
+                (callback.get_ref())(values)
+            })
+        }
     }
 
-    unsafe fn try_connect_unsafe<F>(
-        &self,
-        signal_name: &str,
-        after: bool,
-        callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
-    where
-        F: Fn(&[Value]) -> Option<Value>,
-    {
-        let type_ = self.type_();
-        let (signal_id, details) = SignalId::parse_name(signal_name, type_, true)
-            .ok_or_else(|| bool_error!("Signal '{}' of type '{}' not found", signal_name, type_))?;
-        self.try_connect_unsafe_id(signal_id, details, after, callback)
-    }
-
+    #[track_caller]
     unsafe fn connect_unsafe<F>(
         &self,
         signal_name: &str,
@@ -2637,17 +2550,20 @@ impl<T: ObjectType> ObjectExt for T {
     where
         F: Fn(&[Value]) -> Option<Value>,
     {
-        self.try_connect_unsafe(signal_name, after, callback)
-            .unwrap()
+        let type_ = self.type_();
+        let (signal_id, details) = SignalId::parse_name(signal_name, type_, true)
+            .unwrap_or_else(|| panic!("Signal '{signal_name}' of type '{type_}' not found"));
+        self.connect_unsafe_id(signal_id, details, after, callback)
     }
 
-    unsafe fn try_connect_unsafe_id<F>(
+    #[track_caller]
+    unsafe fn connect_unsafe_id<F>(
         &self,
         signal_id: SignalId,
         details: Option<Quark>,
         after: bool,
         callback: F,
-    ) -> Result<SignalHandlerId, BoolError>
+    ) -> SignalHandlerId
     where
         F: Fn(&[Value]) -> Option<Value>,
     {
@@ -2662,9 +2578,7 @@ impl<T: ObjectType> ObjectExt for T {
                 let ret = callback(values);
                 if let Some(ret) = ret {
                     panic!(
-                        "Signal '{}' of type '{}' required no return value but got value of type '{}'",
-                        signal_name,
-                        type_,
+                        "Signal '{signal_name}' of type '{type_}' required no return value but got value of type '{}'",
                         ret.type_()
                     );
                 }
@@ -2674,9 +2588,7 @@ impl<T: ObjectType> ObjectExt for T {
             Closure::new_unsafe(move |values| {
                 let mut ret = callback(values).unwrap_or_else(|| {
                     panic!(
-                        "Signal '{}' of type '{}' required return value of type '{}' but got None",
-                        signal_name,
-                        type_,
+                        "Signal '{signal_name}' of type '{type_}' required return value of type '{}' but got None",
                         return_type.name()
                     );
                 });
@@ -2689,41 +2601,18 @@ impl<T: ObjectType> ObjectExt for T {
                     return Some(ret);
                 }
 
-                // If it's not directly a valid type but an object type, we check if the
-                // actual typed of the contained object is compatible and if so create
-                // a properly typed Value. This can happen if the type field in the
-                // Value is set to a more generic type than the contained value
-                let opt_obj = ret.get::<Option<Object>>().unwrap_or_else(|_| {
+                if let Err(got) = coerce_object_type(&mut ret, return_type) {
                     panic!(
-                        "Signal '{}' of type '{}' required return value of type '{}' but got '{}'",
-                        signal_name,
-                        type_,
-                        return_type,
-                        ret.type_()
+                        "Signal '{signal_name}' of type '{type_}' required return value of type '{return_type}' but got '{got}'",
                     );
-                });
-
-                let actual_type = opt_obj.map_or_else(|| ret.type_(), |obj| obj.type_());
-                assert!(actual_type.is_a(return_type),
-                    "Signal '{}' of type '{}' required return value of type '{}' but got '{}' (actual '{}')",
-                    signal_name,
-                    type_,
-                    return_type,
-                    ret.type_(),
-                    actual_type
-                );
-
-                ret.inner.g_type = return_type.into_glib();
+                };
                 Some(ret)
             })
         };
 
         assert!(
             type_.is_a(signal_query_type),
-            "Signal '{}' of type '{}' but got type '{}'",
-            signal_name,
-            type_,
-            signal_query_type
+            "Signal '{signal_name}' of type '{type_}' but got type '{signal_query_type}'",
         );
 
         let handler = gobject_ffi::g_signal_connect_closure_by_id(
@@ -2735,45 +2624,33 @@ impl<T: ObjectType> ObjectExt for T {
         );
 
         if handler == 0 {
-            Err(bool_error!(
-                "Failed to connect to signal '{}' of type '{}'",
-                signal_name,
-                type_
-            ))
-        } else {
-            Ok(from_glib(handler))
+            panic!("Failed to connect to signal '{signal_name}' of type '{type_}'",);
         }
+
+        from_glib(handler)
     }
 
-    fn try_connect_closure(
-        &self,
-        signal_name: &str,
-        after: bool,
-        closure: RustClosure,
-    ) -> Result<SignalHandlerId, BoolError> {
-        let type_ = self.type_();
-        let (signal_id, details) = SignalId::parse_name(signal_name, type_, true)
-            .ok_or_else(|| bool_error!("Signal '{}' of type '{}' not found", signal_name, type_))?;
-        self.try_connect_closure_id(signal_id, details, after, closure)
-    }
-
+    #[track_caller]
     fn connect_closure(
         &self,
         signal_name: &str,
         after: bool,
         closure: RustClosure,
     ) -> SignalHandlerId {
-        self.try_connect_closure(signal_name, after, closure)
-            .unwrap()
+        let type_ = self.type_();
+        let (signal_id, details) = SignalId::parse_name(signal_name, type_, true)
+            .unwrap_or_else(|| panic!("Signal '{signal_name}' of type '{type_}' not found"));
+        self.connect_closure_id(signal_id, details, after, closure)
     }
 
-    fn try_connect_closure_id(
+    #[track_caller]
+    fn connect_closure_id(
         &self,
         signal_id: SignalId,
         details: Option<Quark>,
         after: bool,
         closure: RustClosure,
-    ) -> Result<SignalHandlerId, BoolError> {
+    ) -> SignalHandlerId {
         let signal_query = signal_id.query();
         let type_ = self.type_();
         let signal_name = signal_id.name();
@@ -2781,10 +2658,7 @@ impl<T: ObjectType> ObjectExt for T {
         let signal_query_type = signal_query.type_();
         assert!(
             type_.is_a(signal_query_type),
-            "Signal '{}' of type '{}' but got type '{}'",
-            signal_name,
-            type_,
-            signal_query_type
+            "Signal '{signal_name}' of type '{type_}' but got type '{signal_query_type}'",
         );
 
         unsafe {
@@ -2797,28 +2671,14 @@ impl<T: ObjectType> ObjectExt for T {
             );
 
             if handler == 0 {
-                Err(bool_error!(
-                    "Failed to connect to signal '{}' of type '{}'",
-                    signal_name,
-                    type_
-                ))
-            } else {
-                Ok(from_glib(handler))
+                panic!("Failed to connect to signal '{signal_name}' of type '{type_}'",);
             }
+
+            from_glib(handler)
         }
     }
 
-    fn connect_closure_id(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        closure: RustClosure,
-    ) -> SignalHandlerId {
-        self.try_connect_closure_id(signal_id, details, after, closure)
-            .unwrap()
-    }
-
+    #[inline]
     fn watch_closure(&self, closure: &impl AsRef<Closure>) {
         let closure = closure.as_ref();
         unsafe {
@@ -2829,25 +2689,8 @@ impl<T: ObjectType> ObjectExt for T {
         }
     }
 
-    unsafe fn connect_unsafe_id<F>(
-        &self,
-        signal_id: SignalId,
-        details: Option<Quark>,
-        after: bool,
-        callback: F,
-    ) -> SignalHandlerId
-    where
-        F: Fn(&[Value]) -> Option<Value>,
-    {
-        self.try_connect_unsafe_id(signal_id, details, after, callback)
-            .unwrap()
-    }
-
-    fn try_emit<R: TryFromClosureReturnValue>(
-        &self,
-        signal_id: SignalId,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError> {
+    #[track_caller]
+    fn emit<R: TryFromClosureReturnValue>(&self, signal_id: SignalId, args: &[&dyn ToValue]) -> R {
         let signal_query = signal_id.query();
         unsafe {
             let type_ = self.type_();
@@ -2868,10 +2711,10 @@ impl<T: ObjectType> ObjectExt for T {
             )
             .collect::<smallvec::SmallVec<[_; 10]>>();
 
-            validate_signal_arguments(type_, &signal_query, &mut args[1..])?;
+            validate_signal_arguments(type_, &signal_query, &mut args[1..]);
 
             let mut return_value = if signal_query.return_type() != Type::UNIT {
-                Value::from_type(signal_query.return_type().into())
+                Value::from_type_unchecked(signal_query.return_type().into())
             } else {
                 Value::uninitialized()
             };
@@ -2891,18 +2734,12 @@ impl<T: ObjectType> ObjectExt for T {
             R::try_from_closure_return_value(
                 Some(return_value).filter(|r| r.type_().is_valid() && r.type_() != Type::UNIT),
             )
+            .unwrap()
         }
     }
 
-    fn emit<R: TryFromClosureReturnValue>(&self, signal_id: SignalId, args: &[&dyn ToValue]) -> R {
-        self.try_emit(signal_id, args).unwrap()
-    }
-
-    fn try_emit_with_values(
-        &self,
-        signal_id: SignalId,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError> {
+    #[track_caller]
+    fn emit_with_values(&self, signal_id: SignalId, args: &[Value]) -> Option<Value> {
         unsafe {
             let type_ = self.type_();
 
@@ -2921,10 +2758,10 @@ impl<T: ObjectType> ObjectExt for T {
             let mut args = Iterator::chain(std::iter::once(self_v), args.iter().cloned())
                 .collect::<smallvec::SmallVec<[_; 10]>>();
 
-            validate_signal_arguments(type_, &signal_query, &mut args[1..])?;
+            validate_signal_arguments(type_, &signal_query, &mut args[1..]);
 
             let mut return_value = if signal_query.return_type() != Type::UNIT {
-                Value::from_type(signal_query.return_type().into())
+                Value::from_type_unchecked(signal_query.return_type().into())
             } else {
                 Value::uninitialized()
             };
@@ -2941,99 +2778,65 @@ impl<T: ObjectType> ObjectExt for T {
                 return_value_ptr,
             );
 
-            Ok(Some(return_value).filter(|r| r.type_().is_valid() && r.type_() != Type::UNIT))
+            Some(return_value).filter(|r| r.type_().is_valid() && r.type_() != Type::UNIT)
         }
     }
 
-    fn emit_with_values(&self, signal_id: SignalId, args: &[Value]) -> Option<Value> {
-        self.try_emit_with_values(signal_id, args).unwrap()
-    }
-
-    fn try_emit_by_name<R: TryFromClosureReturnValue>(
-        &self,
-        signal_name: &str,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError> {
-        let type_ = self.type_();
-        let signal_id = SignalId::lookup(signal_name, type_)
-            .ok_or_else(|| bool_error!("Signal '{}' of type '{}' not found", signal_name, type_))?;
-        self.try_emit(signal_id, args)
-    }
-
+    #[track_caller]
     fn emit_by_name<R: TryFromClosureReturnValue>(
         &self,
         signal_name: &str,
         args: &[&dyn ToValue],
     ) -> R {
-        self.try_emit_by_name(signal_name, args).unwrap()
-    }
-
-    fn try_emit_by_name_with_values(
-        &self,
-        signal_name: &str,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError> {
         let type_ = self.type_();
-        let signal_id = SignalId::lookup(signal_name, type_)
-            .ok_or_else(|| bool_error!("Signal '{}' of type '{}' not found", signal_name, type_))?;
-        self.try_emit_with_values(signal_id, args)
+        let signal_id = SignalId::lookup(signal_name, type_).unwrap_or_else(|| {
+            panic!("Signal '{signal_name}' of type '{type_}' not found");
+        });
+        self.emit(signal_id, args)
     }
 
+    #[track_caller]
     fn emit_by_name_with_values(&self, signal_name: &str, args: &[Value]) -> Option<Value> {
-        self.try_emit_by_name_with_values(signal_name, args)
-            .unwrap()
-    }
-
-    fn try_emit_by_name_with_details<R: TryFromClosureReturnValue>(
-        &self,
-        signal_name: &str,
-        details: Quark,
-        args: &[&dyn ToValue],
-    ) -> Result<R, BoolError> {
         let type_ = self.type_();
-        let signal_id = SignalId::lookup(signal_name, type_)
-            .ok_or_else(|| bool_error!("Signal '{}' of type '{}' not found", signal_name, type_))?;
-        self.try_emit_with_details(signal_id, details, args)
+        let signal_id = SignalId::lookup(signal_name, type_).unwrap_or_else(|| {
+            panic!("Signal '{signal_name}' of type '{type_}' not found");
+        });
+        self.emit_with_values(signal_id, args)
     }
 
+    #[track_caller]
     fn emit_by_name_with_details<R: TryFromClosureReturnValue>(
         &self,
         signal_name: &str,
         details: Quark,
         args: &[&dyn ToValue],
     ) -> R {
-        self.try_emit_by_name_with_details(signal_name, details, args)
-            .unwrap()
-    }
-
-    fn try_emit_by_name_with_details_and_values(
-        &self,
-        signal_name: &str,
-        details: Quark,
-        args: &[Value],
-    ) -> Result<Option<Value>, BoolError> {
         let type_ = self.type_();
         let signal_id = SignalId::lookup(signal_name, type_)
-            .ok_or_else(|| bool_error!("Signal '{}' of type '{}' not found", signal_name, type_))?;
-        self.try_emit_with_details_and_values(signal_id, details, args)
+            .unwrap_or_else(|| panic!("Signal '{signal_name}' of type '{type_}' not found"));
+        self.emit_with_details(signal_id, details, args)
     }
 
+    #[track_caller]
     fn emit_by_name_with_details_and_values(
         &self,
         signal_name: &str,
         details: Quark,
         args: &[Value],
     ) -> Option<Value> {
-        self.try_emit_by_name_with_details_and_values(signal_name, details, args)
-            .unwrap()
+        let type_ = self.type_();
+        let signal_id = SignalId::lookup(signal_name, type_)
+            .unwrap_or_else(|| panic!("Signal '{signal_name}' of type '{type_}' not found"));
+        self.emit_with_details_and_values(signal_id, details, args)
     }
 
-    fn try_emit_with_details<R: TryFromClosureReturnValue>(
+    #[track_caller]
+    fn emit_with_details<R: TryFromClosureReturnValue>(
         &self,
         signal_id: SignalId,
         details: Quark,
         args: &[&dyn ToValue],
-    ) -> Result<R, BoolError> {
+    ) -> R {
         let signal_query = signal_id.query();
         assert!(signal_query.flags().contains(crate::SignalFlags::DETAILED));
 
@@ -3056,10 +2859,10 @@ impl<T: ObjectType> ObjectExt for T {
             )
             .collect::<smallvec::SmallVec<[_; 10]>>();
 
-            validate_signal_arguments(type_, &signal_query, &mut args[1..])?;
+            validate_signal_arguments(type_, &signal_query, &mut args[1..]);
 
             let mut return_value = if signal_query.return_type() != Type::UNIT {
-                Value::from_type(signal_query.return_type().into())
+                Value::from_type_unchecked(signal_query.return_type().into())
             } else {
                 Value::uninitialized()
             };
@@ -3079,25 +2882,17 @@ impl<T: ObjectType> ObjectExt for T {
             R::try_from_closure_return_value(
                 Some(return_value).filter(|r| r.type_().is_valid() && r.type_() != Type::UNIT),
             )
+            .unwrap()
         }
     }
 
-    fn emit_with_details<R: TryFromClosureReturnValue>(
-        &self,
-        signal_id: SignalId,
-        details: Quark,
-        args: &[&dyn ToValue],
-    ) -> R {
-        self.try_emit_with_details(signal_id, details, args)
-            .unwrap()
-    }
-
-    fn try_emit_with_details_and_values(
+    #[track_caller]
+    fn emit_with_details_and_values(
         &self,
         signal_id: SignalId,
         details: Quark,
         args: &[Value],
-    ) -> Result<Option<Value>, BoolError> {
+    ) -> Option<Value> {
         let signal_query = signal_id.query();
         assert!(signal_query.flags().contains(crate::SignalFlags::DETAILED));
 
@@ -3117,10 +2912,10 @@ impl<T: ObjectType> ObjectExt for T {
             let mut args = Iterator::chain(std::iter::once(self_v), args.iter().cloned())
                 .collect::<smallvec::SmallVec<[_; 10]>>();
 
-            validate_signal_arguments(type_, &signal_query, &mut args[1..])?;
+            validate_signal_arguments(type_, &signal_query, &mut args[1..]);
 
             let mut return_value = if signal_query.return_type() != Type::UNIT {
-                Value::from_type(signal_query.return_type().into())
+                Value::from_type_unchecked(signal_query.return_type().into())
             } else {
                 Value::uninitialized()
             };
@@ -3137,20 +2932,11 @@ impl<T: ObjectType> ObjectExt for T {
                 return_value_ptr,
             );
 
-            Ok(Some(return_value).filter(|r| r.type_().is_valid() && r.type_() != Type::UNIT))
+            Some(return_value).filter(|r| r.type_().is_valid() && r.type_() != Type::UNIT)
         }
     }
 
-    fn emit_with_details_and_values(
-        &self,
-        signal_id: SignalId,
-        details: Quark,
-        args: &[Value],
-    ) -> Option<Value> {
-        self.try_emit_with_details_and_values(signal_id, details, args)
-            .unwrap()
-    }
-
+    #[inline]
     fn disconnect(&self, handler_id: SignalHandlerId) {
         unsafe {
             gobject_ffi::g_signal_handler_disconnect(
@@ -3202,7 +2988,7 @@ impl<T: ObjectType> ObjectExt for T {
         }
 
         let signal_name = if let Some(name) = name {
-            format!("notify::{}\0", name)
+            format!("notify::{name}\0")
         } else {
             "notify\0".into()
         };
@@ -3218,15 +3004,19 @@ impl<T: ObjectType> ObjectExt for T {
         )
     }
 
+    #[inline]
     fn notify(&self, property_name: &str) {
         unsafe {
-            gobject_ffi::g_object_notify(
-                self.as_object_ref().to_glib_none().0,
-                property_name.to_glib_none().0,
-            );
+            property_name.run_with_gstr(|property_name| {
+                gobject_ffi::g_object_notify(
+                    self.as_object_ref().to_glib_none().0,
+                    property_name.as_ptr(),
+                )
+            });
         }
     }
 
+    #[inline]
     fn notify_by_pspec(&self, pspec: &crate::ParamSpec) {
         unsafe {
             gobject_ffi::g_object_notify_by_pspec(
@@ -3236,6 +3026,7 @@ impl<T: ObjectType> ObjectExt for T {
         }
     }
 
+    #[inline]
     fn downgrade(&self) -> WeakRef<T> {
         unsafe {
             let w = WeakRef(Box::pin(mem::zeroed()), PhantomData);
@@ -3247,20 +3038,36 @@ impl<T: ObjectType> ObjectExt for T {
         }
     }
 
-    fn bind_property<'a, O: ObjectType>(
+    fn add_weak_ref_notify<F: FnOnce() + Send + 'static>(&self, f: F) -> WeakRefNotify<T> {
+        WeakRefNotify::new(self, f)
+    }
+
+    fn add_weak_ref_notify_local<F: FnOnce() + 'static>(&self, f: F) -> WeakRefNotify<T> {
+        let callback = crate::thread_guard::ThreadGuard::new(f);
+
+        WeakRefNotify::new(self, move || callback.into_inner()())
+    }
+
+    fn bind_property<'a, 'f, 't, O: ObjectType>(
         &'a self,
         source_property: &'a str,
         target: &'a O,
         target_property: &'a str,
-    ) -> BindingBuilder<'a> {
+    ) -> BindingBuilder<'a, 'f, 't> {
         BindingBuilder::new(self, source_property, target, target_property)
     }
 
+    #[inline]
     fn ref_count(&self) -> u32 {
         let stash = self.as_object_ref().to_glib_none();
         let ptr: *mut gobject_ffi::GObject = stash.0;
 
         unsafe { ffi::g_atomic_int_get(&(*ptr).ref_count as *const u32 as *const i32) as u32 }
+    }
+
+    #[inline]
+    unsafe fn run_dispose(&self) {
+        gobject_ffi::g_object_run_dispose(self.as_ptr() as *mut _);
     }
 }
 
@@ -3285,6 +3092,7 @@ impl<T: ObjectType> WatchedObject<T> {
     ///
     /// This should only be called from within a closure that was previously attached to `T` using
     /// `Watchable::watch_closure`.
+    #[inline]
     pub unsafe fn borrow(&self) -> Borrowed<T>
     where
         T: FromGlibPtrBorrow<*mut <T as ObjectType>::GlibType>,
@@ -3310,6 +3118,16 @@ impl<T: ObjectType> Watchable<T> for T {
 }
 
 #[doc(hidden)]
+impl<'a, T: ObjectType> Watchable<T> for BorrowedObject<'a, T> {
+    fn watched_object(&self) -> WatchedObject<T> {
+        WatchedObject::new(self)
+    }
+    fn watch_closure(&self, closure: &impl AsRef<Closure>) {
+        ObjectExt::watch_closure(&**self, closure)
+    }
+}
+
+#[doc(hidden)]
 impl<T: ObjectType> Watchable<T> for &T {
     fn watched_object(&self) -> WatchedObject<T> {
         WatchedObject::new(*self)
@@ -3321,20 +3139,20 @@ impl<T: ObjectType> Watchable<T> for &T {
 
 // Validate that the given property value has an acceptable type for the given property pspec
 // and if necessary update the value
+#[track_caller]
 fn validate_property_type(
     type_: Type,
     allow_construct_only: bool,
     pspec: &crate::ParamSpec,
     property_value: &mut Value,
-) -> Result<(), BoolError> {
+) {
     if !pspec.flags().contains(crate::ParamFlags::WRITABLE)
         || (!allow_construct_only && pspec.flags().contains(crate::ParamFlags::CONSTRUCT_ONLY))
     {
-        return Err(bool_error!(
-            "property '{}' of type '{}' is not writable",
+        panic!(
+            "property '{}' of type '{type_}' is not writable",
             pspec.name(),
-            type_
-        ));
+        );
     }
 
     unsafe {
@@ -3347,41 +3165,14 @@ fn validate_property_type(
             pspec.value_type().into_glib(),
         ));
 
-        // If it's not directly a valid type but an object type, we check if the
-        // actual type of the contained object is compatible and if so create
-        // a properly typed Value. This can happen if the type field in the
-        // Value is set to a more generic type than the contained value
-        if !valid_type && property_value.type_().is_a(Object::static_type()) {
-            match property_value.get::<Option<Object>>() {
-                Ok(Some(obj)) => {
-                    if obj.type_().is_a(pspec.value_type()) {
-                        property_value.inner.g_type = pspec.value_type().into_glib();
-                    } else {
-                        return Err(
-                            bool_error!(
-                                "property '{}' of type '{}' can't be set from the given object type (expected: '{}', got: '{}')",
-                                pspec.name(),
-                                type_,
-                                pspec.value_type(),
-                                obj.type_(),
-                            )
-                        );
-                    }
-                }
-                Ok(None) => {
-                    // If the value is None then the type is compatible too
-                    property_value.inner.g_type = pspec.value_type().into_glib();
-                }
-                Err(_) => unreachable!("property_value type conformity already checked"),
+        if !valid_type {
+            if let Err(got) = coerce_object_type(property_value, pspec.value_type()) {
+                panic!(
+                        "property '{}' of type '{type_}' can't be set from the given type (expected: '{}', got: '{got}')",
+                        pspec.name(),
+                        pspec.value_type(),
+                    );
             }
-        } else if !valid_type {
-            return Err(bool_error!(format!(
-                "property '{}' of type '{}' can't be set from the given type (expected: '{}', got: '{}')",
-                pspec.name(),
-                type_,
-                pspec.value_type(),
-                property_value.type_(),
-            )));
         }
 
         let changed: bool = from_glib(gobject_ffi::g_param_value_validate(
@@ -3390,77 +3181,55 @@ fn validate_property_type(
         ));
         let change_allowed = pspec.flags().contains(crate::ParamFlags::LAX_VALIDATION);
         if changed && !change_allowed {
-            return Err(bool_error!(
-                "property '{}' of type '{}' can't be set from given value, it is invalid or out of range",
+            panic!(
+                "property '{}' of type '{type_}' can't be set from given value, it is invalid or out of range",
                 pspec.name(),
-                type_,
-            ));
+            );
         }
     }
-
-    Ok(())
 }
 
-fn validate_signal_arguments(
-    type_: Type,
-    signal_query: &SignalQuery,
-    args: &mut [Value],
-) -> Result<(), BoolError> {
+// If it's not directly a valid type but an object type, we check if the
+// actual type of the contained object is compatible and if so create
+// a properly typed Value (by mutating the existing Value).
+// This can happen if the type field in the Value is set to a more
+// generic type than the contained value.
+fn coerce_object_type(property_value: &mut Value, type_: Type) -> Result<(), Type> {
+    // return early if type coercion is not possible
+    match property_value.get::<Option<Object>>() {
+        Ok(Some(obj)) if !(obj.type_().is_a(type_)) => Err(obj.type_()),
+        Ok(_) => {
+            property_value.inner.g_type = type_.into_glib();
+            Ok(())
+        }
+        Err(_) => Err(property_value.type_()),
+    }
+}
+
+#[track_caller]
+fn validate_signal_arguments(type_: Type, signal_query: &SignalQuery, args: &mut [Value]) {
     let signal_name = signal_query.signal_name();
 
     if signal_query.n_params() != args.len() as u32 {
-        return Err(bool_error!(
-            "Incompatible number of arguments for signal '{}' of type '{}' (expected {}, got {})",
-            signal_name,
-            type_,
+        panic!(
+            "Incompatible number of arguments for signal '{signal_name}' of type '{type_}' (expected {}, got {})",
             signal_query.n_params(),
             args.len(),
-        ));
+        );
     }
 
     let param_types = Iterator::zip(args.iter_mut(), signal_query.param_types());
 
     for (i, (arg, param_type)) in param_types.enumerate() {
         let param_type: Type = (*param_type).into();
-        if arg.type_().is_a(Object::static_type()) {
-            match arg.get::<Option<Object>>() {
-                Ok(Some(obj)) => {
-                    if obj.type_().is_a(param_type) {
-                        arg.inner.g_type = param_type.into_glib();
-                    } else {
-                        return Err(
-                            bool_error!(
-                                "Incompatible argument type in argument {} for signal '{}' of type '{}' (expected {}, got {})",
-                                i,
-                                signal_name,
-                                type_,
-                                param_type,
-                                arg.type_(),
-                            )
-                        );
-                    }
-                }
-                Ok(None) => {
-                    // If the value is None then the type is compatible too
-                    arg.inner.g_type = param_type.into_glib();
-                }
-                Err(_) => unreachable!("property_value type conformity already checked"),
-            }
-        } else if param_type != arg.type_() {
-            return Err(
-                bool_error!(
-                    "Incompatible argument type in argument {} for signal '{}' of type '{}' (expected {}, got {})",
-                    i,
-                    signal_name,
-                    type_,
-                    param_type,
-                    arg.type_(),
+        if param_type != arg.type_() {
+            coerce_object_type(arg, param_type).unwrap_or_else(|got|
+                panic!(
+                    "Incompatible argument type in argument {i} for signal '{signal_name}' of type '{type_}' (expected {param_type}, got {got})",
                 )
             );
         }
     }
-
-    Ok(())
 }
 
 impl ObjectClass {
@@ -3495,10 +3264,12 @@ impl ObjectClass {
         unsafe {
             let klass = self as *const _ as *const gobject_ffi::GObjectClass;
 
-            from_glib_none(gobject_ffi::g_object_class_find_property(
-                klass as *mut _,
-                property_name.to_glib_none().0,
-            ))
+            property_name.run_with_gstr(|property_name| {
+                from_glib_none(gobject_ffi::g_object_class_find_property(
+                    klass as *mut _,
+                    property_name.as_ptr(),
+                ))
+            })
         }
     }
 
@@ -3513,7 +3284,7 @@ impl ObjectClass {
 
             let props =
                 gobject_ffi::g_object_class_list_properties(klass as *mut _, &mut n_properties);
-            PtrSlice::from_glib_container_num_static(props, n_properties as usize)
+            PtrSlice::from_glib_container_num(props, n_properties as usize, true)
         }
     }
 }
@@ -3524,6 +3295,79 @@ wrapper! {
 
     match fn {
         type_ => || gobject_ffi::g_initially_unowned_get_type(),
+    }
+}
+
+// ManuallyDrop -> The lifetime of the data isn't bound to a Rust value but a GObject. Drop could free data too early.
+// Pin          -> Make sure the pointer Box(1) passed to FFI is always valid and never reallocates.
+// Box(1)       -> Pointer to Box(2), 64 bits large and compatible with FFI.
+// Box(2)       -> Pointer to dyn FnOnce(), 128 bits large and incompatible with FFI (so Box(1) is passed instead).
+type WeakRefNotifyData = ManuallyDrop<Pin<Box<Box<dyn FnOnce() + 'static>>>>;
+
+// rustdoc-stripper-ignore-next
+/// A handle to disconnect a weak ref notify closure.
+pub struct WeakRefNotify<T: ObjectType> {
+    object: WeakRef<T>,
+    data: WeakRefNotifyData,
+}
+
+unsafe extern "C" fn notify_func(data: ffi::gpointer, _obj: *mut gobject_ffi::GObject) {
+    // SAFETY: Call to FFI with pointers that must be valid due to Pin and lifetimes.
+    //         ManuallyDrop and Pin are elided because the pointer only points to Box<Box<dyn FnOnce()>>.
+    let callback: Box<Box<dyn FnOnce()>> = Box::from_raw(data as *mut _);
+
+    // SAFETY: Function must have type FnOnce() due type checks in WeakRefNotify::new.
+    //         This callback can only be called once when the object is disposed, to the data can be dropped.
+    (*callback)()
+}
+
+impl<T: ObjectType> WeakRefNotify<T> {
+    fn new<F: FnOnce() + 'static>(obj: &T, f: F) -> WeakRefNotify<T> {
+        let data: WeakRefNotifyData = ManuallyDrop::new(Box::pin(Box::new(f)));
+        let data_ptr: *const Box<dyn FnOnce()> = Pin::as_ref(&data).get_ref();
+
+        unsafe {
+            // SAFETY: Call to FFI with pointers that must be valid due to Pin and lifetimes.
+            gobject_ffi::g_object_weak_ref(
+                obj.as_ptr() as *mut gobject_ffi::GObject,
+                Some(notify_func),
+                data_ptr as *mut _,
+            );
+        }
+
+        let object = obj.downgrade();
+
+        WeakRefNotify { object, data }
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Try to upgrade this weak reference to a strong reference.
+    ///
+    /// If the stored object was already destroyed then `None` is returned.
+    pub fn upgrade(&self) -> Option<T> {
+        self.object.upgrade()
+    }
+
+    #[doc(alias = "g_object_weak_unref")]
+    pub fn disconnect(mut self) {
+        // Upgrade the object to make sure it's alive and the callback can't be called while it's disconnected.
+        if let Some(obj) = self.object.upgrade() {
+            let data_ptr: *const Box<dyn FnOnce()> = Pin::as_ref(&self.data).get_ref();
+
+            unsafe {
+                // SAFETY: Call to FFI with pointers that must be valid due to Pin and lifetimes.
+                gobject_ffi::g_object_weak_unref(
+                    obj.as_ptr() as *mut gobject_ffi::GObject,
+                    Some(notify_func),
+                    data_ptr as *mut _,
+                );
+
+                // SAFETY: The data can be dropped because references to GObject have been dropped too.
+                //         The callback can't be called before or after because it's disconnected and the object is still alive.
+                //         This function can't be called anymore either because it consumes self.
+                ManuallyDrop::drop(&mut self.data);
+            }
+        }
     }
 }
 
@@ -3538,6 +3382,7 @@ impl<T: ObjectType> WeakRef<T> {
     /// Create a new empty weak reference.
     ///
     /// `upgrade` will always return `None` until an object is set on it.
+    #[inline]
     pub fn new() -> WeakRef<T> {
         unsafe {
             let mut w = WeakRef(Box::pin(mem::zeroed()), PhantomData);
@@ -3552,6 +3397,7 @@ impl<T: ObjectType> WeakRef<T> {
     // rustdoc-stripper-ignore-next
     /// Set this weak reference to the given object.
     #[doc(alias = "g_weak_ref_set")]
+    #[inline]
     pub fn set(&self, obj: Option<&T>) {
         unsafe {
             gobject_ffi::g_weak_ref_set(
@@ -3568,6 +3414,7 @@ impl<T: ObjectType> WeakRef<T> {
     ///
     /// If the stored object was already destroyed or no object was set in this weak reference then
     /// `None` is returned.
+    #[inline]
     pub fn upgrade(&self) -> Option<T> {
         unsafe {
             let ptr = gobject_ffi::g_weak_ref_get(mut_override(Pin::as_ref(&self.0).get_ref()));
@@ -3582,6 +3429,7 @@ impl<T: ObjectType> WeakRef<T> {
 }
 
 impl<T: ObjectType> Drop for WeakRef<T> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             gobject_ffi::g_weak_ref_clear(Pin::as_mut(&mut self.0).get_unchecked_mut());
@@ -3590,6 +3438,7 @@ impl<T: ObjectType> Drop for WeakRef<T> {
 }
 
 impl<T: ObjectType> Clone for WeakRef<T> {
+    #[inline]
     fn clone(&self) -> Self {
         unsafe {
             let o = self.upgrade();
@@ -3606,6 +3455,7 @@ impl<T: ObjectType> Clone for WeakRef<T> {
 }
 
 impl<T: ObjectType> Default for WeakRef<T> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -3613,6 +3463,27 @@ impl<T: ObjectType> Default for WeakRef<T> {
 
 unsafe impl<T: ObjectType + Sync + Sync> Sync for WeakRef<T> {}
 unsafe impl<T: ObjectType + Send + Sync> Send for WeakRef<T> {}
+
+impl<T: ObjectType> PartialEq for WeakRef<T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.0.priv_.p == other.0.priv_.p }
+    }
+}
+
+impl<T: ObjectType> PartialEq<T> for WeakRef<T> {
+    #[inline]
+    fn eq(&self, other: &T) -> bool {
+        unsafe { self.0.priv_.p == other.as_ptr() as *mut std::os::raw::c_void }
+    }
+}
+
+impl<T: ObjectType> PartialOrd for WeakRef<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        unsafe { self.0.priv_.p.partial_cmp(&other.0.priv_.p) }
+    }
+}
 
 // rustdoc-stripper-ignore-next
 /// A weak reference to the object it was created for that can be sent to
@@ -3625,10 +3496,12 @@ unsafe impl<T: ObjectType + Send + Sync> Send for WeakRef<T> {}
 pub struct SendWeakRef<T: ObjectType>(WeakRef<T>, Option<usize>);
 
 impl<T: ObjectType> SendWeakRef<T> {
+    #[inline]
     pub fn new() -> SendWeakRef<T> {
         SendWeakRef(WeakRef::new(), None)
     }
 
+    #[inline]
     pub fn into_weak_ref(self) -> WeakRef<T> {
         assert!(
             self.1.is_none() || self.1 == Some(thread_id()),
@@ -3642,6 +3515,7 @@ impl<T: ObjectType> SendWeakRef<T> {
 impl<T: ObjectType> ops::Deref for SendWeakRef<T> {
     type Target = WeakRef<T>;
 
+    #[inline]
     fn deref(&self) -> &WeakRef<T> {
         assert!(
             self.1.is_none() || self.1 == Some(thread_id()),
@@ -3654,18 +3528,21 @@ impl<T: ObjectType> ops::Deref for SendWeakRef<T> {
 
 // Deriving this gives the wrong trait bounds
 impl<T: ObjectType> Clone for SendWeakRef<T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self(self.0.clone(), self.1)
     }
 }
 
 impl<T: ObjectType> Default for SendWeakRef<T> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl<T: ObjectType> From<WeakRef<T>> for SendWeakRef<T> {
+    #[inline]
     fn from(v: WeakRef<T>) -> SendWeakRef<T> {
         SendWeakRef(v, Some(thread_id()))
     }
@@ -3674,23 +3551,23 @@ impl<T: ObjectType> From<WeakRef<T>> for SendWeakRef<T> {
 unsafe impl<T: ObjectType> Sync for SendWeakRef<T> {}
 unsafe impl<T: ObjectType> Send for SendWeakRef<T> {}
 
-type TransformFn =
-    Option<Box<dyn Fn(&crate::Binding, &Value) -> Option<Value> + Send + Sync + 'static>>;
+type TransformFn<'b> =
+    Option<Box<dyn Fn(&'b crate::Binding, &'b Value) -> Option<Value> + Send + Sync + 'static>>;
 
 // rustdoc-stripper-ignore-next
 /// Builder for object property bindings.
 #[must_use = "The builder must be built to be used"]
-pub struct BindingBuilder<'a> {
+pub struct BindingBuilder<'a, 'f, 't> {
     source: &'a ObjectRef,
     source_property: &'a str,
     target: &'a ObjectRef,
     target_property: &'a str,
     flags: crate::BindingFlags,
-    transform_to: TransformFn,
-    transform_from: TransformFn,
+    transform_from: TransformFn<'f>,
+    transform_to: TransformFn<'t>,
 }
 
-impl<'a> fmt::Debug for BindingBuilder<'a> {
+impl<'a, 'f, 't> fmt::Debug for BindingBuilder<'a, 'f, 't> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BindingBuilder")
             .field("source", &self.source)
@@ -3702,7 +3579,7 @@ impl<'a> fmt::Debug for BindingBuilder<'a> {
     }
 }
 
-impl<'a> BindingBuilder<'a> {
+impl<'a, 'f, 't> BindingBuilder<'a, 'f, 't> {
     fn new(
         source: &'a impl ObjectType,
         source_property: &'a str,
@@ -3722,7 +3599,10 @@ impl<'a> BindingBuilder<'a> {
 
     // rustdoc-stripper-ignore-next
     /// Transform changed property values from the target object to the source object with the given closure.
-    pub fn transform_from<
+    ///
+    /// This function operates on `glib::Value`s.
+    /// See [`Self::transform_from`] for a version which operates on concrete argument and return types.
+    pub fn transform_from_with_values<
         F: Fn(&crate::Binding, &Value) -> Option<Value> + Send + Sync + 'static,
     >(
         self,
@@ -3735,13 +3615,62 @@ impl<'a> BindingBuilder<'a> {
     }
 
     // rustdoc-stripper-ignore-next
+    /// Transform changed property values from the target object to the source object with the given closure.
+    ///
+    /// This function operates on concrete argument and return types.
+    /// See [`Self::transform_from_with_values`] for a version which operates on `glib::Value`s.
+    pub fn transform_from<
+        S: FromValue<'f>,
+        T: Into<Value>,
+        F: Fn(&'f crate::Binding, S) -> Option<T> + Send + Sync + 'static,
+    >(
+        self,
+        func: F,
+    ) -> Self {
+        Self {
+            transform_from: Some(Box::new(move |binding, from_value| {
+                let from_value = from_value.get().expect("Wrong value type");
+                func(binding, from_value).map(|r| r.into())
+            })),
+            ..self
+        }
+    }
+
+    // rustdoc-stripper-ignore-next
     /// Transform changed property values from the source object to the target object with the given closure.
-    pub fn transform_to<F: Fn(&crate::Binding, &Value) -> Option<Value> + Send + Sync + 'static>(
+    ///
+    /// This function operates on `glib::Value`s.
+    /// See [`Self::transform_to`] for a version which operates on concrete argument and return types.
+    pub fn transform_to_with_values<
+        F: Fn(&crate::Binding, &Value) -> Option<Value> + Send + Sync + 'static,
+    >(
         self,
         func: F,
     ) -> Self {
         Self {
             transform_to: Some(Box::new(func)),
+            ..self
+        }
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Transform changed property values from the source object to the target object with the given closure.
+    ///
+    /// This function operates on concrete argument and return types.
+    /// See [`Self::transform_to_with_values`] for a version which operates on `glib::Value`s.
+    pub fn transform_to<
+        S: FromValue<'t>,
+        T: Into<Value>,
+        F: Fn(&'t crate::Binding, S) -> Option<T> + Send + Sync + 'static,
+    >(
+        self,
+        func: F,
+    ) -> Self {
+        Self {
+            transform_to: Some(Box::new(move |binding, from_value| {
+                let from_value = from_value.get().expect("Wrong value type");
+                func(binding, from_value).map(|r| r.into())
+            })),
             ..self
         }
     }
@@ -3753,10 +3682,33 @@ impl<'a> BindingBuilder<'a> {
     }
 
     // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`BIDIRECTIONAL`][crate::BindingFlags::BIDIRECTIONAL].
+    pub fn bidirectional(mut self) -> Self {
+        self.flags |= crate::BindingFlags::BIDIRECTIONAL;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`SYNC_CREATE`][crate::BindingFlags::SYNC_CREATE].
+    pub fn sync_create(mut self) -> Self {
+        self.flags |= crate::BindingFlags::SYNC_CREATE;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Set the binding flags to [`INVERT_BOOLEAN`][crate::BindingFlags::INVERT_BOOLEAN].
+    pub fn invert_boolean(mut self) -> Self {
+        self.flags |= crate::BindingFlags::INVERT_BOOLEAN;
+        self
+    }
+
+    // rustdoc-stripper-ignore-next
     /// Establish the property binding.
     ///
-    /// This fails if the provided properties do not exist.
-    pub fn try_build(self) -> Result<crate::Binding, crate::BoolError> {
+    /// # Panics
+    /// This panics if the provided properties do not exist.
+    #[track_caller]
+    pub fn build(self) -> crate::Binding {
         unsafe extern "C" fn transform_to_trampoline(
             binding: *mut gobject_ffi::GBinding,
             from_value: *const gobject_ffi::GValue,
@@ -3823,28 +3775,32 @@ impl<'a> BindingBuilder<'a> {
 
         unsafe {
             let source = Object {
-                inner: self.source.clone(),
+                inner: TypedObjectRef::new(self.source.clone()),
                 phantom: std::marker::PhantomData,
             };
             let target = Object {
-                inner: self.target.clone(),
+                inner: TypedObjectRef::new(self.target.clone()),
                 phantom: std::marker::PhantomData,
             };
 
-            let source_property = source.find_property(self.source_property).ok_or_else(|| {
-                bool_error!(
-                    "Source property {} on type {} not found",
-                    self.source_property,
-                    source.type_()
-                )
-            })?;
-            let target_property = target.find_property(self.target_property).ok_or_else(|| {
-                bool_error!(
-                    "Target property {} on type {} not found",
-                    self.target_property,
-                    target.type_()
-                )
-            })?;
+            let source_property = source
+                .find_property(self.source_property)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Source property {} on type {} not found",
+                        self.source_property,
+                        source.type_()
+                    );
+                });
+            let target_property = target
+                .find_property(self.target_property)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Target property {} on type {} not found",
+                        self.target_property,
+                        target.type_()
+                    );
+                });
 
             let source_property_name = source_property.name().as_ptr();
             let target_property_name = target_property.name().as_ptr();
@@ -3862,7 +3818,7 @@ impl<'a> BindingBuilder<'a> {
                 ptr::null_mut()
             };
 
-            Option::<_>::from_glib_none(gobject_ffi::g_object_bind_property_full(
+            from_glib_none(gobject_ffi::g_object_bind_property_full(
                 source.to_glib_none().0,
                 source_property_name as *const _,
                 target.to_glib_none().0,
@@ -3885,14 +3841,7 @@ impl<'a> BindingBuilder<'a> {
                     Some(free_transform_data)
                 },
             ))
-            .ok_or_else(|| bool_error!("Failed to create property bindings"))
         }
-    }
-
-    // rustdoc-stripper-ignore-next
-    /// Similar to `try_build` but fails instead of panicking.
-    pub fn build(self) -> crate::Binding {
-        self.try_build().unwrap()
     }
 }
 
@@ -3908,6 +3857,7 @@ impl<T: IsClass> Class<T> {
     /// This is not equivalent to `T::static_type()` but is the type of the subclass of `T` where
     /// this class belongs to.
     #[doc(alias = "get_type")]
+    #[inline]
     pub fn type_(&self) -> Type {
         unsafe {
             // This also works for interfaces because they also have the type
@@ -3919,6 +3869,7 @@ impl<T: IsClass> Class<T> {
 
     // rustdoc-stripper-ignore-next
     /// Casts this class to a reference to a parent type's class.
+    #[inline]
     pub fn upcast_ref<U: IsClass>(&self) -> &Class<U>
     where
         T: IsA<U>,
@@ -3931,6 +3882,7 @@ impl<T: IsClass> Class<T> {
 
     // rustdoc-stripper-ignore-next
     /// Casts this class to a mutable reference to a parent type's class.
+    #[inline]
     pub fn upcast_ref_mut<U: IsClass>(&mut self) -> &mut Class<U>
     where
         T: IsA<U>,
@@ -3944,6 +3896,7 @@ impl<T: IsClass> Class<T> {
     // rustdoc-stripper-ignore-next
     /// Casts this class to a reference to a child type's class or
     /// fails if this class is not implementing the child class.
+    #[inline]
     pub fn downcast_ref<U: IsClass>(&self) -> Option<&Class<U>>
     where
         U: IsA<T>,
@@ -3961,6 +3914,7 @@ impl<T: IsClass> Class<T> {
     // rustdoc-stripper-ignore-next
     /// Casts this class to a mutable reference to a child type's class or
     /// fails if this class is not implementing the child class.
+    #[inline]
     pub fn downcast_ref_mut<U: IsClass>(&mut self) -> Option<&mut Class<U>>
     where
         U: IsA<T>,
@@ -3979,6 +3933,8 @@ impl<T: IsClass> Class<T> {
     /// Gets the class struct for `Self` of `type_`.
     ///
     /// This will return `None` if `type_` is not a subclass of `Self`.
+    #[doc(alias = "g_type_class_ref")]
+    #[inline]
     pub fn from_type(type_: Type) -> Option<ClassRef<'static, T>> {
         if !type_.is_a(T::static_type()) {
             return None;
@@ -4001,6 +3957,7 @@ impl<T: IsClass> Class<T> {
     // rustdoc-stripper-ignore-next
     /// Gets the parent class struct, if any.
     #[doc(alias = "g_type_class_peek_parent")]
+    #[inline]
     pub fn parent(&self) -> Option<ClassRef<T>> {
         unsafe {
             let ptr = gobject_ffi::g_type_class_peek_parent(&self.0 as *const _ as *mut _);
@@ -4021,12 +3978,14 @@ unsafe impl<T: IsClass> Send for Class<T> {}
 unsafe impl<T: IsClass> Sync for Class<T> {}
 
 impl<T: IsClass> AsRef<T::GlibClassType> for Class<T> {
+    #[inline]
     fn as_ref(&self) -> &T::GlibClassType {
         &self.0
     }
 }
 
 impl<T: IsClass> AsMut<T::GlibClassType> for Class<T> {
+    #[inline]
     fn as_mut(&mut self) -> &mut T::GlibClassType {
         &mut self.0
     }
@@ -4040,12 +3999,14 @@ pub struct ClassRef<'a, T: IsClass>(ptr::NonNull<Class<T>>, bool, PhantomData<&'
 impl<'a, T: IsClass> ops::Deref for ClassRef<'a, T> {
     type Target = Class<T>;
 
+    #[inline]
     fn deref(&self) -> &Class<T> {
         unsafe { self.0.as_ref() }
     }
 }
 
 impl<'a, T: IsClass> Drop for ClassRef<'a, T> {
+    #[inline]
     fn drop(&mut self) {
         if self.1 {
             unsafe {
@@ -4073,6 +4034,7 @@ pub unsafe trait ObjectSubclassIs: IsClass {
 impl<T: ParentClassIs> ops::Deref for Class<T> {
     type Target = Class<T::Parent>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         unsafe {
             let klass = self as *const _ as *const Self::Target;
@@ -4082,6 +4044,7 @@ impl<T: ParentClassIs> ops::Deref for Class<T> {
 }
 
 impl<T: ParentClassIs> ops::DerefMut for Class<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe {
             let klass = self as *mut _ as *mut Self::Target;
@@ -4105,6 +4068,7 @@ impl<T: IsInterface> Interface<T> {
     ///
     /// This is equivalent to `T::static_type()`.
     #[doc(alias = "get_type")]
+    #[inline]
     pub fn type_(&self) -> Type {
         unsafe {
             let klass = self as *const _ as *const gobject_ffi::GTypeInterface;
@@ -4118,6 +4082,7 @@ impl<T: IsInterface> Interface<T> {
     /// This is not equivalent to `T::static_type()` but is the type id of the type this specific
     /// interface belongs to.
     #[doc(alias = "get_instance_type")]
+    #[inline]
     pub fn instance_type(&self) -> Type {
         unsafe {
             // This also works for interfaces because they also have the type
@@ -4131,6 +4096,7 @@ impl<T: IsInterface> Interface<T> {
     /// Gets the interface struct for `Self` of `klass`.
     ///
     /// This will return `None` if `klass` is not implementing `Self`.
+    #[inline]
     pub fn from_class<U: IsClass>(klass: &Class<U>) -> Option<InterfaceRef<T>> {
         if !klass.type_().is_a(T::static_type()) {
             return None;
@@ -4157,6 +4123,7 @@ impl<T: IsInterface> Interface<T> {
     /// Gets the default interface struct for `Self`.
     ///
     /// This will return `None` if `type_` is not an interface.
+    #[inline]
     pub fn from_type(type_: Type) -> Option<InterfaceRef<'static, T>> {
         if !type_.is_a(Type::INTERFACE) {
             return None;
@@ -4179,10 +4146,12 @@ impl<T: IsInterface> Interface<T> {
     // rustdoc-stripper-ignore-next
     /// Gets the default interface struct for `Self`.
     #[doc(alias = "g_type_default_interface_ref")]
+    #[allow(clippy::should_implement_trait)]
+    #[inline]
     pub fn default() -> InterfaceRef<'static, T> {
         unsafe {
             let ptr = gobject_ffi::g_type_default_interface_ref(T::static_type().into_glib());
-            assert!(!ptr.is_null());
+            debug_assert!(!ptr.is_null());
             InterfaceRef(
                 ptr::NonNull::new_unchecked(ptr as *mut Self),
                 true,
@@ -4197,6 +4166,7 @@ impl<T: IsInterface> Interface<T> {
     /// This returns the parent interface if a parent type of the instance type also implements the
     /// interface.
     #[doc(alias = "g_type_interface_peek_parent")]
+    #[inline]
     pub fn parent(&self) -> Option<InterfaceRef<T>> {
         unsafe {
             let ptr = gobject_ffi::g_type_interface_peek_parent(&self.0 as *const _ as *mut _);
@@ -4265,7 +4235,7 @@ impl<T: IsA<Object> + IsInterface> Interface<T> {
                 interface as *mut _,
                 &mut n_properties,
             );
-            PtrSlice::from_glib_container_num_static(props, n_properties as usize)
+            PtrSlice::from_glib_container_num(props, n_properties as usize, true)
         }
     }
 }
@@ -4274,12 +4244,14 @@ unsafe impl<T: IsInterface> Send for Interface<T> {}
 unsafe impl<T: IsInterface> Sync for Interface<T> {}
 
 impl<T: IsInterface> AsRef<T::GlibClassType> for Interface<T> {
+    #[inline]
     fn as_ref(&self) -> &T::GlibClassType {
         &self.0
     }
 }
 
 impl<T: IsInterface> AsMut<T::GlibClassType> for Interface<T> {
+    #[inline]
     fn as_mut(&mut self) -> &mut T::GlibClassType {
         &mut self.0
     }
@@ -4291,6 +4263,7 @@ impl<T: IsInterface> AsMut<T::GlibClassType> for Interface<T> {
 pub struct InterfaceRef<'a, T: IsInterface>(ptr::NonNull<Interface<T>>, bool, PhantomData<&'a ()>);
 
 impl<'a, T: IsInterface> Drop for InterfaceRef<'a, T> {
+    #[inline]
     fn drop(&mut self) {
         if self.1 {
             unsafe {
@@ -4303,6 +4276,7 @@ impl<'a, T: IsInterface> Drop for InterfaceRef<'a, T> {
 impl<'a, T: IsInterface> ops::Deref for InterfaceRef<'a, T> {
     type Target = Interface<T>;
 
+    #[inline]
     fn deref(&self) -> &Interface<T> {
         unsafe { self.0.as_ref() }
     }
@@ -4320,7 +4294,7 @@ pub unsafe trait IsInterface: ObjectType {}
 pub struct ObjectValueTypeChecker<T>(std::marker::PhantomData<T>);
 
 unsafe impl<T: StaticType> crate::value::ValueTypeChecker for ObjectValueTypeChecker<T> {
-    type Error = crate::value::ValueTypeMismatchOrNoneError;
+    type Error = crate::value::ValueTypeMismatchOrNoneError<crate::value::ValueTypeMismatchError>;
 
     fn check(value: &Value) -> Result<(), Self::Error> {
         // g_type_check_value_holds() only checks for the GType of the GValue. This might be
@@ -4373,19 +4347,109 @@ unsafe impl<T: StaticType> crate::value::ValueTypeChecker for ObjectValueTypeChe
     }
 }
 
+// rustdoc-stripper-ignore-next
+/// Borrowed reference to an object of type `T`.
+///
+/// This dereferences into `&T`.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct BorrowedObject<'a, T> {
+    ptr: ptr::NonNull<gobject_ffi::GObject>,
+    phantom: PhantomData<&'a T>,
+}
+
+unsafe impl<'a, T: Send + Sync> Send for BorrowedObject<'a, T> {}
+unsafe impl<'a, T: Send + Sync> Sync for BorrowedObject<'a, T> {}
+
+impl<'a, T: ObjectType> BorrowedObject<'a, T> {
+    // rustdoc-stripper-ignore-next
+    /// Creates a new borrowed object reference.
+    ///
+    /// # SAFETY:
+    ///
+    /// The pointer needs to be valid for at least the lifetime `'a`.
+    #[inline]
+    pub unsafe fn new(ptr: *mut T::GlibType) -> BorrowedObject<'a, T> {
+        BorrowedObject {
+            ptr: ptr::NonNull::new_unchecked(ptr as *mut _),
+            phantom: PhantomData,
+        }
+    }
+
+    // rustdoc-stripper-ignore-next
+    /// Downgrade to a weak reference.
+    #[inline]
+    pub fn downgrade(&self) -> <Self as crate::clone::Downgrade>::Weak
+    where
+        T: crate::clone::Downgrade,
+    {
+        <T as crate::clone::Downgrade>::downgrade(self)
+    }
+}
+
+impl<'a, T> ops::Deref for BorrowedObject<'a, T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        unsafe { &*(&self.ptr as *const _ as *const T) }
+    }
+}
+
+impl<'a, T> AsRef<T> for BorrowedObject<'a, T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        unsafe { &*(&self.ptr as *const _ as *const T) }
+    }
+}
+
+impl<'a, T: PartialEq> PartialEq<T> for BorrowedObject<'a, T> {
+    #[inline]
+    fn eq(&self, other: &T) -> bool {
+        <T as PartialEq>::eq(self, other)
+    }
+}
+
+impl<'a, T: PartialOrd> PartialOrd<T> for BorrowedObject<'a, T> {
+    #[inline]
+    fn partial_cmp(&self, other: &T) -> Option<cmp::Ordering> {
+        <T as PartialOrd>::partial_cmp(self, other)
+    }
+}
+
+impl<'a, T: crate::clone::Downgrade + ObjectType> crate::clone::Downgrade
+    for BorrowedObject<'a, T>
+{
+    type Weak = <T as crate::clone::Downgrade>::Weak;
+
+    #[inline]
+    fn downgrade(&self) -> Self::Weak {
+        <T as crate::clone::Downgrade>::downgrade(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::{
+        cell::Cell,
+        rc::Rc,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
+
     use super::*;
 
     #[test]
     fn new() {
-        let obj: Object = Object::new(&[]).unwrap();
+        let obj: Object = Object::new();
         drop(obj);
     }
 
     #[test]
     fn data() {
-        let obj: Object = Object::new(&[]).unwrap();
+        let obj: Object = Object::new();
         unsafe {
             obj.set_data::<String>("foo", "hello".into());
             let data = obj.data::<String>("foo").unwrap();
@@ -4397,7 +4461,7 @@ mod tests {
 
     #[test]
     fn weak_ref() {
-        let obj: Object = Object::new(&[]).unwrap();
+        let obj: Object = Object::new();
 
         let weakref: WeakRef<Object> = WeakRef::new();
         weakref.set(Some(&obj));
@@ -4414,11 +4478,65 @@ mod tests {
     }
 
     #[test]
+    fn weak_ref_notify() {
+        let obj: Object = Object::new();
+
+        let handle = obj.add_weak_ref_notify(|| {
+            unreachable!();
+        });
+
+        handle.disconnect();
+
+        let called = Arc::new(AtomicBool::new(false));
+        let called_weak = Arc::downgrade(&called);
+        let handle = obj.add_weak_ref_notify(move || {
+            called_weak.upgrade().unwrap().store(true, Ordering::SeqCst);
+        });
+
+        drop(obj);
+        assert!(called.load(Ordering::SeqCst));
+        handle.disconnect();
+
+        let obj: Object = Object::new();
+
+        let called = Arc::new(AtomicBool::new(false));
+        let called_weak = Arc::downgrade(&called);
+        obj.add_weak_ref_notify(move || {
+            called_weak.upgrade().unwrap().store(true, Ordering::SeqCst);
+        });
+
+        drop(obj);
+        assert!(called.load(Ordering::SeqCst));
+
+        let obj: Object = Object::new();
+
+        let called = Rc::new(Cell::new(false));
+        let called_weak = Rc::downgrade(&called);
+        obj.add_weak_ref_notify_local(move || {
+            called_weak.upgrade().unwrap().set(true);
+        });
+
+        drop(obj);
+        assert!(called.get());
+    }
+
+    #[test]
     fn test_value() {
-        let obj1: Object = Object::new(&[]).unwrap();
+        let obj1: Object = Object::new();
         let v = obj1.to_value();
         let obj2 = v.get::<&Object>().unwrap();
 
         assert_eq!(obj1.as_ptr(), obj2.as_ptr());
+    }
+
+    #[test]
+    fn test_borrow_hashing() {
+        let mut m = std::collections::HashSet::new();
+        let boxed_object = crate::BoxedAnyObject::new("");
+
+        m.insert(boxed_object.clone());
+
+        let object: &Object = std::borrow::Borrow::borrow(&boxed_object);
+        assert_eq!(m.get(object), Some(&boxed_object));
     }
 }

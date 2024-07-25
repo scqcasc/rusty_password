@@ -4,8 +4,7 @@
 
 use crate::PageSetup;
 use glib::translate::*;
-use std::fmt;
-use std::mem;
+use std::{fmt, mem};
 
 glib::wrapper! {
     #[doc(alias = "GtkPrintContext")]
@@ -72,12 +71,13 @@ impl PrintContext {
                 left.as_mut_ptr(),
                 right.as_mut_ptr(),
             ));
-            let top = top.assume_init();
-            let bottom = bottom.assume_init();
-            let left = left.assume_init();
-            let right = right.assume_init();
             if ret {
-                Some((top, bottom, left, right))
+                Some((
+                    top.assume_init(),
+                    bottom.assume_init(),
+                    left.assume_init(),
+                    right.assume_init(),
+                ))
             } else {
                 None
             }

@@ -57,7 +57,7 @@ impl Error {
     }
 
     pub(crate) fn add_key(&mut self, key: String) {
-        self.inner.add_key(key);
+        self.inner.add_key(key)
     }
 
     /// What went wrong
@@ -113,7 +113,10 @@ impl<'de, 'a> serde::Deserializer<'de> for Deserializer<'a> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let inner = toml_edit::de::Deserializer::parse(self.input).map_err(Error::new)?;
+        let inner = self
+            .input
+            .parse::<toml_edit::de::Deserializer>()
+            .map_err(Error::new)?;
         inner.deserialize_any(visitor).map_err(Error::new)
     }
 
@@ -123,7 +126,10 @@ impl<'de, 'a> serde::Deserializer<'de> for Deserializer<'a> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let inner = toml_edit::de::Deserializer::parse(self.input).map_err(Error::new)?;
+        let inner = self
+            .input
+            .parse::<toml_edit::de::Deserializer>()
+            .map_err(Error::new)?;
         inner.deserialize_option(visitor).map_err(Error::new)
     }
 
@@ -135,7 +141,10 @@ impl<'de, 'a> serde::Deserializer<'de> for Deserializer<'a> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let inner = toml_edit::de::Deserializer::parse(self.input).map_err(Error::new)?;
+        let inner = self
+            .input
+            .parse::<toml_edit::de::Deserializer>()
+            .map_err(Error::new)?;
         inner
             .deserialize_newtype_struct(name, visitor)
             .map_err(Error::new)
@@ -150,7 +159,10 @@ impl<'de, 'a> serde::Deserializer<'de> for Deserializer<'a> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let inner = toml_edit::de::Deserializer::parse(self.input).map_err(Error::new)?;
+        let inner = self
+            .input
+            .parse::<toml_edit::de::Deserializer>()
+            .map_err(Error::new)?;
         inner
             .deserialize_struct(name, fields, visitor)
             .map_err(Error::new)
@@ -166,7 +178,10 @@ impl<'de, 'a> serde::Deserializer<'de> for Deserializer<'a> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let inner = toml_edit::de::Deserializer::parse(self.input).map_err(Error::new)?;
+        let inner = self
+            .input
+            .parse::<toml_edit::de::Deserializer>()
+            .map_err(Error::new)?;
         inner
             .deserialize_enum(name, variants, visitor)
             .map_err(Error::new)

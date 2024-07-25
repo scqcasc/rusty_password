@@ -1,32 +1,26 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::enums::DeviceType;
-use crate::error::Error;
-use crate::utils::status_to_result;
-
-use std::fmt;
-use std::ptr;
+#[cfg(feature = "script")]
+use std::ffi::CString;
+#[cfg(feature = "use_glib")]
+use std::marker::PhantomData;
+#[cfg(feature = "script")]
+use std::path::Path;
+use std::{fmt, ptr};
 
 #[cfg(feature = "use_glib")]
 use glib::translate::*;
 
-#[cfg(any(feature = "script", feature = "dox"))]
-use crate::enums::Content;
-#[cfg(any(feature = "script", feature = "dox"))]
-use crate::enums::ScriptMode;
-#[cfg(any(feature = "script", feature = "dox"))]
-use crate::recording_surface::RecordingSurface;
-#[cfg(any(feature = "script", feature = "dox"))]
-use crate::surface::Surface;
-#[cfg(any(feature = "script", feature = "dox"))]
-use std::ffi::CString;
-#[cfg(any(feature = "script", feature = "dox"))]
-use std::path::Path;
+use crate::{utils::status_to_result, DeviceType, Error};
+#[cfg(feature = "script")]
+use crate::{Content, RecordingSurface, ScriptMode, Surface};
 
 #[derive(Debug)]
+#[must_use = "if unused the Device will immediately be released"]
 pub struct DeviceAcquireGuard<'a>(&'a Device);
 
 impl<'a> Drop for DeviceAcquireGuard<'a> {
+    #[inline]
     fn drop(&mut self) {
         self.0.release();
     }
@@ -38,27 +32,32 @@ impl<'a> Drop for DeviceAcquireGuard<'a> {
 pub struct Device(ptr::NonNull<ffi::cairo_device_t>);
 
 impl Device {
+    #[inline]
     pub unsafe fn from_raw_none(ptr: *mut ffi::cairo_device_t) -> Device {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         ffi::cairo_device_reference(ptr);
         Device(ptr::NonNull::new_unchecked(ptr))
     }
 
+    #[inline]
     pub unsafe fn from_raw_borrow(ptr: *mut ffi::cairo_device_t) -> crate::Borrowed<Device> {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         crate::Borrowed::new(Device(ptr::NonNull::new_unchecked(ptr)))
     }
 
+    #[inline]
     pub unsafe fn from_raw_full(ptr: *mut ffi::cairo_device_t) -> Device {
-        assert!(!ptr.is_null());
+        debug_assert!(!ptr.is_null());
         Device(ptr::NonNull::new_unchecked(ptr))
     }
 
+    #[inline]
     pub fn to_raw_none(&self) -> *mut ffi::cairo_device_t {
         self.0.as_ptr()
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_create")]
     pub fn create<P: AsRef<Path>>(filename: P) -> Option<Device> {
         unsafe {
@@ -73,7 +72,8 @@ impl Device {
         }
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_from_recording_surface")]
     pub fn from_recording_surface(&self, surface: &RecordingSurface) -> Result<(), Error> {
         unsafe {
@@ -83,20 +83,23 @@ impl Device {
         }
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_get_mode")]
     #[doc(alias = "get_mode")]
     pub fn mode(&self) -> ScriptMode {
         unsafe { ScriptMode::from(ffi::cairo_script_get_mode(self.to_raw_none())) }
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_set_mode")]
     pub fn set_mode(&self, mode: ScriptMode) {
         unsafe { ffi::cairo_script_set_mode(self.to_raw_none(), mode.into()) }
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_surface_create")]
     pub fn surface_create(
         &self,
@@ -114,9 +117,11 @@ impl Device {
         }
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_surface_create_for_target")]
-    pub fn surface_create_for_target(&self, target: &Surface) -> Result<Surface, Error> {
+    pub fn surface_create_for_target(&self, target: impl AsRef<Surface>) -> Result<Surface, Error> {
+        let target = target.as_ref();
         target.status()?;
         unsafe {
             Surface::from_raw_full(ffi::cairo_script_surface_create_for_target(
@@ -126,7 +131,8 @@ impl Device {
         }
     }
 
-    #[cfg(any(feature = "script", feature = "dox"))]
+    #[cfg(feature = "script")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
     #[doc(alias = "cairo_script_write_comment")]
     pub fn write_comment(&self, comment: &str) {
         unsafe {
@@ -196,108 +202,106 @@ impl Device {
         unsafe { ffi::cairo_device_observer_stroke_elapsed(self.to_raw_none()) }
     }
 
-    #[cfg(any(feature = "xlib", feature = "xcb", feature = "dox"))]
+    #[cfg(any(feature = "xlib", feature = "xcb"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "xlib", feature = "xcb"))))]
     #[doc(alias = "cairo_xlib_device_debug_cap_xrender_version")]
     #[doc(alias = "cairo_xcb_device_debug_cap_xrender_version")]
-    pub fn debug_cap_xrender_version(&self, major_version: i32, minor_version: i32) {
-        unsafe {
-            match self.type_() {
-                DeviceType::Xlib => {
-                    #[cfg(feature = "xlib")]
-                    {
-                        ffi::cairo_xlib_device_debug_cap_xrender_version(
-                            self.to_raw_none(),
-                            major_version,
-                            minor_version,
-                        )
-                    }
-                    #[cfg(not(feature = "xlib"))]
-                    {
-                        panic!("you need to enable \"xlib\" feature")
-                    }
+    pub fn debug_cap_xrender_version(&self, _major_version: i32, _minor_version: i32) {
+        match self.type_() {
+            DeviceType::Xlib => {
+                #[cfg(feature = "xlib")]
+                unsafe {
+                    ffi::cairo_xlib_device_debug_cap_xrender_version(
+                        self.to_raw_none(),
+                        _major_version,
+                        _minor_version,
+                    )
                 }
-                DeviceType::Xcb => {
-                    #[cfg(feature = "xcb")]
-                    {
-                        ffi::cairo_xcb_device_debug_cap_xrender_version(
-                            self.to_raw_none(),
-                            major_version,
-                            minor_version,
-                        )
-                    }
-                    #[cfg(not(feature = "xcb"))]
-                    {
-                        panic!("you need to enable \"xcb\" feature")
-                    }
+                #[cfg(not(feature = "xlib"))]
+                {
+                    panic!("you need to enable \"xlib\" feature")
                 }
-                d => panic!("invalid device type: {}", d),
             }
+            DeviceType::Xcb => {
+                #[cfg(feature = "xcb")]
+                unsafe {
+                    ffi::cairo_xcb_device_debug_cap_xrender_version(
+                        self.to_raw_none(),
+                        _major_version,
+                        _minor_version,
+                    )
+                }
+                #[cfg(not(feature = "xcb"))]
+                {
+                    panic!("you need to enable \"xcb\" feature")
+                }
+            }
+            d => panic!("invalid device type: {}", d),
         }
     }
 
-    #[cfg(any(feature = "xlib", feature = "xcb", feature = "dox"))]
+    #[cfg(any(feature = "xlib", feature = "xcb"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "xlib", feature = "xcb"))))]
     #[doc(alias = "cairo_xlib_device_debug_get_precision")]
     #[doc(alias = "cairo_xcb_device_debug_get_precision")]
     pub fn debug_get_precision(&self) -> i32 {
-        unsafe {
-            match self.type_() {
-                DeviceType::Xlib => {
-                    #[cfg(feature = "xlib")]
-                    {
-                        ffi::cairo_xlib_device_debug_get_precision(self.to_raw_none())
-                    }
-                    #[cfg(not(feature = "xlib"))]
-                    {
-                        panic!("you need to enable \"xlib\" feature")
-                    }
+        match self.type_() {
+            DeviceType::Xlib => {
+                #[cfg(feature = "xlib")]
+                unsafe {
+                    ffi::cairo_xlib_device_debug_get_precision(self.to_raw_none())
                 }
-                DeviceType::Xcb => {
-                    #[cfg(feature = "xcb")]
-                    {
-                        ffi::cairo_xcb_device_debug_get_precision(self.to_raw_none())
-                    }
-                    #[cfg(not(feature = "xcb"))]
-                    {
-                        panic!("you need to enable \"xcb\" feature")
-                    }
+                #[cfg(not(feature = "xlib"))]
+                {
+                    panic!("you need to enable \"xlib\" feature")
                 }
-                d => panic!("invalid device type: {}", d),
             }
+            DeviceType::Xcb => {
+                #[cfg(feature = "xcb")]
+                unsafe {
+                    ffi::cairo_xcb_device_debug_get_precision(self.to_raw_none())
+                }
+                #[cfg(not(feature = "xcb"))]
+                {
+                    panic!("you need to enable \"xcb\" feature")
+                }
+            }
+            d => panic!("invalid device type: {}", d),
         }
     }
 
-    #[cfg(any(feature = "xlib", feature = "xcb", feature = "dox"))]
+    #[cfg(any(feature = "xlib", feature = "xcb"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "xlib", feature = "xcb"))))]
     #[doc(alias = "cairo_xlib_device_debug_set_precision")]
     #[doc(alias = "cairo_xcb_device_debug_set_precision")]
-    pub fn debug_set_precision(&self, precision: i32) {
-        unsafe {
-            match self.type_() {
-                DeviceType::Xlib => {
-                    #[cfg(feature = "xlib")]
-                    {
-                        ffi::cairo_xlib_device_debug_set_precision(self.to_raw_none(), precision)
-                    }
-                    #[cfg(not(feature = "xlib"))]
-                    {
-                        panic!("you need to enable \"xlib\" feature")
-                    }
+    pub fn debug_set_precision(&self, _precision: i32) {
+        match self.type_() {
+            DeviceType::Xlib => {
+                #[cfg(feature = "xlib")]
+                unsafe {
+                    ffi::cairo_xlib_device_debug_set_precision(self.to_raw_none(), _precision)
                 }
-                DeviceType::Xcb => {
-                    #[cfg(feature = "xcb")]
-                    {
-                        ffi::cairo_xcb_device_debug_set_precision(self.to_raw_none(), precision)
-                    }
-                    #[cfg(not(feature = "xcb"))]
-                    {
-                        panic!("you need to enable \"xcb\" feature")
-                    }
+                #[cfg(not(feature = "xlib"))]
+                {
+                    panic!("you need to enable \"xlib\" feature")
                 }
-                d => panic!("invalid device type: {}", d),
             }
+            DeviceType::Xcb => {
+                #[cfg(feature = "xcb")]
+                unsafe {
+                    ffi::cairo_xcb_device_debug_set_precision(self.to_raw_none(), _precision)
+                }
+                #[cfg(not(feature = "xcb"))]
+                {
+                    panic!("you need to enable \"xcb\" feature")
+                }
+            }
+            d => panic!("invalid device type: {}", d),
         }
     }
 
     #[doc(alias = "cairo_device_status")]
+    #[inline]
     pub fn status(&self) -> Result<(), Error> {
         let status = unsafe { ffi::cairo_device_status(self.to_raw_none()) };
         status_to_result(status)
@@ -310,12 +314,22 @@ impl Device {
 }
 
 #[cfg(feature = "use_glib")]
+#[cfg_attr(docsrs, doc(cfg(feature = "use_glib")))]
+impl IntoGlibPtr<*mut ffi::cairo_device_t> for Device {
+    #[inline]
+    unsafe fn into_glib_ptr(self) -> *mut ffi::cairo_device_t {
+        std::mem::ManuallyDrop::new(self).to_glib_none().0
+    }
+}
+
+#[cfg(feature = "use_glib")]
+#[cfg_attr(docsrs, doc(cfg(feature = "use_glib")))]
 impl<'a> ToGlibPtr<'a, *mut ffi::cairo_device_t> for Device {
-    type Storage = &'a Device;
+    type Storage = PhantomData<&'a Device>;
 
     #[inline]
     fn to_glib_none(&'a self) -> Stash<'a, *mut ffi::cairo_device_t, Self> {
-        Stash(self.to_raw_none(), self)
+        Stash(self.to_raw_none(), PhantomData)
     }
 
     #[inline]
@@ -325,6 +339,7 @@ impl<'a> ToGlibPtr<'a, *mut ffi::cairo_device_t> for Device {
 }
 
 #[cfg(feature = "use_glib")]
+#[cfg_attr(docsrs, doc(cfg(feature = "use_glib")))]
 impl FromGlibPtrNone<*mut ffi::cairo_device_t> for Device {
     #[inline]
     unsafe fn from_glib_none(ptr: *mut ffi::cairo_device_t) -> Device {
@@ -333,6 +348,7 @@ impl FromGlibPtrNone<*mut ffi::cairo_device_t> for Device {
 }
 
 #[cfg(feature = "use_glib")]
+#[cfg_attr(docsrs, doc(cfg(feature = "use_glib")))]
 impl FromGlibPtrBorrow<*mut ffi::cairo_device_t> for Device {
     #[inline]
     unsafe fn from_glib_borrow(ptr: *mut ffi::cairo_device_t) -> crate::Borrowed<Device> {
@@ -341,6 +357,7 @@ impl FromGlibPtrBorrow<*mut ffi::cairo_device_t> for Device {
 }
 
 #[cfg(feature = "use_glib")]
+#[cfg_attr(docsrs, doc(cfg(feature = "use_glib")))]
 impl FromGlibPtrFull<*mut ffi::cairo_device_t> for Device {
     #[inline]
     unsafe fn from_glib_full(ptr: *mut ffi::cairo_device_t) -> Device {
@@ -356,12 +373,14 @@ gvalue_impl!(
 );
 
 impl Clone for Device {
+    #[inline]
     fn clone(&self) -> Device {
         unsafe { Self::from_raw_none(ffi::cairo_device_reference(self.0.as_ptr())) }
     }
 }
 
 impl Drop for Device {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             ffi::cairo_device_destroy(self.0.as_ptr());

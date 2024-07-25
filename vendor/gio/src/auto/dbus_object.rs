@@ -3,14 +3,12 @@
 // DO NOT EDIT
 
 use crate::DBusInterface;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GDBusObject")]
@@ -25,33 +23,14 @@ impl DBusObject {
     pub const NONE: Option<&'static DBusObject> = None;
 }
 
-pub trait DBusObjectExt: 'static {
-    #[doc(alias = "g_dbus_object_get_interface")]
-    #[doc(alias = "get_interface")]
-    fn interface(&self, interface_name: &str) -> Option<DBusInterface>;
-
-    #[doc(alias = "g_dbus_object_get_interfaces")]
-    #[doc(alias = "get_interfaces")]
-    fn interfaces(&self) -> Vec<DBusInterface>;
-
-    #[doc(alias = "g_dbus_object_get_object_path")]
-    #[doc(alias = "get_object_path")]
-    fn object_path(&self) -> glib::GString;
-
-    #[doc(alias = "interface-added")]
-    fn connect_interface_added<F: Fn(&Self, &DBusInterface) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "interface-removed")]
-    fn connect_interface_removed<F: Fn(&Self, &DBusInterface) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::DBusObject>> Sealed for T {}
 }
 
-impl<O: IsA<DBusObject>> DBusObjectExt for O {
+pub trait DBusObjectExt: IsA<DBusObject> + sealed::Sealed + 'static {
+    #[doc(alias = "g_dbus_object_get_interface")]
+    #[doc(alias = "get_interface")]
     fn interface(&self, interface_name: &str) -> Option<DBusInterface> {
         unsafe {
             from_glib_full(ffi::g_dbus_object_get_interface(
@@ -61,6 +40,8 @@ impl<O: IsA<DBusObject>> DBusObjectExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_object_get_interfaces")]
+    #[doc(alias = "get_interfaces")]
     fn interfaces(&self) -> Vec<DBusInterface> {
         unsafe {
             FromGlibPtrContainer::from_glib_full(ffi::g_dbus_object_get_interfaces(
@@ -69,6 +50,8 @@ impl<O: IsA<DBusObject>> DBusObjectExt for O {
         }
     }
 
+    #[doc(alias = "g_dbus_object_get_object_path")]
+    #[doc(alias = "get_object_path")]
     fn object_path(&self) -> glib::GString {
         unsafe {
             from_glib_none(ffi::g_dbus_object_get_object_path(
@@ -77,6 +60,7 @@ impl<O: IsA<DBusObject>> DBusObjectExt for O {
         }
     }
 
+    #[doc(alias = "interface-added")]
     fn connect_interface_added<F: Fn(&Self, &DBusInterface) + 'static>(
         &self,
         f: F,
@@ -108,6 +92,7 @@ impl<O: IsA<DBusObject>> DBusObjectExt for O {
         }
     }
 
+    #[doc(alias = "interface-removed")]
     fn connect_interface_removed<F: Fn(&Self, &DBusInterface) + 'static>(
         &self,
         f: F,
@@ -139,6 +124,8 @@ impl<O: IsA<DBusObject>> DBusObjectExt for O {
         }
     }
 }
+
+impl<O: IsA<DBusObject>> DBusObjectExt for O {}
 
 impl fmt::Display for DBusObject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

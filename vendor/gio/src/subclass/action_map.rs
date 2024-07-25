@@ -1,26 +1,25 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::{Action, ActionMap};
-use glib::subclass::prelude::*;
-use glib::translate::*;
-use glib::{Cast, GString, IsA, ObjectExt, Quark};
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
+use glib::{prelude::*, subclass::prelude::*, translate::*, GString, Quark};
+use once_cell::sync::Lazy;
+
+use crate::{Action, ActionMap};
+
 pub trait ActionMapImpl: ObjectImpl {
-    fn lookup_action(&self, action_map: &Self::Type, action_name: &str) -> Option<Action>;
-    fn add_action(&self, action_map: &Self::Type, action: &Action);
-    fn remove_action(&self, action_map: &Self::Type, action_name: &str);
+    fn lookup_action(&self, action_name: &str) -> Option<Action>;
+    fn add_action(&self, action: &Action);
+    fn remove_action(&self, action_name: &str);
 }
 
-pub trait ActionMapImplExt: ObjectSubclass {
-    fn parent_lookup_action(&self, action_map: &Self::Type, action_name: &str) -> Option<Action>;
-    fn parent_add_action(&self, action_map: &Self::Type, action: &Action);
-    fn parent_remove_action(&self, action_map: &Self::Type, action_name: &str);
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::ActionMapImplExt> Sealed for T {}
 }
 
-impl<T: ActionMapImpl> ActionMapImplExt for T {
-    fn parent_lookup_action(&self, action_map: &Self::Type, name: &str) -> Option<Action> {
+pub trait ActionMapImplExt: sealed::Sealed + ObjectSubclass {
+    fn parent_lookup_action(&self, name: &str) -> Option<Action> {
         unsafe {
             let type_data = Self::type_data();
             let parent_iface = type_data.as_ref().parent_interface::<ActionMap>()
@@ -30,14 +29,14 @@ impl<T: ActionMapImpl> ActionMapImplExt for T {
                 .lookup_action
                 .expect("no parent \"lookup_action\" implementation");
             let ret = func(
-                action_map.unsafe_cast_ref::<ActionMap>().to_glib_none().0,
+                self.obj().unsafe_cast_ref::<ActionMap>().to_glib_none().0,
                 name.to_glib_none().0,
             );
             from_glib_none(ret)
         }
     }
 
-    fn parent_add_action(&self, action_map: &Self::Type, action: &Action) {
+    fn parent_add_action(&self, action: &Action) {
         unsafe {
             let type_data = Self::type_data();
             let parent_iface = type_data.as_ref().parent_interface::<ActionMap>()
@@ -47,13 +46,13 @@ impl<T: ActionMapImpl> ActionMapImplExt for T {
                 .add_action
                 .expect("no parent \"add_action\" implementation");
             func(
-                action_map.unsafe_cast_ref::<ActionMap>().to_glib_none().0,
+                self.obj().unsafe_cast_ref::<ActionMap>().to_glib_none().0,
                 action.to_glib_none().0,
             );
         }
     }
 
-    fn parent_remove_action(&self, action_map: &Self::Type, action_name: &str) {
+    fn parent_remove_action(&self, action_name: &str) {
         unsafe {
             let type_data = Self::type_data();
             let parent_iface = type_data.as_ref().parent_interface::<ActionMap>()
@@ -63,12 +62,14 @@ impl<T: ActionMapImpl> ActionMapImplExt for T {
                 .remove_action
                 .expect("no parent \"remove_action\" implementation");
             func(
-                action_map.unsafe_cast_ref::<ActionMap>().to_glib_none().0,
+                self.obj().unsafe_cast_ref::<ActionMap>().to_glib_none().0,
                 action_name.to_glib_none().0,
             );
         }
     }
 }
+
+impl<T: ActionMapImpl> ActionMapImplExt for T {}
 
 unsafe impl<T: ActionMapImpl> IsImplementable<T> for ActionMap
 where
@@ -93,17 +94,17 @@ unsafe extern "C" fn action_map_lookup_action<T: ActionMapImpl>(
     let instance = &*(action_map as *mut T::Instance);
     let action_name = GString::from_glib_borrow(action_nameptr);
     let imp = instance.imp();
-    let wrap = from_glib_borrow::<_, ActionMap>(action_map);
 
-    let ret = imp.lookup_action(wrap.unsafe_cast_ref(), &action_name);
+    let ret = imp.lookup_action(&action_name);
     if let Some(action) = ret {
+        let instance = imp.obj();
         let actionptr = action.to_glib_none().0;
 
-        let mut map = wrap
+        let mut map = instance
             .steal_qdata::<HashMap<String, Action>>(*ACTION_MAP_LOOKUP_ACTION_QUARK)
             .unwrap_or_default();
         map.insert(action_name.to_string(), action);
-        wrap.set_qdata(*ACTION_MAP_LOOKUP_ACTION_QUARK, map);
+        instance.set_qdata(*ACTION_MAP_LOOKUP_ACTION_QUARK, map);
 
         actionptr
     } else {
@@ -119,10 +120,7 @@ unsafe extern "C" fn action_map_add_action<T: ActionMapImpl>(
     let imp = instance.imp();
     let action: Borrowed<Action> = from_glib_borrow(actionptr);
 
-    imp.add_action(
-        from_glib_borrow::<_, ActionMap>(action_map).unsafe_cast_ref(),
-        &action,
-    );
+    imp.add_action(&action);
 }
 
 unsafe extern "C" fn action_map_remove_action<T: ActionMapImpl>(
@@ -133,8 +131,5 @@ unsafe extern "C" fn action_map_remove_action<T: ActionMapImpl>(
     let imp = instance.imp();
     let action_name = GString::from_glib_borrow(action_nameptr);
 
-    imp.remove_action(
-        from_glib_borrow::<_, ActionMap>(action_map).unsafe_cast_ref(),
-        &action_name,
-    );
+    imp.remove_action(&action_name);
 }

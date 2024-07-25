@@ -9,9 +9,9 @@ use winnow::{
     token::{take_till, take_while},
 };
 
-pub(crate) type Stream<'i> = &'i str;
+pub type Stream<'i> = &'i str;
 
-pub(crate) fn categories<'s>(
+pub fn categories<'s>(
     input: &mut Stream<'s>,
 ) -> PResult<HashMap<&'s str, HashMap<&'s str, &'s str>>> {
     repeat(0.., category_and_keys).parse_next(input)

@@ -2,14 +2,12 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GListModel")]
@@ -24,28 +22,14 @@ impl ListModel {
     pub const NONE: Option<&'static ListModel> = None;
 }
 
-pub trait ListModelExt: 'static {
-    #[doc(alias = "g_list_model_get_item_type")]
-    #[doc(alias = "get_item_type")]
-    fn item_type(&self) -> glib::types::Type;
-
-    #[doc(alias = "g_list_model_get_n_items")]
-    #[doc(alias = "get_n_items")]
-    fn n_items(&self) -> u32;
-
-    #[doc(alias = "g_list_model_get_object")]
-    #[doc(alias = "get_object")]
-    fn item(&self, position: u32) -> Option<glib::Object>;
-
-    #[doc(alias = "g_list_model_items_changed")]
-    fn items_changed(&self, position: u32, removed: u32, added: u32);
-
-    #[doc(alias = "items-changed")]
-    fn connect_items_changed<F: Fn(&Self, u32, u32, u32) + 'static>(&self, f: F)
-        -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::ListModel>> Sealed for T {}
 }
 
-impl<O: IsA<ListModel>> ListModelExt for O {
+pub trait ListModelExt: IsA<ListModel> + sealed::Sealed + 'static {
+    #[doc(alias = "g_list_model_get_item_type")]
+    #[doc(alias = "get_item_type")]
     fn item_type(&self) -> glib::types::Type {
         unsafe {
             from_glib(ffi::g_list_model_get_item_type(
@@ -54,10 +38,14 @@ impl<O: IsA<ListModel>> ListModelExt for O {
         }
     }
 
+    #[doc(alias = "g_list_model_get_n_items")]
+    #[doc(alias = "get_n_items")]
     fn n_items(&self) -> u32 {
         unsafe { ffi::g_list_model_get_n_items(self.as_ref().to_glib_none().0) }
     }
 
+    #[doc(alias = "g_list_model_get_object")]
+    #[doc(alias = "get_object")]
     fn item(&self, position: u32) -> Option<glib::Object> {
         unsafe {
             from_glib_full(ffi::g_list_model_get_object(
@@ -67,6 +55,7 @@ impl<O: IsA<ListModel>> ListModelExt for O {
         }
     }
 
+    #[doc(alias = "g_list_model_items_changed")]
     fn items_changed(&self, position: u32, removed: u32, added: u32) {
         unsafe {
             ffi::g_list_model_items_changed(
@@ -78,6 +67,7 @@ impl<O: IsA<ListModel>> ListModelExt for O {
         }
     }
 
+    #[doc(alias = "items-changed")]
     fn connect_items_changed<F: Fn(&Self, u32, u32, u32) + 'static>(
         &self,
         f: F,
@@ -113,6 +103,8 @@ impl<O: IsA<ListModel>> ListModelExt for O {
         }
     }
 }
+
+impl<O: IsA<ListModel>> ListModelExt for O {}
 
 impl fmt::Display for ListModel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

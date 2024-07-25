@@ -2,12 +2,9 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::Display;
-use crate::Window;
+use crate::{Display, Window};
 use glib::translate::*;
-use std::fmt;
-use std::mem;
-use std::ptr;
+use std::{fmt, mem, ptr};
 
 glib::wrapper! {
     #[doc(alias = "GdkGLContext")]
@@ -52,9 +49,7 @@ impl GLContext {
                 major.as_mut_ptr(),
                 minor.as_mut_ptr(),
             );
-            let major = major.assume_init();
-            let minor = minor.assume_init();
-            (major, minor)
+            (major.assume_init(), minor.assume_init())
         }
     }
 
@@ -69,8 +64,6 @@ impl GLContext {
         }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gdk_gl_context_get_use_es")]
     #[doc(alias = "get_use_es")]
     pub fn uses_es(&self) -> bool {
@@ -88,9 +81,7 @@ impl GLContext {
                 major.as_mut_ptr(),
                 minor.as_mut_ptr(),
             );
-            let major = major.assume_init();
-            let minor = minor.assume_init();
-            (major, minor)
+            (major.assume_init(), minor.assume_init())
         }
     }
 
@@ -100,8 +91,6 @@ impl GLContext {
         unsafe { from_glib_none(ffi::gdk_gl_context_get_window(self.to_glib_none().0)) }
     }
 
-    #[cfg(any(feature = "v3_20", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_20")))]
     #[doc(alias = "gdk_gl_context_is_legacy")]
     pub fn is_legacy(&self) -> bool {
         unsafe { from_glib(ffi::gdk_gl_context_is_legacy(self.to_glib_none().0)) }
@@ -119,7 +108,7 @@ impl GLContext {
         unsafe {
             let mut error = ptr::null_mut();
             let is_ok = ffi::gdk_gl_context_realize(self.to_glib_none().0, &mut error);
-            assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == glib::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -152,8 +141,6 @@ impl GLContext {
         }
     }
 
-    #[cfg(any(feature = "v3_22", feature = "dox"))]
-    #[cfg_attr(feature = "dox", doc(cfg(feature = "v3_22")))]
     #[doc(alias = "gdk_gl_context_set_use_es")]
     pub fn set_use_es(&self, use_es: i32) {
         unsafe {

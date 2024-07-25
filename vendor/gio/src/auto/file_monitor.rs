@@ -2,17 +2,13 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::File;
-use crate::FileMonitorEvent;
-use glib::object::Cast;
-use glib::object::IsA;
-use glib::signal::connect_raw;
-use glib::signal::SignalHandlerId;
-use glib::translate::*;
-use glib::StaticType;
-use std::boxed::Box as Box_;
-use std::fmt;
-use std::mem::transmute;
+use crate::{File, FileMonitorEvent};
+use glib::{
+    prelude::*,
+    signal::{connect_raw, SignalHandlerId},
+    translate::*,
+};
+use std::{boxed::Box as Box_, fmt, mem::transmute};
 
 glib::wrapper! {
     #[doc(alias = "GFileMonitor")]
@@ -27,45 +23,18 @@ impl FileMonitor {
     pub const NONE: Option<&'static FileMonitor> = None;
 }
 
-pub trait FileMonitorExt: 'static {
-    #[doc(alias = "g_file_monitor_cancel")]
-    fn cancel(&self) -> bool;
-
-    #[doc(alias = "g_file_monitor_emit_event")]
-    fn emit_event(
-        &self,
-        child: &impl IsA<File>,
-        other_file: &impl IsA<File>,
-        event_type: FileMonitorEvent,
-    );
-
-    #[doc(alias = "g_file_monitor_is_cancelled")]
-    fn is_cancelled(&self) -> bool;
-
-    #[doc(alias = "g_file_monitor_set_rate_limit")]
-    fn set_rate_limit(&self, limit_msecs: i32);
-
-    #[doc(alias = "rate-limit")]
-    fn rate_limit(&self) -> i32;
-
-    #[doc(alias = "changed")]
-    fn connect_changed<F: Fn(&Self, &File, Option<&File>, FileMonitorEvent) + 'static>(
-        &self,
-        f: F,
-    ) -> SignalHandlerId;
-
-    #[doc(alias = "cancelled")]
-    fn connect_cancelled_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
-
-    #[doc(alias = "rate-limit")]
-    fn connect_rate_limit_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::FileMonitor>> Sealed for T {}
 }
 
-impl<O: IsA<FileMonitor>> FileMonitorExt for O {
+pub trait FileMonitorExt: IsA<FileMonitor> + sealed::Sealed + 'static {
+    #[doc(alias = "g_file_monitor_cancel")]
     fn cancel(&self) -> bool {
         unsafe { from_glib(ffi::g_file_monitor_cancel(self.as_ref().to_glib_none().0)) }
     }
 
+    #[doc(alias = "g_file_monitor_emit_event")]
     fn emit_event(
         &self,
         child: &impl IsA<File>,
@@ -82,6 +51,7 @@ impl<O: IsA<FileMonitor>> FileMonitorExt for O {
         }
     }
 
+    #[doc(alias = "g_file_monitor_is_cancelled")]
     fn is_cancelled(&self) -> bool {
         unsafe {
             from_glib(ffi::g_file_monitor_is_cancelled(
@@ -90,16 +60,19 @@ impl<O: IsA<FileMonitor>> FileMonitorExt for O {
         }
     }
 
+    #[doc(alias = "g_file_monitor_set_rate_limit")]
     fn set_rate_limit(&self, limit_msecs: i32) {
         unsafe {
             ffi::g_file_monitor_set_rate_limit(self.as_ref().to_glib_none().0, limit_msecs);
         }
     }
 
+    #[doc(alias = "rate-limit")]
     fn rate_limit(&self) -> i32 {
-        glib::ObjectExt::property(self.as_ref(), "rate-limit")
+        ObjectExt::property(self.as_ref(), "rate-limit")
     }
 
+    #[doc(alias = "changed")]
     fn connect_changed<F: Fn(&Self, &File, Option<&File>, FileMonitorEvent) + 'static>(
         &self,
         f: F,
@@ -137,6 +110,7 @@ impl<O: IsA<FileMonitor>> FileMonitorExt for O {
         }
     }
 
+    #[doc(alias = "cancelled")]
     fn connect_cancelled_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_cancelled_trampoline<
             P: IsA<FileMonitor>,
@@ -162,6 +136,7 @@ impl<O: IsA<FileMonitor>> FileMonitorExt for O {
         }
     }
 
+    #[doc(alias = "rate-limit")]
     fn connect_rate_limit_notify<F: Fn(&Self) + 'static>(&self, f: F) -> SignalHandlerId {
         unsafe extern "C" fn notify_rate_limit_trampoline<
             P: IsA<FileMonitor>,
@@ -187,6 +162,8 @@ impl<O: IsA<FileMonitor>> FileMonitorExt for O {
         }
     }
 }
+
+impl<O: IsA<FileMonitor>> FileMonitorExt for O {}
 
 impl fmt::Display for FileMonitor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

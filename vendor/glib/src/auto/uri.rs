@@ -2,14 +2,8 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use crate::translate::*;
-use crate::Bytes;
-use crate::Error;
-use crate::UriFlags;
-use crate::UriHideFlags;
-use std::fmt;
-use std::mem;
-use std::ptr;
+use crate::{translate::*, Bytes, Error, UriFlags, UriHideFlags};
+use std::{fmt, mem, ptr};
 
 crate::wrapper! {
     #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -179,7 +173,7 @@ impl Uri {
 
     #[doc(alias = "g_uri_escape_bytes")]
     pub fn escape_bytes(unescaped: &[u8], reserved_chars_allowed: Option<&str>) -> crate::GString {
-        let length = unescaped.len() as usize;
+        let length = unescaped.len() as _;
         unsafe {
             from_glib_full(ffi::g_uri_escape_bytes(
                 unescaped.to_glib_none().0,
@@ -210,7 +204,7 @@ impl Uri {
             let mut error = ptr::null_mut();
             let is_ok =
                 ffi::g_uri_is_valid(uri_string.to_glib_none().0, flags.into_glib(), &mut error);
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok(())
             } else {
@@ -369,14 +363,13 @@ impl Uri {
                 &mut fragment,
                 &mut error,
             );
-            let port = port.assume_init();
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok((
                     from_glib_full(scheme),
                     from_glib_full(userinfo),
                     from_glib_full(host),
-                    port,
+                    port.assume_init(),
                     from_glib_full(path),
                     from_glib_full(query),
                     from_glib_full(fragment),
@@ -405,10 +398,13 @@ impl Uri {
                 port.as_mut_ptr(),
                 &mut error,
             );
-            let port = port.assume_init();
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
-                Ok((from_glib_full(scheme), from_glib_full(host), port))
+                Ok((
+                    from_glib_full(scheme),
+                    from_glib_full(host),
+                    port.assume_init(),
+                ))
             } else {
                 Err(from_glib_full(error))
             }
@@ -458,8 +454,7 @@ impl Uri {
                 &mut fragment,
                 &mut error,
             );
-            let port = port.assume_init();
-            assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
+            debug_assert_eq!(is_ok == crate::ffi::GFALSE, !error.is_null());
             if error.is_null() {
                 Ok((
                     from_glib_full(scheme),
@@ -467,7 +462,7 @@ impl Uri {
                     from_glib_full(password),
                     from_glib_full(auth_params),
                     from_glib_full(host),
-                    port,
+                    port.assume_init(),
                     from_glib_full(path),
                     from_glib_full(query),
                     from_glib_full(fragment),
@@ -483,7 +478,7 @@ impl Uri {
         escaped_string: &str,
         illegal_characters: Option<&str>,
     ) -> Result<Bytes, crate::Error> {
-        let length = escaped_string.len() as isize;
+        let length = escaped_string.len() as _;
         unsafe {
             let mut error = ptr::null_mut();
             let ret = ffi::g_uri_unescape_bytes(

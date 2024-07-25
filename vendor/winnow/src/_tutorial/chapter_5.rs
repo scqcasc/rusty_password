@@ -35,7 +35,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -100,7 +100,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -163,7 +163,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -200,7 +200,7 @@
 //! ```
 //!
 //! If you look closely at [`repeat`], it isn't collecting directly into a [`Vec`] but
-//! anything that implements the [`Accumulate`] trait to gather the results. This lets us make more complex parsers than we did in
+//! [`Accumulate`] to gather the results. This lets us make more complex parsers than we did in
 //! [`chapter_2`] by accumulating the results into a `()` and [`recognize`][Parser::recognize]-ing the captured input:
 //! ```rust
 //! # use winnow::prelude::*;
@@ -230,7 +230,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #

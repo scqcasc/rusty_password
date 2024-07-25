@@ -1,34 +1,24 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use glib::object::Cast;
-use glib::translate::*;
-use glib::Error;
-
-use glib::subclass::prelude::*;
-
 use std::ptr;
 
-use crate::Cancellable;
-use crate::Initable;
+use glib::{prelude::*, subclass::prelude::*, translate::*, Error};
+
+use crate::{Cancellable, Initable};
 
 pub trait InitableImpl: ObjectImpl {
-    fn init(&self, initable: &Self::Type, cancellable: Option<&Cancellable>) -> Result<(), Error>;
+    fn init(&self, cancellable: Option<&Cancellable>) -> Result<(), Error> {
+        self.parent_init(cancellable)
+    }
 }
 
-pub trait InitableImplExt: ObjectSubclass {
-    fn parent_init(
-        &self,
-        initable: &Self::Type,
-        cancellable: Option<&Cancellable>,
-    ) -> Result<(), Error>;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::InitableImplExt> Sealed for T {}
 }
 
-impl<T: InitableImpl> InitableImplExt for T {
-    fn parent_init(
-        &self,
-        initable: &Self::Type,
-        cancellable: Option<&Cancellable>,
-    ) -> Result<(), Error> {
+pub trait InitableImplExt: sealed::Sealed + ObjectSubclass {
+    fn parent_init(&self, cancellable: Option<&Cancellable>) -> Result<(), Error> {
         unsafe {
             let type_data = Self::type_data();
             let parent_iface =
@@ -40,7 +30,7 @@ impl<T: InitableImpl> InitableImplExt for T {
 
             let mut err = ptr::null_mut();
             func(
-                initable.unsafe_cast_ref::<Initable>().to_glib_none().0,
+                self.obj().unsafe_cast_ref::<Initable>().to_glib_none().0,
                 cancellable.to_glib_none().0,
                 &mut err,
             );
@@ -53,6 +43,8 @@ impl<T: InitableImpl> InitableImplExt for T {
         }
     }
 }
+
+impl<T: InitableImpl> InitableImplExt for T {}
 
 unsafe impl<T: InitableImpl> IsImplementable<T> for Initable {
     fn interface_init(iface: &mut glib::Interface<Self>) {
@@ -70,7 +62,6 @@ unsafe extern "C" fn initable_init<T: InitableImpl>(
     let imp = instance.imp();
 
     match imp.init(
-        from_glib_borrow::<_, Initable>(initable).unsafe_cast_ref(),
         Option::<Cancellable>::from_glib_borrow(cancellable)
             .as_ref()
             .as_ref(),
@@ -78,7 +69,7 @@ unsafe extern "C" fn initable_init<T: InitableImpl>(
         Ok(()) => glib::ffi::GTRUE,
         Err(e) => {
             if !error.is_null() {
-                *error = e.into_raw();
+                *error = e.into_glib_ptr();
             }
             glib::ffi::GFALSE
         }
@@ -88,15 +79,12 @@ unsafe extern "C" fn initable_init<T: InitableImpl>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
-    use crate::traits::InitableExt;
-    use crate::{Cancellable, Initable};
+    use crate::{prelude::*, Cancellable, Initable};
 
     pub mod imp {
-        use super::*;
-        use crate::Cancellable;
-        use crate::Initable;
         use std::cell::Cell;
+
+        use super::*;
 
         pub struct InitableTestType(pub Cell<u64>);
 
@@ -112,11 +100,7 @@ mod tests {
         }
 
         impl InitableImpl for InitableTestType {
-            fn init(
-                &self,
-                _initable: &Self::Type,
-                _cancellable: Option<&Cancellable>,
-            ) -> Result<(), glib::Error> {
+            fn init(&self, _cancellable: Option<&Cancellable>) -> Result<(), glib::Error> {
                 self.0.set(0x123456789abcdef);
                 Ok(())
             }
@@ -129,12 +113,6 @@ mod tests {
         use super::*;
         pub type InitableTestType = <imp::InitableTestType as ObjectSubclass>::Instance;
 
-        #[no_mangle]
-        pub unsafe extern "C" fn initable_test_type_get_type() -> glib::ffi::GType {
-            imp::InitableTestType::type_().into_glib()
-        }
-
-        #[no_mangle]
         pub unsafe extern "C" fn initable_test_type_get_value(this: *mut InitableTestType) -> u64 {
             let this = super::InitableTestType::from_glib_borrow(this);
             this.imp().0.get()
@@ -149,15 +127,17 @@ mod tests {
     #[allow(clippy::new_without_default)]
     impl InitableTestType {
         pub fn new() -> Self {
-            Initable::new(&[], Option::<&Cancellable>::None)
+            Initable::new(Option::<&Cancellable>::None)
                 .expect("Failed creation/initialization of InitableTestType object")
         }
 
-        pub fn new_uninit() -> Self {
+        pub unsafe fn new_uninit() -> Self {
             // This creates an uninitialized InitableTestType object, for testing
             // purposes. In real code, using Initable::new (like the new() method
             // does) is recommended.
-            glib::Object::new(&[]).expect("Failed creation of InitableTestType object")
+            glib::Object::new_internal(Self::static_type(), &mut [])
+                .downcast()
+                .unwrap()
         }
 
         pub fn value(&self) -> u64 {
@@ -167,12 +147,15 @@ mod tests {
 
     #[test]
     fn test_initable_with_init() {
-        let test = InitableTestType::new_uninit();
+        let res = unsafe {
+            let test = InitableTestType::new_uninit();
 
-        assert_ne!(0x123456789abcdef, test.value());
+            assert_ne!(0x123456789abcdef, test.value());
 
-        let result = unsafe { test.init(Option::<&Cancellable>::None) };
-        assert!(result.is_ok());
+            test.init(Option::<&Cancellable>::None).map(|_| test)
+        };
+        assert!(res.is_ok());
+        let test = res.unwrap();
 
         assert_eq!(0x123456789abcdef, test.value());
     }
@@ -184,25 +167,34 @@ mod tests {
     }
 
     #[test]
+    #[should_panic = ""]
     fn test_initable_new_failure() {
         let value: u32 = 2;
-        match Initable::new::<InitableTestType, Cancellable>(
-            &[("invalid-property", &value)],
-            Option::<&Cancellable>::None,
-        ) {
-            Err(InitableError::NewObjectFailed(_)) => (),
-            v => panic!("expected InitableError::NewObjectFailed, got {:?}", v),
-        }
+        let _ = Initable::builder::<InitableTestType>()
+            .property("invalid-property", value)
+            .build(Option::<&Cancellable>::None);
+        unreachable!();
     }
 
     #[test]
     fn test_initable_with_initable_with_type() {
         let test = Initable::with_type(
             InitableTestType::static_type(),
-            &[],
             Option::<&Cancellable>::None,
         )
         .expect("Failed creation/initialization of InitableTestType object from type")
+        .downcast::<InitableTestType>()
+        .expect("Failed downcast of InitableTestType object");
+        assert_eq!(0x123456789abcdef, test.value());
+    }
+
+    #[test]
+    fn test_initable_with_initable_with_values() {
+        let test = Initable::with_type(
+            InitableTestType::static_type(),
+            Option::<&Cancellable>::None,
+        )
+        .expect("Failed creation/initialization of InitableTestType object from values")
         .downcast::<InitableTestType>()
         .expect("Failed downcast of InitableTestType object");
         assert_eq!(0x123456789abcdef, test.value());

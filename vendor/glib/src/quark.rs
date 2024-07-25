@@ -1,9 +1,8 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::translate::*;
-use std::ffi::CStr;
-use std::fmt;
-use std::num::NonZeroU32;
+use std::{fmt, num::NonZeroU32};
+
+use crate::{translate::*, GStr, IntoGStr};
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
 #[repr(transparent)]
@@ -13,18 +12,14 @@ pub struct Quark(NonZeroU32);
 impl Quark {
     #[doc(alias = "g_quark_from_string")]
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Quark {
-        unsafe { from_glib(ffi::g_quark_from_string(s.to_glib_none().0)) }
+    pub fn from_str(s: impl IntoGStr) -> Quark {
+        unsafe { s.run_with_gstr(|s| from_glib(ffi::g_quark_from_string(s.as_ptr()))) }
     }
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
     #[doc(alias = "g_quark_to_string")]
-    pub fn as_str<'a>(&self) -> &'a str {
-        unsafe {
-            CStr::from_ptr(ffi::g_quark_to_string(self.into_glib()))
-                .to_str()
-                .unwrap()
-        }
+    pub fn as_str<'a>(&self) -> &'a GStr {
+        unsafe { GStr::from_ptr(ffi::g_quark_to_string(self.into_glib())) }
     }
 
     #[doc(alias = "g_quark_try_string")]
@@ -39,8 +34,8 @@ impl fmt::Debug for Quark {
     }
 }
 
-impl<'a> From<&'a str> for Quark {
-    fn from(s: &'a str) -> Self {
+impl<T: IntoGStr> From<T> for Quark {
+    fn from(s: T) -> Self {
         Self::from_str(s)
     }
 }
@@ -55,8 +50,9 @@ impl std::str::FromStr for Quark {
 
 #[doc(hidden)]
 impl FromGlib<ffi::GQuark> for Quark {
+    #[inline]
     unsafe fn from_glib(value: ffi::GQuark) -> Self {
-        assert_ne!(value, 0);
+        debug_assert_ne!(value, 0);
         Self(NonZeroU32::new_unchecked(value))
     }
 }
@@ -77,6 +73,7 @@ impl TryFromGlib<ffi::GQuark> for Quark {
 impl IntoGlib for Quark {
     type GlibType = ffi::GQuark;
 
+    #[inline]
     fn into_glib(self) -> ffi::GQuark {
         self.0.get()
     }
@@ -86,6 +83,7 @@ impl IntoGlib for Quark {
 impl IntoGlib for Option<Quark> {
     type GlibType = ffi::GQuark;
 
+    #[inline]
     fn into_glib(self) -> ffi::GQuark {
         self.map(|s| s.0.get()).unwrap_or(0)
     }

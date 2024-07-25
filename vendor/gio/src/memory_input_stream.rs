@@ -2,11 +2,12 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
-    use crate::MemoryInputStream;
+    use std::error::Error;
+
     use futures_util::io::{AsyncBufReadExt, AsyncReadExt};
     use glib::Bytes;
-    use std::error::Error;
+
+    use crate::{prelude::*, MemoryInputStream};
 
     #[test]
     fn new() {
@@ -63,7 +64,7 @@ mod tests {
 
         let res = c
             .block_on(
-                strm.read_future(buf, glib::PRIORITY_DEFAULT)
+                strm.read_future(buf, glib::Priority::default())
                     .map_err(|(_buf, err)| err)
                     .map_ok(move |(mut buf, len)| {
                         buf.truncate(len);

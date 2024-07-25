@@ -1,7 +1,6 @@
 macro_rules! impl_partial_eq {
     ($lhs:ty, $rhs:ty) => {
-        #[allow(unused_lifetimes)]
-        impl<'a> PartialEq<$rhs> for $lhs {
+        impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {
                 let l = self.as_ref();
@@ -10,8 +9,7 @@ macro_rules! impl_partial_eq {
             }
         }
 
-        #[allow(unused_lifetimes)]
-        impl<'a> PartialEq<$lhs> for $rhs {
+        impl<'a, 'b> PartialEq<$lhs> for $rhs {
             #[inline]
             fn eq(&self, other: &$lhs) -> bool {
                 PartialEq::eq(other, self)
@@ -22,8 +20,7 @@ macro_rules! impl_partial_eq {
 
 macro_rules! impl_partial_ord {
     ($lhs:ty, $rhs:ty) => {
-        #[allow(unused_lifetimes)]
-        impl<'a> PartialOrd<$rhs> for $lhs {
+        impl<'a, 'b> PartialOrd<$rhs> for $lhs {
             #[inline]
             fn partial_cmp(&self, other: &$rhs) -> Option<Ordering> {
                 let l = self.as_ref();
@@ -32,8 +29,7 @@ macro_rules! impl_partial_ord {
             }
         }
 
-        #[allow(unused_lifetimes)]
-        impl<'a> PartialOrd<$lhs> for $rhs {
+        impl<'a, 'b> PartialOrd<$lhs> for $rhs {
             #[inline]
             fn partial_cmp(&self, other: &$lhs) -> Option<Ordering> {
                 PartialOrd::partial_cmp(other, self)

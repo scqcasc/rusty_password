@@ -11,52 +11,61 @@
 
 [package]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.70"
 name = "gdk"
-version = "0.15.4"
+version = "0.18.0"
 authors = ["The gtk-rs Project Developers"]
 exclude = ["gir-files/*"]
 description = "Rust bindings for the GDK 3 library"
 homepage = "https://gtk-rs.org/"
 documentation = "https://gtk-rs.org/gtk3-rs/stable/latest/docs/gdk/"
 readme = "README.md"
-keywords = ["gdk", "gtk", "gtk-rs", "gnome", "GUI"]
+keywords = [
+    "gdk",
+    "gtk",
+    "gtk-rs",
+    "gnome",
+    "GUI",
+]
 license = "MIT"
 repository = "https://github.com/gtk-rs/gtk3-rs"
+resolver = "1"
+
 [package.metadata.docs.rs]
-features = ["dox"]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "--generate-link-to-definition",
+]
 
 [lib]
 name = "gdk"
-[dependencies.bitflags]
-version = "1.0"
 
 [dependencies.cairo-rs]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.ffi]
-version = "0.15.1"
+version = "0.18"
 package = "gdk-sys"
 
 [dependencies.gdk-pixbuf]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.gio]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.glib]
-version = "0.15.1"
+version = "0.18"
 
 [dependencies.libc]
 version = "0.2"
 
 [dependencies.pango]
-version = "0.15.1"
+version = "0.18"
+
 [dev-dependencies.gir-format-check]
 version = "^0.1"
 
 [features]
-dox = ["ffi/dox", "glib/dox", "gio/dox", "gdk-pixbuf/dox", "cairo-rs/dox", "pango/dox"]
-v3_20 = ["ffi/v3_20"]
-v3_22 = ["v3_20", "ffi/v3_22"]
-v3_24 = ["v3_22", "ffi/v3_24"]
+unsafe-assume-initialized = []
+v3_24 = ["ffi/v3_24"]

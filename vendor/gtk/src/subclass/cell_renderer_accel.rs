@@ -12,47 +12,38 @@ use crate::CellRendererAccel;
 pub trait CellRendererAccelImpl: CellRendererAccelImplExt + CellRendererTextImpl {
     fn accel_edited(
         &self,
-        renderer: &Self::Type,
         path: &str,
         accel_key: u32,
         accel_mods: gdk::ModifierType,
         hardware_keycode: u32,
     ) {
-        self.parent_accel_edited(renderer, path, accel_key, accel_mods, hardware_keycode);
+        self.parent_accel_edited(path, accel_key, accel_mods, hardware_keycode);
     }
 
-    fn accel_cleared(&self, renderer: &Self::Type, path: &str) {
-        self.parent_accel_cleared(renderer, path);
+    fn accel_cleared(&self, path: &str) {
+        self.parent_accel_cleared(path);
     }
 }
 
-pub trait CellRendererAccelImplExt: ObjectSubclass {
-    fn parent_accel_edited(
-        &self,
-        renderer: &Self::Type,
-        path: &str,
-        accel_key: u32,
-        accel_mods: gdk::ModifierType,
-        hardware_keycode: u32,
-    );
-    fn parent_accel_cleared(&self, renderer: &Self::Type, path: &str);
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::CellRendererAccelImpl> Sealed for T {}
 }
 
-impl<T: CellRendererAccelImpl> CellRendererAccelImplExt for T {
+pub trait CellRendererAccelImplExt: ObjectSubclass + sealed::Sealed {
     fn parent_accel_edited(
         &self,
-        renderer: &Self::Type,
         path: &str,
         accel_key: u32,
         accel_mods: gdk::ModifierType,
         hardware_keycode: u32,
     ) {
         unsafe {
-            let data = T::type_data();
+            let data = Self::type_data();
             let parent_class = data.as_ref().parent_class() as *mut ffi::GtkCellRendererAccelClass;
             if let Some(f) = (*parent_class).accel_edited {
                 f(
-                    renderer
+                    self.obj()
                         .unsafe_cast_ref::<CellRendererAccel>()
                         .to_glib_none()
                         .0,
@@ -64,14 +55,13 @@ impl<T: CellRendererAccelImpl> CellRendererAccelImplExt for T {
             }
         }
     }
-
-    fn parent_accel_cleared(&self, renderer: &Self::Type, path: &str) {
+    fn parent_accel_cleared(&self, path: &str) {
         unsafe {
-            let data = T::type_data();
+            let data = Self::type_data();
             let parent_class = data.as_ref().parent_class() as *mut ffi::GtkCellRendererAccelClass;
             if let Some(f) = (*parent_class).accel_cleared {
                 f(
-                    renderer
+                    self.obj()
                         .unsafe_cast_ref::<CellRendererAccel>()
                         .to_glib_none()
                         .0,
@@ -81,6 +71,8 @@ impl<T: CellRendererAccelImpl> CellRendererAccelImplExt for T {
         }
     }
 }
+
+impl<T: CellRendererAccelImpl> CellRendererAccelImplExt for T {}
 
 unsafe impl<T: CellRendererAccelImpl> IsSubclassable<T> for CellRendererAccel {
     fn class_init(class: &mut ::glib::Class<Self>) {
@@ -105,10 +97,8 @@ unsafe extern "C" fn cell_renderer_accel_edited<T: CellRendererAccelImpl>(
 ) {
     let instance = &*(ptr as *mut T::Instance);
     let imp = instance.imp();
-    let wrap: Borrowed<CellRendererAccel> = from_glib_borrow(ptr);
 
     imp.accel_edited(
-        wrap.unsafe_cast_ref(),
         &GString::from_glib_borrow(path),
         accel_key,
         from_glib(accel_mods),
@@ -122,7 +112,6 @@ unsafe extern "C" fn cell_renderer_accel_cleared<T: CellRendererAccelImpl>(
 ) {
     let instance = &*(ptr as *mut T::Instance);
     let imp = instance.imp();
-    let wrap: Borrowed<CellRendererAccel> = from_glib_borrow(ptr);
 
-    imp.accel_cleared(wrap.unsafe_cast_ref(), &GString::from_glib_borrow(path))
+    imp.accel_cleared(&GString::from_glib_borrow(path))
 }

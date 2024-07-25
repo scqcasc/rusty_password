@@ -5,11 +5,10 @@
 //! `GObject` subclasses that don't require any additional data in these
 //! structs and don't provide any new virtual methods.
 
-use super::prelude::*;
-use crate::object::ObjectType;
+use std::{fmt, ops};
 
-use std::fmt;
-use std::ops;
+use super::prelude::*;
+use crate::prelude::*;
 
 // rustdoc-stripper-ignore-next
 /// A basic instance struct that does not store any additional data.
@@ -59,12 +58,14 @@ unsafe impl<T: ObjectSubclass> super::types::ClassStruct for ClassStruct<T> {
 impl<T: ObjectSubclass> ops::Deref for ClassStruct<T> {
     type Target = crate::Class<<T as ObjectSubclass>::Type>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         unsafe { &*(self as *const _ as *const Self::Target) }
     }
 }
 
 impl<T: ObjectSubclass> ops::DerefMut for ClassStruct<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *(self as *mut _ as *mut Self::Target) }
     }

@@ -2,13 +2,7 @@
 // from gir-files (https://github.com/gtk-rs/gir-files)
 // DO NOT EDIT
 
-use glib::error::ErrorDomain;
-use glib::translate::*;
-use glib::value::FromValue;
-use glib::value::ToValue;
-use glib::Quark;
-use glib::StaticType;
-use glib::Type;
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
@@ -38,6 +32,7 @@ impl fmt::Display for Colorspace {
 impl IntoGlib for Colorspace {
     type GlibType = ffi::GdkColorspace;
 
+    #[inline]
     fn into_glib(self) -> ffi::GdkColorspace {
         match self {
             Self::Rgb => ffi::GDK_COLORSPACE_RGB,
@@ -48,6 +43,7 @@ impl IntoGlib for Colorspace {
 
 #[doc(hidden)]
 impl FromGlib<ffi::GdkColorspace> for Colorspace {
+    #[inline]
     unsafe fn from_glib(value: ffi::GdkColorspace) -> Self {
         match value {
             ffi::GDK_COLORSPACE_RGB => Self::Rgb,
@@ -57,8 +53,20 @@ impl FromGlib<ffi::GdkColorspace> for Colorspace {
 }
 
 impl StaticType for Colorspace {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "gdk_colorspace_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::gdk_colorspace_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for Colorspace {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -66,15 +74,17 @@ impl glib::value::ValueType for Colorspace {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for Colorspace {
+unsafe impl<'a> glib::value::FromValue<'a> for Colorspace {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for Colorspace {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -83,8 +93,16 @@ impl ToValue for Colorspace {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<Colorspace> for glib::Value {
+    #[inline]
+    fn from(v: Colorspace) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -124,6 +142,7 @@ impl fmt::Display for InterpType {
 impl IntoGlib for InterpType {
     type GlibType = ffi::GdkInterpType;
 
+    #[inline]
     fn into_glib(self) -> ffi::GdkInterpType {
         match self {
             Self::Nearest => ffi::GDK_INTERP_NEAREST,
@@ -137,6 +156,7 @@ impl IntoGlib for InterpType {
 
 #[doc(hidden)]
 impl FromGlib<ffi::GdkInterpType> for InterpType {
+    #[inline]
     unsafe fn from_glib(value: ffi::GdkInterpType) -> Self {
         match value {
             ffi::GDK_INTERP_NEAREST => Self::Nearest,
@@ -149,8 +169,20 @@ impl FromGlib<ffi::GdkInterpType> for InterpType {
 }
 
 impl StaticType for InterpType {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "gdk_interp_type_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::gdk_interp_type_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for InterpType {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -158,15 +190,17 @@ impl glib::value::ValueType for InterpType {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for InterpType {
+unsafe impl<'a> glib::value::FromValue<'a> for InterpType {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for InterpType {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -175,8 +209,16 @@ impl ToValue for InterpType {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<InterpType> for glib::Value {
+    #[inline]
+    fn from(v: InterpType) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -193,6 +235,7 @@ pub enum PixbufAlphaMode {
     __Unknown(i32),
 }
 
+#[allow(deprecated)]
 impl fmt::Display for PixbufAlphaMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -207,10 +250,12 @@ impl fmt::Display for PixbufAlphaMode {
     }
 }
 
+#[allow(deprecated)]
 #[doc(hidden)]
 impl IntoGlib for PixbufAlphaMode {
     type GlibType = ffi::GdkPixbufAlphaMode;
 
+    #[inline]
     fn into_glib(self) -> ffi::GdkPixbufAlphaMode {
         match self {
             Self::Bilevel => ffi::GDK_PIXBUF_ALPHA_BILEVEL,
@@ -220,8 +265,10 @@ impl IntoGlib for PixbufAlphaMode {
     }
 }
 
+#[allow(deprecated)]
 #[doc(hidden)]
 impl FromGlib<ffi::GdkPixbufAlphaMode> for PixbufAlphaMode {
+    #[inline]
     unsafe fn from_glib(value: ffi::GdkPixbufAlphaMode) -> Self {
         match value {
             ffi::GDK_PIXBUF_ALPHA_BILEVEL => Self::Bilevel,
@@ -231,25 +278,44 @@ impl FromGlib<ffi::GdkPixbufAlphaMode> for PixbufAlphaMode {
     }
 }
 
+#[allow(deprecated)]
 impl StaticType for PixbufAlphaMode {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "gdk_pixbuf_alpha_mode_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::gdk_pixbuf_alpha_mode_get_type()) }
     }
 }
 
+#[allow(deprecated)]
+impl glib::HasParamSpec for PixbufAlphaMode {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
+    }
+}
+
+#[allow(deprecated)]
 impl glib::value::ValueType for PixbufAlphaMode {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for PixbufAlphaMode {
+#[allow(deprecated)]
+unsafe impl<'a> glib::value::FromValue<'a> for PixbufAlphaMode {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
+#[allow(deprecated)]
 impl ToValue for PixbufAlphaMode {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -258,8 +324,17 @@ impl ToValue for PixbufAlphaMode {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+#[allow(deprecated)]
+impl From<PixbufAlphaMode> for glib::Value {
+    #[inline]
+    fn from(v: PixbufAlphaMode) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -308,6 +383,7 @@ impl fmt::Display for PixbufError {
 impl IntoGlib for PixbufError {
     type GlibType = ffi::GdkPixbufError;
 
+    #[inline]
     fn into_glib(self) -> ffi::GdkPixbufError {
         match self {
             Self::CorruptImage => ffi::GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
@@ -324,6 +400,7 @@ impl IntoGlib for PixbufError {
 
 #[doc(hidden)]
 impl FromGlib<ffi::GdkPixbufError> for PixbufError {
+    #[inline]
     unsafe fn from_glib(value: ffi::GdkPixbufError) -> Self {
         match value {
             ffi::GDK_PIXBUF_ERROR_CORRUPT_IMAGE => Self::CorruptImage,
@@ -338,32 +415,42 @@ impl FromGlib<ffi::GdkPixbufError> for PixbufError {
     }
 }
 
-impl ErrorDomain for PixbufError {
-    fn domain() -> Quark {
+impl glib::error::ErrorDomain for PixbufError {
+    #[inline]
+    fn domain() -> glib::Quark {
         unsafe { from_glib(ffi::gdk_pixbuf_error_quark()) }
     }
 
+    #[inline]
     fn code(self) -> i32 {
         self.into_glib()
     }
 
+    #[inline]
+    #[allow(clippy::match_single_binding)]
     fn from(code: i32) -> Option<Self> {
-        match code {
-            ffi::GDK_PIXBUF_ERROR_CORRUPT_IMAGE => Some(Self::CorruptImage),
-            ffi::GDK_PIXBUF_ERROR_INSUFFICIENT_MEMORY => Some(Self::InsufficientMemory),
-            ffi::GDK_PIXBUF_ERROR_BAD_OPTION => Some(Self::BadOption),
-            ffi::GDK_PIXBUF_ERROR_UNKNOWN_TYPE => Some(Self::UnknownType),
-            ffi::GDK_PIXBUF_ERROR_UNSUPPORTED_OPERATION => Some(Self::UnsupportedOperation),
-            ffi::GDK_PIXBUF_ERROR_FAILED => Some(Self::Failed),
-            ffi::GDK_PIXBUF_ERROR_INCOMPLETE_ANIMATION => Some(Self::IncompleteAnimation),
-            _ => Some(Self::Failed),
+        match unsafe { from_glib(code) } {
+            Self::__Unknown(_) => Some(Self::Failed),
+            value => Some(value),
         }
     }
 }
 
 impl StaticType for PixbufError {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "gdk_pixbuf_error_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::gdk_pixbuf_error_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for PixbufError {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -371,15 +458,17 @@ impl glib::value::ValueType for PixbufError {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for PixbufError {
+unsafe impl<'a> glib::value::FromValue<'a> for PixbufError {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for PixbufError {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -388,8 +477,16 @@ impl ToValue for PixbufError {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<PixbufError> for glib::Value {
+    #[inline]
+    fn from(v: PixbufError) -> Self {
+        ToValue::to_value(&v)
     }
 }
 
@@ -429,6 +526,7 @@ impl fmt::Display for PixbufRotation {
 impl IntoGlib for PixbufRotation {
     type GlibType = ffi::GdkPixbufRotation;
 
+    #[inline]
     fn into_glib(self) -> ffi::GdkPixbufRotation {
         match self {
             Self::None => ffi::GDK_PIXBUF_ROTATE_NONE,
@@ -442,6 +540,7 @@ impl IntoGlib for PixbufRotation {
 
 #[doc(hidden)]
 impl FromGlib<ffi::GdkPixbufRotation> for PixbufRotation {
+    #[inline]
     unsafe fn from_glib(value: ffi::GdkPixbufRotation) -> Self {
         match value {
             ffi::GDK_PIXBUF_ROTATE_NONE => Self::None,
@@ -454,8 +553,20 @@ impl FromGlib<ffi::GdkPixbufRotation> for PixbufRotation {
 }
 
 impl StaticType for PixbufRotation {
-    fn static_type() -> Type {
+    #[inline]
+    #[doc(alias = "gdk_pixbuf_rotation_get_type")]
+    fn static_type() -> glib::Type {
         unsafe { from_glib(ffi::gdk_pixbuf_rotation_get_type()) }
+    }
+}
+
+impl glib::HasParamSpec for PixbufRotation {
+    type ParamSpec = glib::ParamSpecEnum;
+    type SetValue = Self;
+    type BuilderFn = fn(&str, Self) -> glib::ParamSpecEnumBuilder<Self>;
+
+    fn param_spec_builder() -> Self::BuilderFn {
+        Self::ParamSpec::builder_with_default
     }
 }
 
@@ -463,15 +574,17 @@ impl glib::value::ValueType for PixbufRotation {
     type Type = Self;
 }
 
-unsafe impl<'a> FromValue<'a> for PixbufRotation {
+unsafe impl<'a> glib::value::FromValue<'a> for PixbufRotation {
     type Checker = glib::value::GenericValueTypeChecker<Self>;
 
+    #[inline]
     unsafe fn from_value(value: &'a glib::Value) -> Self {
         from_glib(glib::gobject_ffi::g_value_get_enum(value.to_glib_none().0))
     }
 }
 
 impl ToValue for PixbufRotation {
+    #[inline]
     fn to_value(&self) -> glib::Value {
         let mut value = glib::Value::for_value_type::<Self>();
         unsafe {
@@ -480,7 +593,15 @@ impl ToValue for PixbufRotation {
         value
     }
 
+    #[inline]
     fn value_type(&self) -> glib::Type {
         Self::static_type()
+    }
+}
+
+impl From<PixbufRotation> for glib::Value {
+    #[inline]
+    fn from(v: PixbufRotation) -> Self {
+        ToValue::to_value(&v)
     }
 }

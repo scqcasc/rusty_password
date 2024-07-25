@@ -3,8 +3,7 @@
 // DO NOT EDIT
 
 use crate::SocketAddressEnumerator;
-use glib::object::IsA;
-use glib::translate::*;
+use glib::{prelude::*, translate::*};
 use std::fmt;
 
 glib::wrapper! {
@@ -20,18 +19,13 @@ impl SocketConnectable {
     pub const NONE: Option<&'static SocketConnectable> = None;
 }
 
-pub trait SocketConnectableExt: 'static {
-    #[doc(alias = "g_socket_connectable_enumerate")]
-    fn enumerate(&self) -> SocketAddressEnumerator;
-
-    #[doc(alias = "g_socket_connectable_proxy_enumerate")]
-    fn proxy_enumerate(&self) -> SocketAddressEnumerator;
-
-    #[doc(alias = "g_socket_connectable_to_string")]
-    fn to_string(&self) -> glib::GString;
+mod sealed {
+    pub trait Sealed {}
+    impl<T: super::IsA<super::SocketConnectable>> Sealed for T {}
 }
 
-impl<O: IsA<SocketConnectable>> SocketConnectableExt for O {
+pub trait SocketConnectableExt: IsA<SocketConnectable> + sealed::Sealed + 'static {
+    #[doc(alias = "g_socket_connectable_enumerate")]
     fn enumerate(&self) -> SocketAddressEnumerator {
         unsafe {
             from_glib_full(ffi::g_socket_connectable_enumerate(
@@ -40,6 +34,7 @@ impl<O: IsA<SocketConnectable>> SocketConnectableExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_connectable_proxy_enumerate")]
     fn proxy_enumerate(&self) -> SocketAddressEnumerator {
         unsafe {
             from_glib_full(ffi::g_socket_connectable_proxy_enumerate(
@@ -48,6 +43,7 @@ impl<O: IsA<SocketConnectable>> SocketConnectableExt for O {
         }
     }
 
+    #[doc(alias = "g_socket_connectable_to_string")]
     fn to_string(&self) -> glib::GString {
         unsafe {
             from_glib_full(ffi::g_socket_connectable_to_string(
@@ -56,6 +52,8 @@ impl<O: IsA<SocketConnectable>> SocketConnectableExt for O {
         }
     }
 }
+
+impl<O: IsA<SocketConnectable>> SocketConnectableExt for O {}
 
 impl fmt::Display for SocketConnectable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -162,7 +162,7 @@ pub struct Time {
     pub minute: u8,
     /// Second: 0 to {58, 59, 60} (based on leap second rules)
     pub second: u8,
-    /// Nanosecond: 0 to `999_999_999`
+    /// Nanosecond: 0 to 999_999_999
     pub nanosecond: u32,
 }
 
@@ -179,7 +179,7 @@ pub enum Offset {
 
     /// Offset between local time and UTC
     Custom {
-        /// Minutes: -`1_440..1_440`
+        /// Minutes: -1_440..1_440
         minutes: i16,
     },
 }
@@ -308,15 +308,7 @@ impl FromStr for Datetime {
             if date.month < 1 || date.month > 12 {
                 return Err(DatetimeParseError {});
             }
-            let is_leap_year =
-                (date.year % 4 == 0) && ((date.year % 100 != 0) || (date.year % 400 == 0));
-            let max_days_in_month = match date.month {
-                2 if is_leap_year => 29,
-                2 => 28,
-                4 | 6 | 9 | 11 => 30,
-                _ => 31,
-            };
-            if date.day < 1 || date.day > max_days_in_month {
+            if date.day < 1 || date.day > 31 {
                 return Err(DatetimeParseError {});
             }
 
@@ -357,7 +349,6 @@ impl FromStr for Datetime {
 
                 let mut end = whole.len();
                 for (i, byte) in whole.bytes().enumerate() {
-                    #[allow(clippy::single_match_else)]
                     match byte {
                         b'0'..=b'9' => {
                             if i < 9 {
@@ -390,8 +381,7 @@ impl FromStr for Datetime {
             if time.minute > 59 {
                 return Err(DatetimeParseError {});
             }
-            // 00-58, 00-59, 00-60 based on leap second rules
-            if time.second > 60 {
+            if time.second > 59 {
                 return Err(DatetimeParseError {});
             }
             if time.nanosecond > 999_999_999 {
@@ -461,7 +451,7 @@ impl FromStr for Datetime {
 
 fn digit(chars: &mut str::Chars<'_>) -> Result<u8, DatetimeParseError> {
     match chars.next() {
-        Some(c) if c.is_ascii_digit() => Ok(c as u8 - b'0'),
+        Some(c) if ('0'..='9').contains(&c) => Ok(c as u8 - b'0'),
         _ => Err(DatetimeParseError {}),
     }
 }

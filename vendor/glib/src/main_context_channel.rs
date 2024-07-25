@@ -1,18 +1,14 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::thread_guard::ThreadGuard;
-use crate::translate::*;
-use crate::Continue;
-use crate::MainContext;
-use crate::Priority;
-use crate::Source;
-use crate::SourceId;
-use std::collections::VecDeque;
-use std::fmt;
-use std::mem;
-use std::ptr;
-use std::sync::mpsc;
-use std::sync::{Arc, Condvar, Mutex};
+use std::{
+    collections::VecDeque,
+    fmt, mem, ptr,
+    sync::{mpsc, Arc, Condvar, Mutex},
+};
+
+use crate::{
+    thread_guard::ThreadGuard, translate::*, ControlFlow, MainContext, Priority, Source, SourceId,
+};
 
 enum ChannelSourceState {
     NotAttached,
@@ -201,20 +197,20 @@ impl<T> Channel<T> {
 }
 
 #[repr(C)]
-struct ChannelSource<T, F: FnMut(T) -> Continue + 'static> {
+struct ChannelSource<T, F: FnMut(T) -> ControlFlow + 'static> {
     source: ffi::GSource,
-    source_funcs: Option<Box<ffi::GSourceFuncs>>,
-    channel: Option<Channel<T>>,
-    callback: Option<ThreadGuard<F>>,
+    source_funcs: Box<ffi::GSourceFuncs>,
+    channel: Channel<T>,
+    callback: ThreadGuard<F>,
 }
 
-unsafe extern "C" fn dispatch<T, F: FnMut(T) -> Continue + 'static>(
+unsafe extern "C" fn dispatch<T, F: FnMut(T) -> ControlFlow + 'static>(
     source: *mut ffi::GSource,
     callback: ffi::GSourceFunc,
     _user_data: ffi::gpointer,
 ) -> ffi::gboolean {
     let source = &mut *(source as *mut ChannelSource<T, F>);
-    assert!(callback.is_none());
+    debug_assert!(callback.is_none());
 
     // Set ready-time to -1 so that we won't get called again before a new item is added
     // to the channel queue.
@@ -222,25 +218,17 @@ unsafe extern "C" fn dispatch<T, F: FnMut(T) -> Continue + 'static>(
 
     // Get a reference to the callback. This will panic if we're called from a different
     // thread than where the source was attached to the main context.
-    let callback = source
-        .callback
-        .as_mut()
-        .expect("ChannelSource called before Receiver was attached")
-        .get_mut();
+    let callback = source.callback.get_mut();
 
     // Now iterate over all items that we currently have in the channel until it is
     // empty again. If all senders are disconnected at some point we remove the GSource
     // from the main context it was attached to as it will never ever be called again.
-    let channel = source
-        .channel
-        .as_ref()
-        .expect("ChannelSource without Channel");
     loop {
-        match channel.try_recv() {
+        match source.channel.try_recv() {
             Err(mpsc::TryRecvError::Empty) => break,
             Err(mpsc::TryRecvError::Disconnected) => return ffi::G_SOURCE_REMOVE,
             Ok(item) => {
-                if callback(item) == Continue(false) {
+                if callback(item).is_break() {
                     return ffi::G_SOURCE_REMOVE;
                 }
             }
@@ -251,33 +239,25 @@ unsafe extern "C" fn dispatch<T, F: FnMut(T) -> Continue + 'static>(
 }
 
 #[cfg(feature = "v2_64")]
-unsafe extern "C" fn dispose<T, F: FnMut(T) -> Continue + 'static>(source: *mut ffi::GSource) {
+unsafe extern "C" fn dispose<T, F: FnMut(T) -> ControlFlow + 'static>(source: *mut ffi::GSource) {
     let source = &mut *(source as *mut ChannelSource<T, F>);
 
-    if let Some(ref channel) = source.channel {
-        // Set the source inside the channel to None so that all senders know that there
-        // is no receiver left and wake up the condition variable if any
-        let mut inner = (channel.0).0.lock().unwrap();
-        inner.source = ChannelSourceState::Destroyed;
-        if let Some(ChannelBound { ref cond, .. }) = (channel.0).1 {
-            cond.notify_all();
-        }
+    // Set the source inside the channel to None so that all senders know that there
+    // is no receiver left and wake up the condition variable if any
+    let mut inner = (source.channel.0).0.lock().unwrap();
+    inner.source = ChannelSourceState::Destroyed;
+    if let Some(ChannelBound { ref cond, .. }) = (source.channel.0).1 {
+        cond.notify_all();
     }
 }
 
-unsafe extern "C" fn finalize<T, F: FnMut(T) -> Continue + 'static>(source: *mut ffi::GSource) {
+unsafe extern "C" fn finalize<T, F: FnMut(T) -> ControlFlow + 'static>(source: *mut ffi::GSource) {
     let source = &mut *(source as *mut ChannelSource<T, F>);
 
     // Drop all memory we own by taking it out of the Options
 
-    #[cfg(feature = "v2_64")]
-    {
-        let _ = source.channel.take().expect("Receiver without channel");
-    }
     #[cfg(not(feature = "v2_64"))]
     {
-        let channel = source.channel.take().expect("Receiver without channel");
-
         // FIXME: This is the same as would otherwise be done in the dispose() function but
         // unfortunately it doesn't exist in older version of GLib. Doing it only here can
         // cause a channel sender to get a reference to the source with reference count 0
@@ -287,14 +267,14 @@ unsafe extern "C" fn finalize<T, F: FnMut(T) -> Continue + 'static>(source: *mut
         //
         // Set the source inside the channel to None so that all senders know that there
         // is no receiver left and wake up the condition variable if any
-        let mut inner = (channel.0).0.lock().unwrap();
+        let mut inner = (source.channel.0).0.lock().unwrap();
         inner.source = ChannelSourceState::Destroyed;
-        if let Some(ChannelBound { ref cond, .. }) = (channel.0).1 {
+        if let Some(ChannelBound { ref cond, .. }) = (source.channel.0).1 {
             cond.notify_all();
         }
     }
-
-    let _ = source.source_funcs.take();
+    ptr::drop_in_place(&mut source.channel);
+    ptr::drop_in_place(&mut source.source_funcs);
 
     // Take the callback out of the source. This will panic if the value is dropped
     // from a different thread than where the callback was created so try to drop it
@@ -303,11 +283,10 @@ unsafe extern "C" fn finalize<T, F: FnMut(T) -> Continue + 'static>(source: *mut
     // This can only really happen if the caller to `attach()` gets the `Source` from the returned
     // `SourceId` and sends it to another thread or otherwise retrieves it from the main context,
     // but better safe than sorry.
-    let callback = source
-        .callback
-        .take()
-        .expect("channel source finalized twice");
-    if !callback.is_owner() {
+    if source.callback.is_owner() {
+        ptr::drop_in_place(&mut source.callback);
+    } else {
+        let callback = ptr::read(&source.callback);
         let context =
             ffi::g_source_get_context(source as *mut ChannelSource<T, F> as *mut ffi::GSource);
         if !context.is_null() {
@@ -474,7 +453,7 @@ impl<T> Receiver<T> {
     ///
     /// This function panics if called from a thread that is not the owner of the provided
     /// `context`, or, if `None` is provided, of the thread default main context.
-    pub fn attach<F: FnMut(T) -> Continue + 'static>(
+    pub fn attach<F: FnMut(T) -> ControlFlow + 'static>(
         mut self,
         context: Option<&MainContext>,
         func: F,
@@ -495,7 +474,6 @@ impl<T> Receiver<T> {
                 mut_override(&*source_funcs),
                 mem::size_of::<ChannelSource<T, F>>() as u32,
             ) as *mut ChannelSource<T, F>;
-            assert!(!source.is_null());
 
             #[cfg(feature = "v2_64")]
             {
@@ -527,9 +505,9 @@ impl<T> Receiver<T> {
             // Store all our data inside our part of the GSource
             {
                 let source = &mut *source;
-                ptr::write(&mut source.channel, Some(channel));
-                ptr::write(&mut source.callback, Some(ThreadGuard::new(func)));
-                ptr::write(&mut source.source_funcs, Some(source_funcs));
+                ptr::write(ptr::addr_of_mut!(source.channel), channel);
+                ptr::write(ptr::addr_of_mut!(source.callback), ThreadGuard::new(func));
+                ptr::write(ptr::addr_of_mut!(source.source_funcs), source_funcs);
             }
 
             let source = Source::from_glib_full(mut_override(&(*source).source));
@@ -561,6 +539,7 @@ impl MainContext {
     /// will fail.
     ///
     /// The returned `Sender` behaves the same as `std::sync::mpsc::Sender`.
+    #[deprecated = "Use an async channel, from async-channel for example, on the main context using spawn_future_local() instead"]
     pub fn channel<T>(priority: Priority) -> (Sender<T>, Receiver<T>) {
         let channel = Channel::new(None);
         let receiver = Receiver(Some(channel.clone()), priority);
@@ -584,6 +563,7 @@ impl MainContext {
     /// will fail.
     ///
     /// The returned `SyncSender` behaves the same as `std::sync::mpsc::SyncSender`.
+    #[deprecated = "Use an async channel, from async-channel for example, on the main context using spawn_future_local() instead"]
     pub fn sync_channel<T>(priority: Priority, bound: usize) -> (SyncSender<T>, Receiver<T>) {
         let channel = Channel::new(Some(bound));
         let receiver = Receiver(Some(channel.clone()), priority);
@@ -594,14 +574,17 @@ impl MainContext {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
+    use std::{
+        cell::RefCell,
+        rc::Rc,
+        sync::atomic::{AtomicBool, Ordering},
+        thread, time,
+    };
+
     use super::*;
     use crate::MainLoop;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::thread;
-    use std::time;
 
     #[test]
     fn test_channel() {
@@ -619,9 +602,9 @@ mod tests {
             *sum_clone.borrow_mut() += item;
             if *sum_clone.borrow() == 6 {
                 l_clone.quit();
-                Continue(false)
+                ControlFlow::Break
             } else {
-                Continue(true)
+                ControlFlow::Continue
             }
         });
 
@@ -653,7 +636,7 @@ mod tests {
         let helper = Helper(l.clone());
         receiver.attach(Some(&c), move |_| {
             let _helper = &helper;
-            Continue(true)
+            ControlFlow::Continue
         });
 
         drop(sender);
@@ -677,7 +660,7 @@ mod tests {
 
         let (sender, receiver) = MainContext::channel::<i32>(Priority::default());
 
-        let source_id = receiver.attach(Some(&c), move |_| Continue(true));
+        let source_id = receiver.attach(Some(&c), move |_| ControlFlow::Continue);
 
         let source = c.find_source_by_id(&source_id).unwrap();
         source.destroy();
@@ -704,7 +687,7 @@ mod tests {
         let helper = Helper(dropped.clone());
         let source_id = receiver.attach(Some(&c), move |_| {
             let _helper = &helper;
-            Continue(true)
+            ControlFlow::Continue
         });
 
         let source = c.find_source_by_id(&source_id).unwrap();
@@ -733,9 +716,9 @@ mod tests {
             *sum_clone.borrow_mut() += item;
             if *sum_clone.borrow() == 6 {
                 l_clone.quit();
-                Continue(false)
+                ControlFlow::Break
             } else {
-                Continue(true)
+                ControlFlow::Continue
             }
         });
 
@@ -782,9 +765,9 @@ mod tests {
             *sum_clone.borrow_mut() += item;
             if *sum_clone.borrow() == 6 {
                 l_clone.quit();
-                Continue(false)
+                ControlFlow::Break
             } else {
-                Continue(true)
+                ControlFlow::Continue
             }
         });
 
@@ -893,7 +876,7 @@ mod tests {
                     Err(mpsc::RecvTimeoutError::Disconnected)
                 );
                 l_clone.quit();
-                Continue(false)
+                ControlFlow::Break
             } else {
                 // But as we didn't consume the next one yet, there must be no
                 // other item available yet
@@ -901,7 +884,7 @@ mod tests {
                     wait_receiver.recv_timeout(time::Duration::from_millis(50)),
                     Err(mpsc::RecvTimeoutError::Timeout)
                 );
-                Continue(true)
+                ControlFlow::Continue
             }
         });
         l.run();

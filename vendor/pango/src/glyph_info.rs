@@ -1,7 +1,8 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::GlyphGeometry;
 use std::fmt;
+
+use crate::GlyphGeometry;
 
 glib::wrapper! {
     #[doc(alias = "PangoGlyphInfo")]
@@ -9,14 +10,22 @@ glib::wrapper! {
 }
 
 impl GlyphInfo {
+    #[inline]
     pub fn glyph(&self) -> u32 {
         self.inner.glyph
     }
 
+    #[inline]
+    pub fn set_glyph(&mut self, glyph: u32) {
+        self.inner.glyph = glyph
+    }
+
+    #[inline]
     pub fn geometry(&self) -> &GlyphGeometry {
         unsafe { &*(&self.inner.geometry as *const _ as *const GlyphGeometry) }
     }
 
+    #[inline]
     pub fn geometry_mut(&mut self) -> &mut GlyphGeometry {
         unsafe { &mut *(&mut self.inner.geometry as *mut _ as *mut GlyphGeometry) }
     }
