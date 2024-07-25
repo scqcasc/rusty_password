@@ -13,8 +13,11 @@ Options:
   -h, --help             Print help
   -V, --version          Print version
 ```
+The "--simple" option removes some characters that can cause issues with some password validator tools.
 
 TODO:
 - [ ] Increase the font size of the password
 - [ ] Add button to generate a new password
 - [ ] Auto-add the generated password to the clipboard
+- [ ] Add GUI option to alter password length
+- [ ] Add GUI option for simple vs complex passwords
