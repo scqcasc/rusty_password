@@ -10,7 +10,6 @@
 
 use crate::{CryptoRng, Error, RngCore, SeedableRng};
 
-#[cfg(any(test, feature = "getrandom"))]
 pub(crate) use rand_chacha::ChaCha12Core as Core;
 
 use rand_chacha::ChaCha12Rng as Rng;
@@ -57,8 +56,7 @@ impl RngCore for StdRng {
 }
 
 impl SeedableRng for StdRng {
-    // Fix to 256 bits. Changing this is a breaking change!
-    type Seed = [u8; 32];
+    type Seed = <Rng as SeedableRng>::Seed;
 
     #[inline(always)]
     fn from_seed(seed: Self::Seed) -> Self {

@@ -108,11 +108,17 @@ pub mod hidden_export {
     pub use super::float::IntoFloat; // used by rand_distr
 }
 pub mod uniform;
+#[deprecated(
+    since = "0.8.0",
+    note = "use rand::distributions::{WeightedIndex, WeightedError} instead"
+)]
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+pub mod weighted;
 
 pub use self::bernoulli::{Bernoulli, BernoulliError};
 pub use self::distribution::{Distribution, DistIter, DistMap};
 #[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::distribution::DistString;
 pub use self::float::{Open01, OpenClosed01};
 pub use self::other::Alphanumeric;
@@ -120,7 +126,7 @@ pub use self::slice::Slice;
 #[doc(inline)]
 pub use self::uniform::Uniform;
 #[cfg(feature = "alloc")]
-pub use self::weighted_index::{Weight, WeightError, WeightedIndex};
+pub use self::weighted_index::{WeightedError, WeightedIndex};
 
 #[allow(unused)]
 use crate::Rng;
@@ -143,22 +149,18 @@ use crate::Rng;
 /// * `bool`: Generates `false` or `true`, each with probability 0.5.
 /// * Floating point types (`f32` and `f64`): Uniformly distributed in the
 ///   half-open range `[0, 1)`. See notes below.
-/// * Wrapping integers ([`Wrapping<T>`]), besides the type identical to their
+/// * Wrapping integers (`Wrapping<T>`), besides the type identical to their
 ///   normal integer variants.
-/// * Non-zero integers ([`NonZeroU8`]), which are like their normal integer
-///   variants but cannot produce zero.
-/// * SIMD types like x86's [`__m128i`], `std::simd`'s [`u32x4`]/[`f32x4`]/
-///   [`mask32x4`] (requires [`simd_support`]), where each lane is distributed
-///   like their scalar `Standard` variants. See the list of `Standard`
-///   implementations for more.
 ///
 /// The `Standard` distribution also supports generation of the following
 /// compound types where all component types are supported:
 ///
 /// *   Tuples (up to 12 elements): each element is generated sequentially.
-/// *   Arrays: each element is generated sequentially;
+/// *   Arrays (up to 32 elements): each element is generated sequentially;
 ///     see also [`Rng::fill`] which supports arbitrary array length for integer
 ///     and float types and tends to be faster for `u32` and smaller types.
+///     When using `rustc` ≥ 1.51, enable the `min_const_gen` feature to support
+///     arrays larger than 32 elements.
 ///     Note that [`Rng::fill`] and `Standard`'s array support are *not* equivalent:
 ///     the former is optimised for integer types (using fewer RNG calls for
 ///     element types smaller than the RNG word size), while the latter supports
@@ -211,13 +213,6 @@ use crate::Rng;
 /// CPUs all methods have approximately equal performance).
 ///
 /// [`Uniform`]: uniform::Uniform
-/// [`Wrapping<T>`]: std::num::Wrapping
-/// [`NonZeroU8`]: std::num::NonZeroU8
-/// [`__m128i`]: https://doc.rust-lang.org/core/arch/x86/struct.__m128i.html
-/// [`u32x4`]: std::simd::u32x4
-/// [`f32x4`]: std::simd::f32x4
-/// [`mask32x4`]: std::simd::mask32x4
-/// [`simd_support`]: https://github.com/rust-random/rand#crate-features
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Standard;

@@ -13,7 +13,7 @@
 
 use self::core::fmt;
 use crate::guts::ChaCha;
-use rand_core::block::{BlockRng, BlockRngCore, CryptoBlockRng};
+use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
 
 #[cfg(feature = "serde1")] use serde::{Serialize, Deserialize, Serializer, Deserializer};
@@ -87,7 +87,13 @@ macro_rules! chacha_impl {
             type Results = Array64<u32>;
             #[inline]
             fn generate(&mut self, r: &mut Self::Results) {
-                self.state.refill4($rounds, &mut r.0);
+                // Fill slice of words by writing to equivalent slice of bytes, then fixing endianness.
+                self.state.refill4($rounds, unsafe {
+                    &mut *(&mut *r as *mut Array64<u32> as *mut [u8; 256])
+                });
+                for x in r.as_mut() {
+                    *x = x.to_le();
+                }
             }
         }
 
@@ -99,7 +105,7 @@ macro_rules! chacha_impl {
             }
         }
 
-        impl CryptoBlockRng for $ChaChaXCore {}
+        impl CryptoRng for $ChaChaXCore {}
 
         /// A cryptographically secure random number generator that uses the ChaCha algorithm.
         ///
@@ -176,7 +182,7 @@ macro_rules! chacha_impl {
 
         impl $ChaChaXRng {
             // The buffer is a 4-block window, i.e. it is always at a block-aligned position in the
-            // stream but if the stream has been sought it may not be self-aligned.
+            // stream but if the stream has been seeked it may not be self-aligned.
 
             /// Get the offset from the start of the stream, in 32-bit words.
             ///
@@ -622,16 +628,5 @@ mod test {
         assert_eq!(rng.get_word_pos(), 0);
         rng.set_word_pos(0);
         assert_eq!(rng.get_word_pos(), 0);
-    }
-
-    #[test]
-    fn test_trait_objects() {
-        use rand_core::CryptoRng;
-
-        let mut rng1 = ChaChaRng::from_seed(Default::default());
-        let rng2 = &mut rng1.clone() as &mut dyn CryptoRng;
-        for _ in 0..1000 {
-            assert_eq!(rng1.next_u64(), rng2.next_u64());
-        }
     }
 }

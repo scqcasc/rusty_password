@@ -64,7 +64,7 @@ pub trait Distribution<T> {
     ///     .collect();
     ///
     /// // Dice-rolling:
-    /// let die_range = Uniform::new_inclusive(1, 6).unwrap();
+    /// let die_range = Uniform::new_inclusive(1, 6);
     /// let mut roll_die = die_range.sample_iter(&mut rng);
     /// while roll_die.next().unwrap() != 6 {
     ///     println!("Not a 6; rolling again!");
@@ -93,7 +93,7 @@ pub trait Distribution<T> {
     ///
     /// let mut rng = thread_rng();
     ///
-    /// let die = Uniform::new_inclusive(1, 6).unwrap();
+    /// let die = Uniform::new_inclusive(1, 6);
     /// let even_number = die.map(|num| num % 2 == 0);
     /// while !even_number.sample(&mut rng) {
     ///     println!("Still odd; rolling again!");
@@ -112,7 +112,7 @@ pub trait Distribution<T> {
     }
 }
 
-impl<'a, T, D: Distribution<T> + ?Sized> Distribution<T> for &'a D {
+impl<'a, T, D: Distribution<T>> Distribution<T> for &'a D {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
         (*self).sample(rng)
     }
@@ -159,6 +159,14 @@ where
 {
 }
 
+#[cfg(features = "nightly")]
+impl<D, R, T> iter::TrustedLen for DistIter<D, R, T>
+where
+    D: Distribution<T>,
+    R: Rng,
+{
+}
+
 /// A distribution of values of type `S` derived from the distribution `D`
 /// by mapping its output of type `T` through the closure `F`.
 ///
@@ -186,7 +194,6 @@ where
 /// Sampling a `String` of random characters is not quite the same as collecting
 /// a sequence of chars. This trait contains some helpers.
 #[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub trait DistString {
     /// Append `len` random chars to `string`
     fn append_string<R: Rng + ?Sized>(&self, rng: &mut R, string: &mut String, len: usize);
@@ -220,7 +227,7 @@ mod tests {
 
     #[test]
     fn test_distributions_map() {
-        let dist = Uniform::new_inclusive(0, 5).unwrap().map(|val| val + 15);
+        let dist = Uniform::new_inclusive(0, 5).map(|val| val + 15);
 
         let mut rng = crate::test::rng(212);
         let val = dist.sample(&mut rng);
@@ -233,7 +240,6 @@ mod tests {
             rng: &mut R,
         ) -> impl Iterator<Item = i32> + '_ {
             Uniform::new_inclusive(1, 6)
-                .unwrap()
                 .sample_iter(rng)
                 .filter(|x| *x != 5)
                 .take(10)

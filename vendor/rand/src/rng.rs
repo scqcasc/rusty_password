@@ -53,7 +53,7 @@ use core::{mem, slice};
 /// # let v = foo(&mut thread_rng());
 /// ```
 pub trait Rng: RngCore {
-    /// Return a random value via the [`Standard`] distribution.
+    /// Return a random value supporting the [`Standard`] distribution.
     ///
     /// # Example
     ///
@@ -68,9 +68,11 @@ pub trait Rng: RngCore {
     ///
     /// # Arrays and tuples
     ///
-    /// The `rng.gen()` method is able to generate arrays
+    /// The `rng.gen()` method is able to generate arrays (up to 32 elements)
     /// and tuples (up to 12 elements), so long as all element types can be
     /// generated.
+    /// When using `rustc` ≥ 1.51, enable the `min_const_gen` feature to support
+    /// arrays larger than 32 elements.
     ///
     /// For arrays of integers, especially for those with small element types
     /// (< 64 bit), it will likely be faster to instead use [`Rng::fill`].
@@ -103,7 +105,7 @@ pub trait Rng: RngCore {
     ///
     /// # Panics
     ///
-    /// Panics if the range is empty, or if `high - low` overflows for floats.
+    /// Panics if the range is empty.
     ///
     /// # Example
     ///
@@ -130,33 +132,7 @@ pub trait Rng: RngCore {
         R: SampleRange<T>
     {
         assert!(!range.is_empty(), "cannot sample empty range");
-        range.sample_single(self).unwrap()
-    }
-
-    /// Generate values via an iterator
-    ///
-    /// This is a just a wrapper over [`Rng::sample_iter`] using
-    /// [`distributions::Standard`].
-    ///
-    /// Note: this method consumes its argument. Use
-    /// `(&mut rng).gen_iter()` to avoid consuming the RNG.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rand::{rngs::mock::StepRng, Rng};
-    ///
-    /// let rng = StepRng::new(1, 1);
-    /// let v: Vec<i32> = rng.gen_iter().take(5).collect();
-    /// assert_eq!(&v, &[1, 2, 3, 4, 5]);
-    /// ```
-    #[inline]
-    fn gen_iter<T>(self) -> distributions::DistIter<Standard, Self, T>
-    where
-        Self: Sized,
-        Standard: Distribution<T>,
-    {
-        Standard.sample_iter(self)
+        range.sample_single(self)
     }
 
     /// Sample a new value, using the given distribution.
@@ -168,10 +144,10 @@ pub trait Rng: RngCore {
     /// use rand::distributions::Uniform;
     ///
     /// let mut rng = thread_rng();
-    /// let x = rng.sample(Uniform::new(10u32, 15).unwrap());
+    /// let x = rng.sample(Uniform::new(10u32, 15));
     /// // Type annotation requires two types, the type and distribution; the
     /// // distribution can be inferred.
-    /// let y = rng.sample::<u16, _>(Uniform::new(10, 15).unwrap());
+    /// let y = rng.sample::<u16, _>(Uniform::new(10, 15));
     /// ```
     fn sample<T, D: Distribution<T>>(&mut self, distr: D) -> T {
         distr.sample(self)
@@ -179,8 +155,11 @@ pub trait Rng: RngCore {
 
     /// Create an iterator that generates values using the given distribution.
     ///
-    /// Note: this method consumes its arguments. Use
-    /// `(&mut rng).sample_iter(..)` to avoid consuming the RNG.
+    /// Note that this function takes its arguments by value. This works since
+    /// `(&mut R): Rng where R: Rng` and
+    /// `(&D): Distribution where D: Distribution`,
+    /// however borrowing is not automatic hence `rng.sample_iter(...)` may
+    /// need to be replaced with `(&mut rng).sample_iter(...)`.
     ///
     /// # Example
     ///
@@ -204,7 +183,7 @@ pub trait Rng: RngCore {
     ///                              .collect::<Vec<(f64, bool)>>());
     ///
     /// // Dice-rolling:
-    /// let die_range = Uniform::new_inclusive(1, 6).unwrap();
+    /// let die_range = Uniform::new_inclusive(1, 6);
     /// let mut roll_die = (&mut rng).sample_iter(die_range);
     /// while roll_die.next().unwrap() != 6 {
     ///     println!("Not a 6; rolling again!");
@@ -373,7 +352,7 @@ macro_rules! impl_fill {
                     rng.try_fill_bytes(unsafe {
                         slice::from_raw_parts_mut(self.as_mut_ptr()
                             as *mut u8,
-                            mem::size_of_val(self)
+                            self.len() * mem::size_of::<$t>()
                         )
                     })?;
                     for x in self {
@@ -413,6 +392,8 @@ macro_rules! impl_fill {
 impl_fill!(u16, u32, u64, usize, u128,);
 impl_fill!(i8, i16, i32, i64, isize, i128,);
 
+#[cfg_attr(doc_cfg, doc(cfg(feature = "min_const_gen")))]
+#[cfg(feature = "min_const_gen")]
 impl<T, const N: usize> Fill for [T; N]
 where [T]: Fill
 {
@@ -420,6 +401,32 @@ where [T]: Fill
         self[..].try_fill(rng)
     }
 }
+
+#[cfg(not(feature = "min_const_gen"))]
+macro_rules! impl_fill_arrays {
+    ($n:expr,) => {};
+    ($n:expr, $N:ident) => {
+        impl<T> Fill for [T; $n] where [T]: Fill {
+            fn try_fill<R: Rng + ?Sized>(&mut self, rng: &mut R) -> Result<(), Error> {
+                self[..].try_fill(rng)
+            }
+        }
+    };
+    ($n:expr, $N:ident, $($NN:ident,)*) => {
+        impl_fill_arrays!($n, $N);
+        impl_fill_arrays!($n - 1, $($NN,)*);
+    };
+    (!div $n:expr,) => {};
+    (!div $n:expr, $N:ident, $($NN:ident,)*) => {
+        impl_fill_arrays!($n, $N);
+        impl_fill_arrays!(!div $n / 2, $($NN,)*);
+    };
+}
+#[cfg(not(feature = "min_const_gen"))]
+#[rustfmt::skip]
+impl_fill_arrays!(32, N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,);
+#[cfg(not(feature = "min_const_gen"))]
+impl_fill_arrays!(!div 4096, N,N,N,N,N,N,N,);
 
 #[cfg(test)]
 mod test {

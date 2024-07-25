@@ -43,7 +43,7 @@
 //!     }
 //! }
 //!
-//! // optionally, also implement CryptoBlockRng for MyRngCore
+//! // optionally, also implement CryptoRng for MyRngCore
 //!
 //! // Final RNG.
 //! let mut rng = BlockRng::<MyRngCore>::seed_from_u64(0);
@@ -54,7 +54,8 @@
 //! [`fill_bytes`]: RngCore::fill_bytes
 
 use crate::impls::{fill_via_u32_chunks, fill_via_u64_chunks};
-use crate::{Error, CryptoRng, RngCore, SeedableRng};
+use crate::{CryptoRng, Error, RngCore, SeedableRng};
+use core::convert::AsRef;
 use core::fmt;
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
@@ -75,12 +76,6 @@ pub trait BlockRngCore {
     /// Generate a new block of results.
     fn generate(&mut self, results: &mut Self::Results);
 }
-
-/// A marker trait used to indicate that an [`RngCore`] implementation is
-/// supposed to be cryptographically secure.
-///
-/// See [`CryptoRng`] docs for more information.
-pub trait CryptoBlockRng: BlockRngCore { }
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
 /// [`BlockRngCore`] with `u32` array buffer; i.e. this can be used to implement
@@ -183,7 +178,10 @@ impl<R: BlockRngCore> BlockRng<R> {
     }
 }
 
-impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
+impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R>
+where
+    <R as BlockRngCore>::Results: AsRef<[u32]> + AsMut<[u32]>,
+{
     #[inline]
     fn next_u32(&mut self) -> u32 {
         if self.index >= self.results.as_ref().len() {
@@ -228,7 +226,7 @@ impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
                 self.generate_and_set(0);
             }
             let (consumed_u32, filled_u8) =
-                fill_via_u32_chunks(&mut self.results.as_mut()[self.index..], &mut dest[read_len..]);
+                fill_via_u32_chunks(&self.results.as_ref()[self.index..], &mut dest[read_len..]);
 
             self.index += consumed_u32;
             read_len += filled_u8;
@@ -260,8 +258,6 @@ impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng<R> {
         Ok(Self::new(R::from_rng(rng)?))
     }
 }
-
-impl<R: CryptoBlockRng + BlockRngCore<Item = u32>> CryptoRng for BlockRng<R> {}
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
 /// [`BlockRngCore`] with `u64` array buffer; i.e. this can be used to implement
@@ -350,7 +346,10 @@ impl<R: BlockRngCore> BlockRng64<R> {
     }
 }
 
-impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R> {
+impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R>
+where
+    <R as BlockRngCore>::Results: AsRef<[u64]> + AsMut<[u64]>,
+{
     #[inline]
     fn next_u32(&mut self) -> u32 {
         let mut index = self.index - self.half_used as usize;
@@ -388,13 +387,13 @@ impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R> {
         let mut read_len = 0;
         self.half_used = false;
         while read_len < dest.len() {
-            if self.index >= self.results.as_ref().len() {
+            if self.index as usize >= self.results.as_ref().len() {
                 self.core.generate(&mut self.results);
                 self.index = 0;
             }
 
             let (consumed_u64, filled_u8) = fill_via_u64_chunks(
-                &mut self.results.as_mut()[self.index..],
+                &self.results.as_ref()[self.index as usize..],
                 &mut dest[read_len..],
             );
 
@@ -429,7 +428,7 @@ impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng64<R> {
     }
 }
 
-impl<R: CryptoBlockRng + BlockRngCore<Item = u64>> CryptoRng for BlockRng64<R> {}
+impl<R: BlockRngCore + CryptoRng> CryptoRng for BlockRng<R> {}
 
 #[cfg(test)]
 mod test {
@@ -469,20 +468,20 @@ mod test {
         let mut rng3 = rng1.clone();
 
         let mut a = [0; 16];
-        a[..4].copy_from_slice(&rng1.next_u32().to_le_bytes());
-        a[4..12].copy_from_slice(&rng1.next_u64().to_le_bytes());
-        a[12..].copy_from_slice(&rng1.next_u32().to_le_bytes());
+        (&mut a[..4]).copy_from_slice(&rng1.next_u32().to_le_bytes());
+        (&mut a[4..12]).copy_from_slice(&rng1.next_u64().to_le_bytes());
+        (&mut a[12..]).copy_from_slice(&rng1.next_u32().to_le_bytes());
 
         let mut b = [0; 16];
-        b[..4].copy_from_slice(&rng2.next_u32().to_le_bytes());
-        b[4..8].copy_from_slice(&rng2.next_u32().to_le_bytes());
-        b[8..].copy_from_slice(&rng2.next_u64().to_le_bytes());
+        (&mut b[..4]).copy_from_slice(&rng2.next_u32().to_le_bytes());
+        (&mut b[4..8]).copy_from_slice(&rng2.next_u32().to_le_bytes());
+        (&mut b[8..]).copy_from_slice(&rng2.next_u64().to_le_bytes());
         assert_eq!(a, b);
 
         let mut c = [0; 16];
-        c[..8].copy_from_slice(&rng3.next_u64().to_le_bytes());
-        c[8..12].copy_from_slice(&rng3.next_u32().to_le_bytes());
-        c[12..].copy_from_slice(&rng3.next_u32().to_le_bytes());
+        (&mut c[..8]).copy_from_slice(&rng3.next_u64().to_le_bytes());
+        (&mut c[8..12]).copy_from_slice(&rng3.next_u32().to_le_bytes());
+        (&mut c[12..]).copy_from_slice(&rng3.next_u32().to_le_bytes());
         assert_eq!(a, c);
     }
 
@@ -519,22 +518,22 @@ mod test {
         let mut rng3 = rng1.clone();
 
         let mut a = [0; 16];
-        a[..4].copy_from_slice(&rng1.next_u32().to_le_bytes());
-        a[4..12].copy_from_slice(&rng1.next_u64().to_le_bytes());
-        a[12..].copy_from_slice(&rng1.next_u32().to_le_bytes());
+        (&mut a[..4]).copy_from_slice(&rng1.next_u32().to_le_bytes());
+        (&mut a[4..12]).copy_from_slice(&rng1.next_u64().to_le_bytes());
+        (&mut a[12..]).copy_from_slice(&rng1.next_u32().to_le_bytes());
 
         let mut b = [0; 16];
-        b[..4].copy_from_slice(&rng2.next_u32().to_le_bytes());
-        b[4..8].copy_from_slice(&rng2.next_u32().to_le_bytes());
-        b[8..].copy_from_slice(&rng2.next_u64().to_le_bytes());
+        (&mut b[..4]).copy_from_slice(&rng2.next_u32().to_le_bytes());
+        (&mut b[4..8]).copy_from_slice(&rng2.next_u32().to_le_bytes());
+        (&mut b[8..]).copy_from_slice(&rng2.next_u64().to_le_bytes());
         assert_ne!(a, b);
         assert_eq!(&a[..4], &b[..4]);
         assert_eq!(&a[4..12], &b[8..]);
 
         let mut c = [0; 16];
-        c[..8].copy_from_slice(&rng3.next_u64().to_le_bytes());
-        c[8..12].copy_from_slice(&rng3.next_u32().to_le_bytes());
-        c[12..].copy_from_slice(&rng3.next_u32().to_le_bytes());
+        (&mut c[..8]).copy_from_slice(&rng3.next_u64().to_le_bytes());
+        (&mut c[8..12]).copy_from_slice(&rng3.next_u32().to_le_bytes());
+        (&mut c[12..]).copy_from_slice(&rng3.next_u32().to_le_bytes());
         assert_eq!(b, c);
     }
 }
