@@ -1,16 +1,16 @@
+// Thanks to https://github.com/pjmlp/gwc-rs/ for showing the way forward with the GUI
+
+
 extern crate gtk;
 
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
-    ToolbarStyle, SeparatorToolItem, FileChooserDialog, FileChooserAction, ResponseType,
-    MessageDialog, MessageType, ButtonsType, DialogFlags};
+    ToolbarStyle, SeparatorToolItem, FileChooserDialog, FileChooserAction, ResponseType};
 use clap::Parser;
 use std::rc::Rc;
 use std::borrow::Borrow;
 mod password;
 
-
-const APP_ID: &str = "org.scq.Rusty_Password";
 
 ///Set up cli arg
 #[derive(Parser, Debug)]
@@ -50,11 +50,15 @@ impl GWCApp {
     pub fn init(&mut self) {
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         let password = Label::new(Some(password::get_password(true, 15).as_str()));
+        password.set_selectable(true);
+        password.set_focus_on_click(true);
+        
+        
         
         let win = Window::new(WindowType::Toplevel);
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
-        win.set_size_request(250, 600);
+        win.set_size_request(500, 400);
 
         win.connect_delete_event(|_, _| {
             gtk::main_quit();
@@ -98,7 +102,7 @@ impl GWCApp {
 
     ///  Called when the user selects the
     /// File->Open option
-    fn on_menu_open(win:&Rc<Window>, lbl : &Rc<Label>) {
+    fn on_menu_open(win:&Rc<Window>, _lbl : &Rc<Label>) {
         let filesel = FileChooserDialog::new(Some("Choose a file"), Some(win.as_ref()),
                                                     FileChooserAction::Open);
         filesel.add_buttons(&[
@@ -108,7 +112,7 @@ impl GWCApp {
 
         filesel.set_select_multiple(true);
         filesel.run();
-        let file = filesel.filename();
+        let _file = filesel.filename();
         filesel.close();
 
     }
