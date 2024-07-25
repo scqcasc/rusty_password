@@ -51,9 +51,12 @@ impl GWCApp {
     /// Responsible for initializing the application state, including the whole UI
     pub fn init(&mut self) {
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
-        let password = Label::new(Some(password::get_password(true, 15).as_str()));
+        let pass_str: String = password::get_password(true, 15);
+        let password = Label::new(None);
+        let pass_mu = format!("<span size='16pt'>{}</span>",&pass_str);
         password.set_selectable(true);
         password.set_focus_on_click(true);
+        password.set_markup(pass_mu.as_str());
         
         
         
