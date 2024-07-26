@@ -43,10 +43,24 @@ pub enum PasswordType {
     Complex,
 }
 
+enum PasswordContents<'a> {
+    Lc(&'a str),
+    Uc(&'a str),
+    Num(&'a str),
+    Sc(&'a str),
+    Scext(&'a str),
+}
+
+pub fn set_pw_contents(pw_contents: PasswordContents) {
+    match pw_contents {
+        PasswordContents::Lc("abcdefghijklmnopqrstuvwxyz"),
+        PasswordContents::Uc("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+        
+    }
+}
 pub struct Password {
     pub password_type: PasswordType,
     pub password_length: i32,
-
 }
 
 impl Password {
