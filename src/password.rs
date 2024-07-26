@@ -1,14 +1,24 @@
 use rand::Rng;
 
+use crate::main;
+
 fn get_charset(simple: bool) -> String {
+    let mut main_string: String = String::from("");
+    let lc: &str = "abcdefghijklmnopqrstuvwxyz";
+    let uc: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let num: &str = "0123456789";
+    let sc: &str= "!+=%#*";
+    let scext: &str = "@!~{}[]()^";
+    main_string.push_str(lc);
+    main_string.push_str(uc);
+    main_string.push_str(num);
+    main_string.push_str(sc);
+
     if simple {
-        return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-            abcdefghijklmnopqrstuvwxyz\
-            0123456789!+=%#*");
+        return main_string;
     } else {
-        return String::from("ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-            abcdefghijklmnopqrstuvwxyz\
-            0123456789)(*^%$#@!~{}[]+=");
+        main_string.push_str(scext);
+        return main_string;
     }
 }
 
