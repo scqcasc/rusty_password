@@ -1,7 +1,5 @@
 use rand::Rng;
 
-use crate::main;
-
 fn get_charset(simple: bool) -> String {
     let mut main_string: String = String::from("");
     let lc: &str = "abcdefghijklmnopqrstuvwxyz";
