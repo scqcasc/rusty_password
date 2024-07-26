@@ -50,7 +50,11 @@ impl GWCApp {
 
     
     pub fn set_password(&self, password: &Label) {
-        let pass_str: String = password::get_password(true, 15);
+        let p = password::Password {
+            password_type: password::PasswordType::Complex,
+            password_length: 15,
+        };
+        let pass_str: String = p.get_a_password();
         let pass_mu = format!("<span size='16pt'>{}</span>",&pass_str);
         password.set_selectable(true);
         password.set_focus_on_click(true);
@@ -252,7 +256,17 @@ fn main() {
     
         gtk::main();
     }else{
-        let my_password = password::get_password(args.simple, args.length);
+        let p = password::Password {
+            password_type: {
+                if args.simple {
+                    password::PasswordType::Simple
+                } else {
+                    password::PasswordType::Complex
+                }
+            },
+            password_length: args.length,
+        };
+        let my_password: String = p.get_a_password();
         println!("{:?}", my_password);
     }
     
