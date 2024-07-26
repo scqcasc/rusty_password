@@ -1,3 +1,41 @@
+// change this to a more OO model.  
+// enum Password that impliments methods to generate the password and
+// ensure one of each type is included
+// Doing something like
+//fn check_is_in(letter: char, sub_list: &str) -> bool {
+//    if sub_list.contains(letter) {
+//        println!("{letter} found");
+//        return true;
+//    }
+//    return false;
+//}
+//fn main() {
+//    let mut main_binding: String = String::from("");
+//    let binding: &str = "abc";
+//    let binding2: &str = "ABC";
+//    
+//    main_binding.push_str(binding);
+//    main_binding.push_str(binding2);
+//    
+//    let password: String = String::from("aBd");
+//    
+//    for l in password.chars() {
+//        if check_is_in(l, binding) {
+//            break;
+//        }
+//        
+//    }
+//    
+//    for l in password.chars() {
+//        if check_is_in(l, binding2) {
+//            break;
+//        }
+//    }
+//}
+
+
+
+
 use rand::Rng;
 
 fn get_charset(simple: bool) -> String {
