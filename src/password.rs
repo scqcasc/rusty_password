@@ -43,20 +43,24 @@ pub enum PasswordType {
     Complex,
 }
 
-enum PasswordContents<'a> {
-    Lc(&'a str),
-    Uc(&'a str),
-    Num(&'a str),
-    Sc(&'a str),
-    Scext(&'a str),
+enum PasswordContents {
+    Lc,
+    Uc,
+    Num,
+    Sc,
+    Scext,
+}
+impl PasswordContents {
+    fn value(&self) -> &str {
+        match *self {
+            PasswordContents::Lc => "abcdefghijklmnopqrstuvwxyz",
+            PasswordContents::Uc => "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            PasswordContents::Num => "0123456789",
+            PasswordContents::Sc => "!+=%#*",
+            PasswordContents::Scext => "@!~{}[]()^",
+    }
 }
 
-pub fn set_pw_contents(pw_contents: PasswordContents) {
-    match pw_contents {
-        PasswordContents::Lc("abcdefghijklmnopqrstuvwxyz"),
-        PasswordContents::Uc("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-        
-    }
 }
 pub struct Password {
     pub password_type: PasswordType,
@@ -95,21 +99,16 @@ impl Password {
 
 
     fn get_charset(&self, simple: bool) -> String {
-        let mut main_string: String = String::from("");
-        let lc: &str = "abcdefghijklmnopqrstuvwxyz";
-        let uc: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let num: &str = "0123456789";
-        let sc: &str= "!+=%#*";
-        let scext: &str = "@!~{}[]()^";
-        main_string.push_str(lc);
-        main_string.push_str(uc);
-        main_string.push_str(num);
-        main_string.push_str(sc);
+        let mut main_string: String = String::from("");        
+        main_string.push_str(PasswordContents::value(&PasswordContents::Lc));
+        main_string.push_str(PasswordContents::value(&PasswordContents::Uc));
+        main_string.push_str(PasswordContents::value(&PasswordContents::Num));
+        main_string.push_str(PasswordContents::value(&PasswordContents::Sc));
     
         if simple {
             return main_string;
         } else {
-            main_string.push_str(scext);
+            main_string.push_str(PasswordContents::value(&PasswordContents::Scext));
             return main_string;
         }
     }
