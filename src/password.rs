@@ -2,12 +2,7 @@
 // enum Password that impliments methods to generate the password and
 // ensure one of each type is included
 // Doing something like
-//fn check_is_in(letter: char, sub_list: &str) -> bool {
-//    if sub_list.contains(letter) {
-//        println!("{letter} found");
-//        return true;
-//    }
-//    return false;
+
 //}
 //fn main() {
 //    let mut main_binding: String = String::from("");
@@ -68,6 +63,14 @@ pub struct Password {
 }
 
 impl Password {
+    fn check_in_list(&self,letter: char, sub_list: &str) -> bool {
+        if sub_list.contains(letter) {
+            println!("{letter} found");
+            return true;
+        }
+        return false;
+    }
+
     pub fn get_a_password(&self) -> String {
         match self.password_type { 
             PasswordType::Complex => {
@@ -88,6 +91,7 @@ impl Password {
         let password_len = length;
         let mut rng = rand::thread_rng();
     
+        // do a loop here checking to make sure all the types have a char in
         let password: String = (0..password_len)
             .map(|_| {
                 let idx = rng.gen_range(0..charset.len());
