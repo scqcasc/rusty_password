@@ -49,16 +49,16 @@ impl GWCApp {
     }
 
     
-    pub fn set_password(&self, password: &Label) {
+    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>) {
         let p = password::Password {
             password_type: password::PasswordType::Complex,
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
         let pass_mu = format!("<span size='16pt'>{}</span>",&pass_str);
-        password.set_selectable(true);
-        password.set_focus_on_click(true);
-        password.set_markup(pass_mu.as_str());
+        lbl.set_selectable(true);
+        lbl.set_focus_on_click(true);
+        lbl.set_markup(pass_mu.as_str());
     }
 
     /// Responsible for initializing the application state, including the whole UI
@@ -66,7 +66,7 @@ impl GWCApp {
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         let  password = Label::new(None);
         
-        self.set_password(&password);
+        
         let win = Window::new(WindowType::Toplevel);
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
@@ -81,7 +81,7 @@ impl GWCApp {
         // The fields must be updated for the helper methods to work as expected.
         self.window = Some(Rc::new(win));
         self.passwd_label = Some(Rc::new(password));
-        
+        GWCApp::set_password(&self.window.clone().unwrap(), &self.passwd_label.clone().unwrap());
 
         // create the application menu
         let menu_bar = self.init_menus();
@@ -150,7 +150,6 @@ impl GWCApp {
         pass_box.pack_start(&new_passwd_label, false, true, 0);
         new_passwd.add(&pass_box);
 
-
         file_box.pack_start(&file_image, false, false, 0);
         file_box.pack_start(&file_label, true, true, 0);
         file_item.add(&file_box);
@@ -175,8 +174,8 @@ impl GWCApp {
                 let w = win.to_owned().clone();
                 let l = label.clone();
 
-                file_item.connect_activate(move |_| {
-                    GWCApp::on_menu_open(&w, &l);
+                new_passwd.connect_activate(move |_| {
+                    GWCApp::set_password(&w, &l);
                 });
             }
         }
