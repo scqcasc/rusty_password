@@ -63,11 +63,14 @@ pub struct Password {
 }
 
 impl Password {
-    fn check_in_list(&self,letter: char, sub_list: &str) -> bool {
-        if sub_list.contains(letter) {
-            println!("{letter} found");
-            return true;
+    fn check_in_list(&self, password: &String, sub_list: &PasswordContents) -> bool {
+        let list = sub_list.value();
+        for l in password.chars() {
+            if list.contains(l) {
+                return true;
+            }
         }
+        
         return false;
     }
 
@@ -75,30 +78,46 @@ impl Password {
         match self.password_type { 
             PasswordType::Complex => {
                 let my_pass = self.get_password(false, self.password_length);
-                return my_pass;
+                return my_pass.unwrap();
             },
             PasswordType::Simple => {
                 let my_pass = self.get_password(true, self.password_length);
-                return my_pass;
+                return my_pass.unwrap();
             }
     }
 }
 
-    pub fn get_password(&self, simple: bool, length: i32) -> String {
+    pub fn get_password(&self, simple: bool, length: i32) -> Option<String> {
         let binding = self.get_charset(simple);
         let charset: &[u8] = binding.as_bytes();
         
         let password_len = length;
         let mut rng = rand::thread_rng();
-    
+        
+        
+        
+        let checks = [PasswordContents::Lc, PasswordContents::Uc, PasswordContents::Num, PasswordContents::Sc];
         // do a loop here checking to make sure all the types have a char in
-        let password: String = (0..password_len)
+        loop {
+            let password: String = (0..password_len)
             .map(|_| {
                 let idx = rng.gen_range(0..charset.len());
                 charset[idx] as char
             })
             .collect();
-            return password;
+            'inner_loop: loop {
+                for i in 0..checks.len() {
+                    let value = self.check_in_list(&password, &checks[i]);
+                    let ready = value;
+                    if ready == false {
+                        break 'inner_loop;
+                    }
+                };
+                return Some(password.clone());
+            };
+           
+        };
+        
     }
 
 
