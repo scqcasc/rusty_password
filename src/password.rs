@@ -56,8 +56,8 @@ impl PasswordContents {
             PasswordContents::Lc => "abcdefghijklmnopqrstuvwxyz",
             PasswordContents::Uc => "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
             PasswordContents::Num => "0123456789",
-            PasswordContents::Sc => "!+=%#*",
-            PasswordContents::Scext => "@!~{}[]()^",
+            PasswordContents::Sc => "!+=%#*@^",
+            PasswordContents::Scext => "~{}[]()",
     }
 }
 
