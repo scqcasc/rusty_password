@@ -48,7 +48,6 @@ impl GWCApp {
         GWCApp { passwd_label: None, window: None }
     }
 
-    
     pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>) {
         let p = password::Password {
             password_type: password::PasswordType::Complex,
@@ -69,7 +68,6 @@ impl GWCApp {
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
         win.set_size_request(500, 400);
-
         win.connect_delete_event(|_, _| {
             gtk::main_quit();
             Propagation::Stop  
@@ -96,8 +94,6 @@ impl GWCApp {
         if let Some (ref w) = self.window {
             w.add(&v_box);
         }
-
-
     }
 
     /// Displays the application window
@@ -118,11 +114,8 @@ impl GWCApp {
         let new_passwd: MenuItem = MenuItem::new();
         let new_passwd_label: Label = Label::new(Some("New Password"));
         let pass_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-
         pass_box.pack_start(&new_passwd_label, false, true, 0);
         new_passwd.add(&pass_box);
-
-        // menu.append(&file_item);
         menu.append(&new_passwd);
         menu.append(&quit);
         file.set_submenu(Some(&menu));
@@ -132,7 +125,6 @@ impl GWCApp {
         let help_menu = Menu::new();
         let help = MenuItem::with_label("Help");
         let about = MenuItem::with_label("About");
-
         help_menu.append(&about);
         help.set_submenu(Some(&help_menu));
         menu_bar.append(&help);
