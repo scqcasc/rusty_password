@@ -6,7 +6,7 @@ extern crate gtk;
 use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
-    ToolbarStyle, SeparatorToolItem, FileChooserDialog, FileChooserAction, ResponseType};
+    ToolbarStyle, SeparatorToolItem};
 use clap::Parser;
 use std::rc::Rc;
 use std::borrow::Borrow;
@@ -113,25 +113,6 @@ impl GWCApp {
         }
     }
 
-    ///  Called when the user selects the
-    /// File->Open option
-    fn on_menu_open(win:&Rc<Window>, _lbl : &Rc<Label>) {
-        let filesel = FileChooserDialog::new(Some("Choose a file"), Some(win.as_ref()),
-                                                    FileChooserAction::Open);
-        filesel.add_buttons(&[
-            ("Open", ResponseType::Ok.into()),
-            ("Cancel", ResponseType::Cancel.into())
-        ]);
-
-        filesel.set_select_multiple(true);
-        filesel.run();
-        let _file = filesel.filename();
-        filesel.close();
-
-    }
-
-
-
     /// Creates the application menus
     fn init_menus (&self) -> MenuBar {
         let menu = Menu::new();
@@ -212,9 +193,9 @@ impl GWCApp {
         let toolbar = Toolbar::new();
         toolbar.set_style(ToolbarStyle::Both);
 
-        // let open_btn_image = Image::from_icon_name(Some("document-open"), IconSize::LargeToolbar.into());
-        // let open_btn = ToolButton::new(Some(&open_btn_image), Some("Open"));
-        // toolbar.insert(&open_btn, 0);
+        let new_pass_button_image = Image::from_icon_name(Some("document-new"), IconSize::LargeToolbar.into());
+        let new_pass_button = ToolButton::new(Some(&new_pass_button_image), Some("New"));
+        toolbar.insert(&new_pass_button, 0);
 
         let sep = SeparatorToolItem::new();
         toolbar.insert(&sep, 1);
@@ -224,16 +205,16 @@ impl GWCApp {
         toolbar.insert(&quit_btn, 2);
 
 
-        // if let Some (ref label) = self.passwd_label {
-        //     if let Some (ref win) = self.window {
-        //         let w = win.to_owned().clone();
-        //         let l = label.clone();
+        if let Some (ref label) = self.passwd_label {
+            if let Some (ref win) = self.window {
+                let w = win.to_owned().clone();
+                let l = label.clone();
 
-        //         // open_btn.connect_clicked(move |_| {
-        //         //     GWCApp::on_menu_open(&w, &l);
-        //         // });
-        //     }
-        // }
+                new_pass_button.connect_clicked(move |_| {
+                    GWCApp::set_password(&w, &l);
+                });
+            }
+        }
 
         quit_btn.connect_clicked(|_| {
             gtk::main_quit();

@@ -20,6 +20,7 @@ The "--simple" option removes some characters that can cause issues with some pa
 ![current gui](screenshots/current_gui.png "Current GUI")
 
 ![current cli](screenshots/current_cli.png "Current CLI")
+
 TODO:
 - [x] Increase the font size of the password
 - [x] Make sure password contains at least one of each char type
@@ -27,3 +28,6 @@ TODO:
 - [ ] Auto-add the generated password to the clipboard
 - [ ] Add GUI option to alter password length
 - [ ] Add GUI option for simple vs complex passwords
+
+## Thanks
+Thanks to https://github.com/pjmlp/gwc-rs/ for showing the way forward with the GUI
