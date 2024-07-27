@@ -62,10 +62,13 @@ impl Password {
         
         let password_len = length;
         let mut rng = rand::thread_rng();
-        
-        
-        
-        let checks = [PasswordContents::Lc, PasswordContents::Uc, PasswordContents::Num, PasswordContents::Sc];
+
+        let checks = [
+                PasswordContents::Lc, 
+                PasswordContents::Uc, 
+                PasswordContents::Num, 
+                PasswordContents::Sc
+            ];
         // do a loop here checking to make sure all the types have a char in
         loop {
             let password: String = (0..password_len)
@@ -84,11 +87,8 @@ impl Password {
                 };
                 return Some(password.clone());
             };
-           
         };
-        
     }
-
 
     fn get_charset(&self, simple: bool) -> String {
         let mut main_string: String = String::from("");        
