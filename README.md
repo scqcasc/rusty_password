@@ -24,7 +24,7 @@ The "--simple" option removes some characters that can cause issues with some pa
 TODO:
 - [x] Increase the font size of the password
 - [x] Make sure password contains at least one of each char type
-- [ ] Add button to generate a new password
+- [x] Add button to generate a new password
 - [ ] Auto-add the generated password to the clipboard
 - [ ] Add GUI option to alter password length
 - [ ] Add GUI option for simple vs complex passwords
