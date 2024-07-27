@@ -177,7 +177,12 @@ impl GWCApp {
     fn init_extra_tools(&self) -> gtk::Box {
         let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let rb_simple: RadioButton = RadioButton::new();
+        let rb_simple_lable: Label = Label::new(Some("Simple"));
+        rb_simple.add(&rb_simple_lable);
         let rb_complex: RadioButton = RadioButton::new();
+        let rb_complex_lable: Label = Label::new(Some("Complex"));
+        rb_complex.add(&rb_complex_lable);
+        
         toolbar.add(&rb_complex);
         toolbar.add(&rb_simple);
         toolbar
