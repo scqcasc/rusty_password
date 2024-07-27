@@ -15,6 +15,11 @@ Options:
 ```
 The "--simple" option removes some characters that can cause issues with some password validator tools.
 
+## Screenshot
+
+![current gui](screenshots/current_gui.png "Current GUI")
+
+![current cli](screenshots/current_cli.png "Current CLI")
 TODO:
 - [x] Increase the font size of the password
 - [x] Make sure password contains at least one of each char type
