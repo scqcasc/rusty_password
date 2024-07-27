@@ -155,7 +155,7 @@ impl GWCApp {
         file_box.pack_start(&file_label, true, true, 0);
         file_item.add(&file_box);
 
-        menu.append(&file_item);
+        // menu.append(&file_item);
         menu.append(&new_passwd);
         menu.append(&quit);
         file.set_submenu(Some(&menu));
@@ -210,9 +210,9 @@ impl GWCApp {
         let toolbar = Toolbar::new();
         toolbar.set_style(ToolbarStyle::Both);
 
-        let open_btn_image = Image::from_icon_name(Some("document-open"), IconSize::LargeToolbar.into());
-        let open_btn = ToolButton::new(Some(&open_btn_image), Some("Open"));
-        toolbar.insert(&open_btn, 0);
+        // let open_btn_image = Image::from_icon_name(Some("document-open"), IconSize::LargeToolbar.into());
+        // let open_btn = ToolButton::new(Some(&open_btn_image), Some("Open"));
+        // toolbar.insert(&open_btn, 0);
 
         let sep = SeparatorToolItem::new();
         toolbar.insert(&sep, 1);
@@ -222,16 +222,16 @@ impl GWCApp {
         toolbar.insert(&quit_btn, 2);
 
 
-        if let Some (ref label) = self.passwd_label {
-            if let Some (ref win) = self.window {
-                let w = win.to_owned().clone();
-                let l = label.clone();
+        // if let Some (ref label) = self.passwd_label {
+        //     if let Some (ref win) = self.window {
+        //         let w = win.to_owned().clone();
+        //         let l = label.clone();
 
-                open_btn.connect_clicked(move |_| {
-                    GWCApp::on_menu_open(&w, &l);
-                });
-            }
-        }
+        //         // open_btn.connect_clicked(move |_| {
+        //         //     GWCApp::on_menu_open(&w, &l);
+        //         // });
+        //     }
+        // }
 
         quit_btn.connect_clicked(|_| {
             gtk::main_quit();
