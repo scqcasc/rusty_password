@@ -31,17 +31,18 @@ pub struct Password {
 }
 
 impl Password {
+    // checks to make sure at least one of the chars in the password are in the supplied list
     fn check_in_list(&self, password: &String, sub_list: &PasswordContents) -> bool {
         let list = sub_list.value();
-        for l in password.chars() {
-            if list.contains(l) {
+        for c in password.chars() {
+            if list.contains(c) {
                 return true;
             }
         }
-        
         return false;
     }
 
+    // called by the set_password method from main
     pub fn get_a_password(&self) -> String {
         match self.password_type { 
             PasswordType::Complex => {
@@ -54,14 +55,12 @@ impl Password {
             }
     }
 }
-
-    pub fn get_password(&self, simple: bool, length: i32) -> Option<String> {
+    // gets the password and verifies that one char from each passwordcontents type is in the result
+    fn get_password(&self, simple: bool, length: i32) -> Option<String> {
         let binding = self.get_charset(simple);
         let charset: &[u8] = binding.as_bytes();
-        
         let password_len = length;
         let mut rng = rand::thread_rng();
-
         let checks = [
                 PasswordContents::Lc, 
                 PasswordContents::Uc, 
@@ -89,6 +88,7 @@ impl Password {
         };
     }
 
+    // builds a complete String of possible password characters from the various types
     fn get_charset(&self, simple: bool) -> String {
         let mut main_string: String = String::from("");        
         main_string.push_str(PasswordContents::value(&PasswordContents::Lc));
