@@ -217,12 +217,9 @@ fn main() {
             println!("Failed to initialize GTK.");
             return;
         }
-    
         let mut window = GWCApp::new();
-    
         window.init();
         window.show();
-    
         gtk::main();
     }else{
         let p = password::Password {
