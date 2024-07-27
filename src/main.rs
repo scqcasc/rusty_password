@@ -6,7 +6,7 @@ extern crate gtk;
 use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
-    ToolbarStyle, SeparatorToolItem};
+    ToolbarStyle, SeparatorToolItem, RadioButton};
 use clap::Parser;
 use std::rc::Rc;
 use std::borrow::Borrow;
@@ -48,6 +48,8 @@ impl GWCApp {
         GWCApp { passwd_label: None, window: None }
     }
 
+    
+
     pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>) {
         let p = password::Password {
             password_type: password::PasswordType::Complex,
@@ -85,6 +87,10 @@ impl GWCApp {
         // followed by the toolbar
         let tool_bar = self.init_toolbar();
         v_box.pack_start(&tool_bar, false, false, 0);
+
+        // Create the complexity radio buttons
+        let radio_container: gtk::Box = self.init_extra_tools();
+        v_box.pack_start(&radio_container, false, true, 0);
 
         // Create the password label
         if let Some (ref lbl) = self.passwd_label {
@@ -165,6 +171,16 @@ impl GWCApp {
         }
 
         menu_bar
+    }
+
+    // Create the extra tools toolbar
+    fn init_extra_tools(&self) -> gtk::Box {
+        let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let rb_simple: RadioButton = RadioButton::new();
+        let rb_complex: RadioButton = RadioButton::new();
+        toolbar.add(&rb_complex);
+        toolbar.add(&rb_simple);
+        toolbar
     }
 
     /// Creates the application toolbar
