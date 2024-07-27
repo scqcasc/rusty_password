@@ -53,8 +53,8 @@ impl Password {
                 let my_pass = self.get_password(true, self.password_length);
                 return my_pass.unwrap();
             }
+        }
     }
-}
     // gets the password and verifies that one char from each passwordcontents type is in the result
     fn get_password(&self, simple: bool, length: i32) -> Option<String> {
         let binding = self.get_charset(simple);
