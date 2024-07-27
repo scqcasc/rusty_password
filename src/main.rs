@@ -21,6 +21,7 @@ struct Args{
     /// length of password to create
     #[arg(short, long, default_value_t = 15)]
     length: i32,
+
     /// simplify possible characters
     #[arg(short, long, default_value_t = false)]
     simple: bool,
@@ -38,7 +39,6 @@ struct GWCApp {
 
     /// a kind of handle for the Gtk+ window
     window : Option<Rc<Window>>
-
 }
 
 impl GWCApp {
@@ -55,7 +55,7 @@ impl GWCApp {
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
-        let pass_mu = format!("<span size='16pt'>{}</span>",&pass_str);
+        let pass_mu: String= format!("<span size='16pt'>{}</span>",&pass_str);
         lbl.set_selectable(true);
         lbl.set_focus_on_click(true);
         lbl.set_markup(pass_mu.as_str());
@@ -65,8 +65,6 @@ impl GWCApp {
     pub fn init(&mut self) {
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         let  password = Label::new(None);
-        
-        
         let win = Window::new(WindowType::Toplevel);
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
@@ -74,8 +72,7 @@ impl GWCApp {
 
         win.connect_delete_event(|_, _| {
             gtk::main_quit();
-            Propagation::Stop
-            
+            Propagation::Stop  
         });
 
         // The fields must be updated for the helper methods to work as expected.
@@ -91,8 +88,7 @@ impl GWCApp {
         let tool_bar = self.init_toolbar();
         v_box.pack_start(&tool_bar, false, false, 0);
 
-        // Create the text label for showing the word count
-        
+        // Create the password label
         if let Some (ref lbl) = self.passwd_label {
             v_box.pack_start(lbl.as_ref(), true, true, 0);
         }
@@ -119,21 +115,12 @@ impl GWCApp {
         let menu_bar = MenuBar::new();
         let file = MenuItem::with_label("File");
         let quit = MenuItem::with_label("Quit");
-        let file_item = MenuItem::new();
-        let file_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        let file_image = Image::from_icon_name(Some("document-open"), IconSize::Menu.into());
-        let file_label = Label::new(Some("File"));
-
         let new_passwd: MenuItem = MenuItem::new();
         let new_passwd_label: Label = Label::new(Some("New Password"));
         let pass_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
 
         pass_box.pack_start(&new_passwd_label, false, true, 0);
         new_passwd.add(&pass_box);
-
-        file_box.pack_start(&file_image, false, false, 0);
-        file_box.pack_start(&file_label, true, true, 0);
-        file_item.add(&file_box);
 
         // menu.append(&file_item);
         menu.append(&new_passwd);
@@ -150,11 +137,11 @@ impl GWCApp {
         help.set_submenu(Some(&help_menu));
         menu_bar.append(&help);
 
+        // This connects the new_passwd menu item with the set_password method
         if let Some (ref label) = self.passwd_label {
             if let Some (ref win) = self.window {
                 let w = win.to_owned().clone();
                 let l = label.clone();
-
                 new_passwd.connect_activate(move |_| {
                     GWCApp::set_password(&w, &l);
                 });
@@ -209,7 +196,6 @@ impl GWCApp {
             if let Some (ref win) = self.window {
                 let w = win.to_owned().clone();
                 let l = label.clone();
-
                 new_pass_button.connect_clicked(move |_| {
                     GWCApp::set_password(&w, &l);
                 });
