@@ -189,13 +189,16 @@ impl GWCApp {
             let wx = win.to_owned().clone();
             about.connect_activate(move |_| {
                 let p = AboutDialog::new();
-
-                p.set_authors(&["Sean Quaint"]);
+                const VERSION: &str = env!("CARGO_PKG_VERSION");
+                const AUTHORS: &[&str] = &[env!("CARGO_PKG_AUTHORS")];
+                const HOMEPAGE: &str = env!("CARGO_PKG_HOMEPAGE");
+                const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
+                p.set_authors(AUTHORS);
                 p.set_website_label(Some("A GTK/Rust-based strong password generator"));
-                p.set_website(Some("https://github.com/scqcasc/rusty_password"));
-                p.set_authors(&["Sean Quaint"]);
+                p.set_website(Some(HOMEPAGE));
+                p.set_version(Some(VERSION));
                 p.set_title("About Rusty-Password");
-                p.set_comments(Some("Written while learning about Rust and GTK4"));
+                p.set_comments(Some(DESCRIPTION));
                 p.set_transient_for(Some(wx.borrow() as &Window));
                 p.run();
                 p.close();
