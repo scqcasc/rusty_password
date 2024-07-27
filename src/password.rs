@@ -22,9 +22,8 @@ impl PasswordContents {
             PasswordContents::Num => "0123456789",
             PasswordContents::Sc => "!+=%#*@^",
             PasswordContents::Scext => "~{}[]()",
+        }
     }
-}
-
 }
 pub struct Password {
     pub password_type: PasswordType,
