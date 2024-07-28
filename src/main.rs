@@ -65,14 +65,14 @@ impl GWCApp {
     }
     
 
-    pub fn get_pass_type(data: &Rc<GtkPasswdArray>) -> std::option::Option<PasswordType> {
+    pub fn get_pass_type(data: &Rc<GtkPasswdArray>) -> PasswordType {
         for pw_type in &data.types {
             if pw_type.radio_buton.is_active() {
-                return Some(pw_type.password_type.clone());
+                return pw_type.password_type.clone();
             }
         }
-        
-        Some((PasswordType::Complex))
+        return PasswordType::Complex;
+        /* `Option<PasswordType>` value */
     }
 
     pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>, pass_type: PasswordType) {
@@ -108,8 +108,8 @@ impl GWCApp {
         self.passwd_label = Some(Rc::new(password));
         self.password_type = Some(Rc::new(rbgs_array));
         
-
-        GWCApp::set_password(&self.window.clone().unwrap(), &self.passwd_label.clone().unwrap(), GWCApp::get_pass_type(&self.password_type).clone().unwrap());
+        let pt: PasswordType= GWCApp::get_pass_type(&<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type).unwrap().clone());
+        GWCApp::set_password(&self.window.clone().unwrap(), &self.passwd_label.clone().unwrap(), pt);
 
         // create the application menu
         let menu_bar = self.init_menus();
@@ -169,10 +169,13 @@ impl GWCApp {
         // This connects the new_passwd menu item with the set_password method
         if let Some (ref label) = self.passwd_label {
             if let Some (ref win) = self.window {
+                // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
+                let pt: PasswordType= GWCApp::get_pass_type(&<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type).unwrap().clone());
+                GWCApp::set_password(&self.window.clone().unwrap(), &self.passwd_label.clone().unwrap(), pt);
                 let w = win.to_owned().clone();
                 let l = label.clone();
                 new_passwd.connect_activate(move |_| {
-                    GWCApp::set_password(&w, &l);
+                    GWCApp::set_password(&w, &l, pt);
                 });
             }
         }
@@ -253,13 +256,15 @@ impl GWCApp {
 
         if let Some (ref label) = self.passwd_label {
             if let Some (ref win) = self.window {
-                
-                let w = win.to_owned().clone();
-                let l = label.clone();
-                new_pass_button.connect_clicked(move |_| {
-                    GWCApp::set_password(&w, &l);
-                });
-            }
+                if let Some (ref password_type) = self.password_type {
+                    let w = win.to_owned().clone();
+                    let l = label.clone();
+                    let pt:Rc<GtkPasswdArray> = password_type.clone();
+                    new_pass_button.connect_clicked(move |_| {
+                        GWCApp::set_password(&w, &l, &pt);        
+                    });
+                }
+            
         }
 
         quit_btn.connect_clicked(|_| {
