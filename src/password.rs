@@ -2,6 +2,7 @@
 
 use rand::Rng;
 
+#[derive(Debug, Clone)]
 pub enum PasswordType {
     Simple,
     Complex,

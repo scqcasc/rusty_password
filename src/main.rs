@@ -31,6 +31,18 @@ struct Args{
     #[arg(short, long, default_value_t = false)]
     gui: bool,
 }
+#[derive(Debug, Clone)]
+struct GtkPasswordTypes {
+    name: String,
+    radio_buton: gtk::RadioButton,
+    password_type: PasswordType,
+}
+
+#[derive(Debug)]
+// // probably don't need this
+struct GtkPasswdArray {
+    types: Vec<GtkPasswordTypes>  
+}
 
 /// The application window state
 #[derive(Debug, Clone)]
@@ -41,21 +53,32 @@ struct GWCApp {
     /// a kind of handle for the Gtk+ window
     window : Option<Rc<Window>>,
 
-    // option for password type
-    // password_type: Option<Rc<gtk::RadioButton>>,
+    /// option for password type
+    password_type: Option<Rc<GtkPasswdArray>>,
 }
 
 impl GWCApp {
 
     /// Provides a new instance of the GWC application
     pub fn new() -> GWCApp {
-        GWCApp { passwd_label: None, window: None}
+        GWCApp { passwd_label: None, window: None, password_type: None}
     }
     
 
-    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>) {
+    pub fn get_pass_type(data: &Rc<GtkPasswdArray>) -> std::option::Option<PasswordType> {
+        for pw_type in &data.types {
+            if pw_type.radio_buton.is_active() {
+                return Some(pw_type.password_type.clone());
+            }
+        }
+        
+        Some((PasswordType::Complex))
+    }
+
+    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>, pass_type: PasswordType) {
+        
         let p = password::Password {
-            password_type: PasswordType::Complex,
+            password_type: pass_type,
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
@@ -70,6 +93,8 @@ impl GWCApp {
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         let  password = Label::new(None);
         let win = Window::new(WindowType::Toplevel);
+        let rbgs: Vec<GtkPasswordTypes> = self.build_rbg();
+        let rbgs_array: GtkPasswdArray = GtkPasswdArray{ types: rbgs};
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
         win.set_size_request(500, 400);
@@ -81,7 +106,10 @@ impl GWCApp {
         // The fields must be updated for the helper methods to work as expected.
         self.window = Some(Rc::new(win));
         self.passwd_label = Some(Rc::new(password));
-        GWCApp::set_password(&self.window.clone().unwrap(), &self.passwd_label.clone().unwrap());
+        self.password_type = Some(Rc::new(rbgs_array));
+        
+
+        GWCApp::set_password(&self.window.clone().unwrap(), &self.passwd_label.clone().unwrap(), GWCApp::get_pass_type(&self.password_type).clone().unwrap());
 
         // create the application menu
         let menu_bar = self.init_menus();
@@ -177,14 +205,22 @@ impl GWCApp {
     }
 
     /// Creates a vector of radio butttons for the form
-    pub fn build_rbg(&self) -> Vec<gtk::RadioButton> { 
-        let rb_complex = gtk::RadioButton::with_label("complex");
-        let rb_simple = gtk::RadioButton::from_widget(&rb_complex);
+    pub fn build_rbg(&self) -> Vec<GtkPasswordTypes> { 
+        let rbc: GtkPasswordTypes = GtkPasswordTypes {
+            name: String::from("Complex"),
+            radio_buton: gtk::RadioButton::with_label("complex"),
+            password_type: PasswordType::Complex,
+        };
+        let rbs: GtkPasswordTypes = GtkPasswordTypes {
+            name: String::from("Simple"),
+            radio_buton: gtk::RadioButton::from_widget(&rbc.radio_buton),
+            password_type: PasswordType::Simple,
+        };
         let rb_simple_lable: Label = Label::new(Some("simple"));
-        rb_simple.add(&rb_simple_lable);
-        let mut rbg: Vec<gtk::RadioButton> = Vec::with_capacity(2);
-        rbg.push(rb_complex);
-        rbg.push(rb_simple);
+        rbs.radio_buton.add(&rb_simple_lable);
+        let mut rbg: Vec<GtkPasswordTypes> = Vec::with_capacity(2);
+        rbg.push(rbc);
+        rbg.push(rbs);
         rbg
     }
     
@@ -193,7 +229,7 @@ impl GWCApp {
         let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let rbg = self.build_rbg();
         for tbi in rbg.iter() {
-            toolbar.add(tbi);
+            toolbar.add(&tbi.radio_buton);
         }
         toolbar
     }
