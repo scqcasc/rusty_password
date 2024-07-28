@@ -41,34 +41,21 @@ struct GWCApp {
     /// a kind of handle for the Gtk+ window
     window : Option<Rc<Window>>,
 
-    /// option for password type
-    password_type: Option<Rc<gtk::RadioButton>>,
+    // option for password type
+    // password_type: Option<Rc<gtk::RadioButton>>,
 }
 
 impl GWCApp {
 
     /// Provides a new instance of the GWC application
     pub fn new() -> GWCApp {
-        GWCApp { passwd_label: None, window: None, password_type: None}
+        GWCApp { passwd_label: None, window: None}
     }
     
-    pub fn get_password_type(rbg: gtk::RadioButton) -> PasswordType {
-        // There needs to be an array of radio buttons created to iterate through.
-        }
-    }
 
-    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>, password_type: &Rc<gtk::RadioButton>) {
+    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>) {
         let p = password::Password {
-            password_type: {
-                if password_type.is_active(){
-                    if password_type.label() == "complex" {
-                        return password::PasswordType::Complex;
-                    }
-                    if password_type.label() == "simple" {
-                        password::PasswordType::Simple
-                    }
-                }
-            },
+            password_type: PasswordType::Complex,
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
@@ -189,15 +176,25 @@ impl GWCApp {
         menu_bar
     }
 
-    // Create the extra tools toolbar
-    fn init_extra_tools(&self) -> gtk::Box {
-        let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    /// Creates a vector of radio butttons for the form
+    pub fn build_rbg(&self) -> Vec<gtk::RadioButton> { 
         let rb_complex = gtk::RadioButton::with_label("complex");
         let rb_simple = gtk::RadioButton::from_widget(&rb_complex);
         let rb_simple_lable: Label = Label::new(Some("simple"));
         rb_simple.add(&rb_simple_lable);
-        toolbar.add(&rb_complex);
-        toolbar.add(&rb_simple);
+        let mut rbg: Vec<gtk::RadioButton> = Vec::with_capacity(2);
+        rbg.push(rb_complex);
+        rbg.push(rb_simple);
+        rbg
+    }
+    
+    // Create the extra tools toolbar
+    fn init_extra_tools(&self) -> gtk::Box {
+        let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let rbg = self.build_rbg();
+        for tbi in rbg.iter() {
+            toolbar.add(tbi);
+        }
         toolbar
     }
 
@@ -220,7 +217,7 @@ impl GWCApp {
 
         if let Some (ref label) = self.passwd_label {
             if let Some (ref win) = self.window {
-                if let Some(ref rbg:&Rc<RadioButtonExt>) = self.rb
+                
                 let w = win.to_owned().clone();
                 let l = label.clone();
                 new_pass_button.connect_clicked(move |_| {
