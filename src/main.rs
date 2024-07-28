@@ -3,7 +3,8 @@
 
 extern crate gtk;
 
-use gtk::glib::Propagation;
+use gtk::builders::RadioButtonBuilder;
+use gtk::glib::{Propagation, PropertyGet};
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
     ToolbarStyle, SeparatorToolItem, RadioButton};
@@ -176,13 +177,12 @@ impl GWCApp {
     // Create the extra tools toolbar
     fn init_extra_tools(&self) -> gtk::Box {
         let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        let rb_simple: RadioButton = RadioButton::new();
-        let rb_simple_lable: Label = Label::new(Some("Simple"));
-        rb_simple.add(&rb_simple_lable);
-        let rb_complex: RadioButton = RadioButton::new();
+        let mut rb_simple: RadioButton = RadioButton::new();
+        rb_simple = gtk::RadioButton::with_label("Simple");
+        let mut rb_complex: RadioButton = RadioButton::new();
+        rb_complex = gtk::RadioButton::from_widget(&rb_simple);
         let rb_complex_lable: Label = Label::new(Some("Complex"));
         rb_complex.add(&rb_complex_lable);
-        
         toolbar.add(&rb_complex);
         toolbar.add(&rb_simple);
         toolbar
