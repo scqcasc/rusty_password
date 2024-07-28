@@ -6,8 +6,9 @@ extern crate gtk;
 use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
-    ToolbarStyle, SeparatorToolItem, RadioButton};
+    ToolbarStyle, SeparatorToolItem};
 use clap::Parser;
+use password::PasswordType;
 use std::rc::Rc;
 use std::borrow::Borrow;
 
@@ -38,21 +39,36 @@ struct GWCApp {
     passwd_label: Option<Rc<Label>>,
 
     /// a kind of handle for the Gtk+ window
-    window : Option<Rc<Window>>
+    window : Option<Rc<Window>>,
+
+    /// option for password type
+    password_type: Option<Rc<gtk::RadioButton>>,
 }
 
 impl GWCApp {
 
     /// Provides a new instance of the GWC application
     pub fn new() -> GWCApp {
-        GWCApp { passwd_label: None, window: None }
+        GWCApp { passwd_label: None, window: None, password_type: None}
+    }
+    
+    pub fn get_password_type(rbg: gtk::RadioButton) -> PasswordType {
+        // There needs to be an array of radio buttons created to iterate through.
+        }
     }
 
-    
-
-    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>) {
+    pub fn set_password(_win:&Rc<Window>, lbl : &Rc<Label>, password_type: &Rc<gtk::RadioButton>) {
         let p = password::Password {
-            password_type: password::PasswordType::Complex,
+            password_type: {
+                if password_type.is_active(){
+                    if password_type.label() == "complex" {
+                        return password::PasswordType::Complex;
+                    }
+                    if password_type.label() == "simple" {
+                        password::PasswordType::Simple
+                    }
+                }
+            },
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
@@ -176,12 +192,10 @@ impl GWCApp {
     // Create the extra tools toolbar
     fn init_extra_tools(&self) -> gtk::Box {
         let toolbar: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        let mut rb_simple: RadioButton = RadioButton::new();
-        rb_simple = gtk::RadioButton::with_label("Simple");
-        let mut rb_complex: RadioButton = RadioButton::new();
-        rb_complex = gtk::RadioButton::from_widget(&rb_simple);
-        let rb_complex_lable: Label = Label::new(Some("Complex"));
-        rb_complex.add(&rb_complex_lable);
+        let rb_complex = gtk::RadioButton::with_label("complex");
+        let rb_simple = gtk::RadioButton::from_widget(&rb_complex);
+        let rb_simple_lable: Label = Label::new(Some("simple"));
+        rb_simple.add(&rb_simple_lable);
         toolbar.add(&rb_complex);
         toolbar.add(&rb_simple);
         toolbar
@@ -206,6 +220,7 @@ impl GWCApp {
 
         if let Some (ref label) = self.passwd_label {
             if let Some (ref win) = self.window {
+                if let Some(ref rbg:&Rc<RadioButtonExt>) = self.rb
                 let w = win.to_owned().clone();
                 let l = label.clone();
                 new_pass_button.connect_clicked(move |_| {
