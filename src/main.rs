@@ -3,8 +3,7 @@
 
 extern crate gtk;
 
-use gtk::builders::RadioButtonBuilder;
-use gtk::glib::{Propagation, PropertyGet};
+use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{Window, WindowType, Label, Menu, MenuBar, MenuItem, IconSize, Image, AboutDialog, Toolbar, ToolButton,
     ToolbarStyle, SeparatorToolItem, RadioButton};
