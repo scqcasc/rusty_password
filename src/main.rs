@@ -86,6 +86,7 @@ impl GWCApp {
         lbl.set_selectable(true);
         lbl.set_focus_on_click(true);
         lbl.set_markup(pass_mu.as_str());
+        println!("{:?}", p.password_type);
     }
 
     /// Responsible for initializing the application state, including the whole UI
@@ -174,7 +175,7 @@ impl GWCApp {
                 let w = win.to_owned().clone();
                 let l = label.clone();
                 new_passwd.connect_activate(move |_| {
-                    GWCApp::set_password(&w, &l, pt);
+                    GWCApp::set_password(&w, &l, pt.clone());
                 });
             }
         }
@@ -262,7 +263,7 @@ impl GWCApp {
                 let w = win.to_owned().clone();
                 let l = label.clone();
                 new_pass_button.connect_clicked(move |_| {
-                    GWCApp::set_password(&w, &l, &pt);
+                    GWCApp::set_password(&w, &l, pt.clone());
                 });
             }
         }
