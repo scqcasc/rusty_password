@@ -33,7 +33,6 @@ struct Args{
 }
 #[derive(Debug, Clone)]
 struct GtkPasswordTypes {
-    name: String,
     radio_buton: gtk::RadioButton,
     password_type: PasswordType,
 }
@@ -210,12 +209,10 @@ impl GWCApp {
     /// Creates a vector of radio butttons for the form
     pub fn build_rbg(&self) -> Vec<GtkPasswordTypes> { 
         let rbc: GtkPasswordTypes = GtkPasswordTypes {
-            name: String::from("Complex"),
             radio_buton: gtk::RadioButton::with_label("complex"),
             password_type: PasswordType::Complex,
         };
         let rbs: GtkPasswordTypes = GtkPasswordTypes {
-            name: String::from("Simple"),
             radio_buton: gtk::RadioButton::from_widget(&rbc.radio_buton),
             password_type: PasswordType::Simple,
         };
