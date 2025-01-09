@@ -4,10 +4,10 @@ extern crate gtk;
 
 use clap::Parser;
 use gtk::glib::Propagation;
-use gtk::prelude::*;
+use gtk::{prelude::*, SpinButton};
 use gtk::{
     AboutDialog, IconSize, Image, Label, Menu, MenuBar, MenuItem, SeparatorToolItem, ToolButton,
-    Toolbar, ToolbarStyle, Window, WindowType, Entry
+    Toolbar, ToolbarStyle, Window, WindowType, Entry, Adjustment
 };
 use password::PasswordType;
 use std::borrow::Borrow;
@@ -65,7 +65,9 @@ struct GWCApp {
     // password_tb
     password_tb: Option<Rc<Entry>>,
 
-    
+    //pass_size_spin
+    password_size_spin: Option<Rc<SpinButton>>,
+
 }
 
 impl GWCApp {
@@ -78,6 +80,7 @@ impl GWCApp {
             notes_tb: None,
             username_tb: None,
             password_tb: None,
+            password_size_spin: None,
         }
     }
 
@@ -97,20 +100,26 @@ impl GWCApp {
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
-        // let pass_mu: String = format!("<span size='16pt'>{}</span>", &pass_str);
-        // lbl.set_selectable(true);
         lbl.set_focus_on_click(true);
         lbl.set_text(&pass_str);
-        // lbl.set_markup(pass_mu.as_str());
-        // println!("{:?}", p.password_type);
+        
     }
 
     /// Responsible for initializing the application state, including the whole UI
     pub fn init(&mut self) {
-        let grid = gtk::Grid::new();
-        grid.set_row_spacing(10);
-        grid.set_column_spacing(10);
-        grid.set_margin(5);
+
+        // input_grid contains the input fields
+        let input_grid = gtk::Grid::new();
+        input_grid.set_row_spacing(10);
+        input_grid.set_column_spacing(10);
+        input_grid.set_margin(5);
+
+        // tool_grid contains the tools
+        let tool_grid = gtk::Grid::new();
+        tool_grid.set_row_spacing(10);
+        tool_grid.set_column_spacing(10);
+        tool_grid.set_margin(5);
+
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         
         // let row_3 = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -118,6 +127,7 @@ impl GWCApp {
         let url_label = Label::new(Some("URL"));
         let notes_label = Label::new(Some("Notes"));
         let username_label = Label::new(Some("Username"));
+        let password_size_label = Label::new(Some("Password Size"));
         
 
         let win = Window::new(WindowType::Toplevel);
@@ -127,7 +137,10 @@ impl GWCApp {
         let notes_tb: Entry = Entry::new();
         let username_tb: Entry = Entry::new();
         let password_tb: Entry = Entry::new();
+        let adjustment: Adjustment = gtk::Adjustment::new (15.0, 0.0, 100.0, 1.0, 5.0, 0.0);
+        let password_size_spin: SpinButton = SpinButton::new(Some(&adjustment),1.0, 0);
 
+        
     
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
@@ -144,6 +157,7 @@ impl GWCApp {
         self.notes_tb = Some(Rc::new(notes_tb));
         self.username_tb = Some(Rc::new(username_tb));
         self.password_tb = Some(Rc::new(password_tb));
+        self.password_size_spin = Some(Rc::new(password_size_spin));
 
 
         let pt: PasswordType = GWCApp::get_pass_type(
@@ -167,35 +181,42 @@ impl GWCApp {
 
         // Create the complexity radio buttons
         let radio_container: gtk::Box = self.init_extra_tools();
-        v_box.pack_start(&radio_container, false, true, 0);
+        tool_grid.attach(&radio_container, 0,1,1,1);
+        // v_box.pack_start(&radio_container, false, true, 0);
+
+        if let Some(ref password_size_spin) = self.password_size_spin {
+            tool_grid.attach(&password_size_label, 1, 1, 1, 1);
+            tool_grid.attach(password_size_spin.as_ref(), 2, 1, 1, 1);
+        }
 
         // add the url tb
         if let Some(ref url_tb) = self.url_tb {
-            grid.attach(&url_label, 0, 0, 1, 1);
-            grid.attach(url_tb.as_ref(), 1, 0, 55, 1);
+            input_grid.attach(&url_label, 0, 0, 1, 1);
+            input_grid.attach(url_tb.as_ref(), 1, 0, 55, 1);
         }
 
         // add the username tb
         if let Some(ref username_tb) = self.username_tb {
-            grid.attach(&username_label, 0, 1, 1, 1);
-            grid.attach(username_tb.as_ref(), 1, 1, 55, 1);
+            input_grid.attach(&username_label, 0, 1, 1, 1);
+            input_grid.attach(username_tb.as_ref(), 1, 1, 55, 1);
         }
         // add the notes tb
         if let Some(ref notes_tb) = self.notes_tb {
-            grid.attach(&notes_label, 0, 2, 1, 1);
-            grid.attach(notes_tb.as_ref(), 1, 2, 55, 1);
+            input_grid.attach(&notes_label, 0, 2, 1, 1);
+            input_grid.attach(notes_tb.as_ref(), 1, 2, 55, 1);
         }
 
         // Create the password label
         if let Some(ref password_tb) = self.password_tb {
-            grid.attach(&password_label, 0, 3, 1, 1);
-            grid.attach(password_tb.as_ref(),1, 3, 25, 1);
+            input_grid.attach(&password_label, 0, 3, 1, 1);
+            input_grid.attach(password_tb.as_ref(),1, 3, 25, 1);
 
         }
 
         if let Some(ref w) = self.window {
             w.add(&v_box);
-            v_box.add(&grid);
+            v_box.add(&tool_grid);
+            v_box.add(&input_grid);
             // v_box.add(&row_2);
             // v_box.add(&row_3);
 
