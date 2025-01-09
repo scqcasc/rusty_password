@@ -7,7 +7,7 @@ use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{
     AboutDialog, IconSize, Image, Label, Menu, MenuBar, MenuItem, SeparatorToolItem, ToolButton,
-    Toolbar, ToolbarStyle, Window, WindowType,
+    Toolbar, ToolbarStyle, Window, WindowType, Entry
 };
 use password::PasswordType;
 use std::borrow::Borrow;
@@ -54,6 +54,14 @@ struct GWCApp {
 
     /// option for password type
     password_type: Option<Rc<GtkPasswdArray>>,
+
+    /// url_tb
+    url_tb: Option<Rc<Entry>>,
+
+    // notes_tb
+    notes_tb: Option<Rc<Entry>>,
+
+    
 }
 
 impl GWCApp {
@@ -63,6 +71,8 @@ impl GWCApp {
             passwd_label: None,
             window: None,
             password_type: None,
+            url_tb: None,
+            notes_tb: None,
         }
     }
 
@@ -96,6 +106,9 @@ impl GWCApp {
         let win = Window::new(WindowType::Toplevel);
         let rbgs: Vec<GtkPasswordTypes> = self.build_rbg();
         let rbgs_array: GtkPasswdArray = GtkPasswdArray { types: rbgs };
+        let url_tb: Entry = Entry::new();
+        let notes_tb: Entry = Entry::new();
+        url_tb.set_size_request(100, 25);
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
         win.set_size_request(500, 400);
@@ -108,6 +121,8 @@ impl GWCApp {
         self.window = Some(Rc::new(win));
         self.passwd_label = Some(Rc::new(password));
         self.password_type = Some(Rc::new(rbgs_array));
+        self.url_tb = Some(Rc::new(url_tb));
+        self.notes_tb = Some(Rc::new(notes_tb));
 
         let pt: PasswordType = GWCApp::get_pass_type(
             &<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type)
@@ -132,9 +147,19 @@ impl GWCApp {
         let radio_container: gtk::Box = self.init_extra_tools();
         v_box.pack_start(&radio_container, false, true, 0);
 
+        // add the url tb
+        if let Some(ref url_tb) = self.url_tb {
+            v_box.pack_start(url_tb.as_ref(), false, false, 10);
+        }
+
+        // add the notes tb
+        if let Some(ref notes_tb) = self.notes_tb {
+            v_box.pack_start(notes_tb.as_ref(), false, false, 10);
+        }
+
         // Create the password label
         if let Some(ref lbl) = self.passwd_label {
-            v_box.pack_start(lbl.as_ref(), true, true, 0);
+            v_box.pack_start(lbl.as_ref(), false, false, 10);
         }
 
         if let Some(ref w) = self.window {
