@@ -28,6 +28,7 @@ TODO:
 - [ ] Auto-add the generated password to the clipboard
 - [ ] Add GUI option to alter password length
 - [ ] Add GUI option for simple vs complex passwords
+- [ ] Add db for storing passwords usernames and urls
 
 ## Thanks
 Thanks to https://github.com/pjmlp/gwc-rs/ for showing the way forward with the GUI
