@@ -342,10 +342,15 @@ impl GWCApp {
         let sep = SeparatorToolItem::new();
         toolbar.insert(&sep, 1);
 
+        let view_button_image = Image::from_icon_name(Some("preview"), IconSize::LargeToolbar.into());
+        let view_button = ToolButton::new(Some(&view_button_image), Some("View"));
+        toolbar.insert(&view_button,2);
+        let sep = SeparatorToolItem::new();
+        toolbar.insert(&sep, 3);
         let quit_btn_image =
             Image::from_icon_name(Some("application-exit"), IconSize::LargeToolbar.into());
         let quit_btn = ToolButton::new(Some(&quit_btn_image), Some("Quit"));
-        toolbar.insert(&quit_btn, 2);
+        toolbar.insert(&quit_btn, 4);
 
         // This connects the new_passwd menu item with the set_password method
         if let Some(ref label) = self.password_tb {
