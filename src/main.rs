@@ -94,10 +94,11 @@ impl GWCApp {
         /* `Option<PasswordType>` value */
     }
 
-    pub fn set_password(_win: &Rc<Window>, lbl: &Rc<Entry>, pass_type: PasswordType) {
+    pub fn set_password(_win: &Rc<Window>, lbl: &Rc<Entry>, pass_type: PasswordType, size: &Rc<gtk::SpinButton>) {
+        
         let p = password::Password {
             password_type: pass_type,
-            password_length: 15,
+            password_length: size.value_as_int(),
         };
         let pass_str: String = p.get_a_password();
         lbl.set_focus_on_click(true);
@@ -122,14 +123,14 @@ impl GWCApp {
 
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         
-        // let row_3 = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        // Labels
         let password_label = Label::new(Some("Password"));
         let url_label = Label::new(Some("URL"));
         let notes_label = Label::new(Some("Notes"));
         let username_label = Label::new(Some("Username"));
         let password_size_label = Label::new(Some("Password Size"));
         
-
+        // Widgets
         let win = Window::new(WindowType::Toplevel);
         let rbgs: Vec<GtkPasswordTypes> = self.build_rbg();
         let rbgs_array: GtkPasswdArray = GtkPasswdArray { types: rbgs };
@@ -140,8 +141,7 @@ impl GWCApp {
         let adjustment: Adjustment = gtk::Adjustment::new (15.0, 0.0, 100.0, 1.0, 5.0, 0.0);
         let password_size_spin: SpinButton = SpinButton::new(Some(&adjustment),1.0, 0);
 
-        
-    
+        // main win properties
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
         win.set_size_request(500, 400);
@@ -169,6 +169,7 @@ impl GWCApp {
             &self.window.clone().unwrap(),
             &self.password_tb.clone().unwrap(),
             pt,
+            &self.password_size_spin.clone().unwrap(),
         );
 
         // create the application menu
@@ -182,8 +183,8 @@ impl GWCApp {
         // Create the complexity radio buttons
         let radio_container: gtk::Box = self.init_extra_tools();
         tool_grid.attach(&radio_container, 0,1,1,1);
-        // v_box.pack_start(&radio_container, false, true, 0);
-
+        
+        // add the password size spinner
         if let Some(ref password_size_spin) = self.password_size_spin {
             tool_grid.attach(&password_size_label, 1, 1, 1, 1);
             tool_grid.attach(password_size_spin.as_ref(), 2, 1, 1, 1);
@@ -209,17 +210,13 @@ impl GWCApp {
         // Create the password label
         if let Some(ref password_tb) = self.password_tb {
             input_grid.attach(&password_label, 0, 3, 1, 1);
-            input_grid.attach(password_tb.as_ref(),1, 3, 25, 1);
-
+            input_grid.attach(password_tb.as_ref(),1, 3, 55, 1);
         }
 
         if let Some(ref w) = self.window {
             w.add(&v_box);
             v_box.add(&tool_grid);
             v_box.add(&input_grid);
-            // v_box.add(&row_2);
-            // v_box.add(&row_3);
-
         }
     }
 
@@ -259,17 +256,21 @@ impl GWCApp {
         // This connects the new_passwd menu item with the set_password method
         if let Some(ref label) = self.password_tb {
             if let Some(ref win) = self.window {
-                // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
-                let pt: PasswordType = GWCApp::get_pass_type(
-                    &<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type)
-                        .unwrap()
-                        .clone(),
-                );
-                let w = win.to_owned().clone();
-                let l = label.clone();
-                new_passwd.connect_activate(move |_| {
-                    GWCApp::set_password(&w, &l, pt.clone());
-                });
+                if let Some(ref size) = self.password_size_spin{
+                    // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
+                    let pt: PasswordType = GWCApp::get_pass_type(
+                        &<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type)
+                            .unwrap()
+                            .clone(),
+                    );
+                    let w = win.to_owned().clone();
+                    let l = label.clone();
+                    let s = size.clone();
+                
+                    new_passwd.connect_activate(move |_| {
+                        GWCApp::set_password(&w, &l, pt.clone(), &s);
+                    });
+                }
             }
         }
 
@@ -349,18 +350,23 @@ impl GWCApp {
         // This connects the new_passwd menu item with the set_password method
         if let Some(ref label) = self.password_tb {
             if let Some(ref win) = self.window {
-                // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
-                let pt: PasswordType = GWCApp::get_pass_type(
-                    &<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type)
-                        .unwrap()
-                        .clone(),
-                );
+                if let Some(ref size) = self.password_size_spin{
 
-                let w = win.to_owned().clone();
-                let l = label.clone();
-                new_pass_button.connect_clicked(move |_| {
-                    GWCApp::set_password(&w, &l, pt.clone());
-                });
+                    // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
+                    let pt: PasswordType = GWCApp::get_pass_type(
+                        &<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type)
+                            .unwrap()
+                            .clone(),
+                    );
+
+                    let w = win.to_owned().clone();
+                    let l = label.clone();
+                    let s = size.clone();
+
+                    new_pass_button.connect_clicked(move |_| {
+                        GWCApp::set_password(&w, &l, pt.clone(), &s);
+                    });
+                }
             }
         }
 
