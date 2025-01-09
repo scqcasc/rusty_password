@@ -46,9 +46,7 @@ struct GtkPasswdArray {
 /// The application window state
 #[derive(Debug, Clone)]
 struct GWCApp {
-    /// the window label used to display the counters
-    passwd_label: Option<Rc<Label>>,
-
+  
     /// a kind of handle for the Gtk+ window
     window: Option<Rc<Window>>,
 
@@ -61,6 +59,12 @@ struct GWCApp {
     // notes_tb
     notes_tb: Option<Rc<Entry>>,
 
+    // username_tb
+    username_tb: Option<Rc<Entry>>,
+
+    // password_tb
+    password_tb: Option<Rc<Entry>>,
+
     
 }
 
@@ -68,11 +72,12 @@ impl GWCApp {
     /// Provides a new instance of the GWC application
     pub fn new() -> GWCApp {
         GWCApp {
-            passwd_label: None,
             window: None,
             password_type: None,
             url_tb: None,
             notes_tb: None,
+            username_tb: None,
+            password_tb: None,
         }
     }
 
@@ -86,17 +91,18 @@ impl GWCApp {
         /* `Option<PasswordType>` value */
     }
 
-    pub fn set_password(_win: &Rc<Window>, lbl: &Rc<Label>, pass_type: PasswordType) {
+    pub fn set_password(_win: &Rc<Window>, lbl: &Rc<Entry>, pass_type: PasswordType) {
         let p = password::Password {
             password_type: pass_type,
             password_length: 15,
         };
         let pass_str: String = p.get_a_password();
-        let pass_mu: String = format!("<span size='16pt'>{}</span>", &pass_str);
-        lbl.set_selectable(true);
+        // let pass_mu: String = format!("<span size='16pt'>{}</span>", &pass_str);
+        // lbl.set_selectable(true);
         lbl.set_focus_on_click(true);
-        lbl.set_markup(pass_mu.as_str());
-        println!("{:?}", p.password_type);
+        lbl.set_text(&pass_str);
+        // lbl.set_markup(pass_mu.as_str());
+        // println!("{:?}", p.password_type);
     }
 
     /// Responsible for initializing the application state, including the whole UI
@@ -108,9 +114,10 @@ impl GWCApp {
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
         
         // let row_3 = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        let password = Label::new(None);
-        let url_label = Label::new(Some("URL   "));
+        let password_label = Label::new(Some("Password"));
+        let url_label = Label::new(Some("URL"));
         let notes_label = Label::new(Some("Notes"));
+        let username_label = Label::new(Some("Username"));
         
 
         let win = Window::new(WindowType::Toplevel);
@@ -118,6 +125,9 @@ impl GWCApp {
         let rbgs_array: GtkPasswdArray = GtkPasswdArray { types: rbgs };
         let url_tb: Entry = Entry::new();
         let notes_tb: Entry = Entry::new();
+        let username_tb: Entry = Entry::new();
+        let password_tb: Entry = Entry::new();
+
     
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
@@ -129,10 +139,12 @@ impl GWCApp {
 
         // The fields must be updated for the helper methods to work as expected.
         self.window = Some(Rc::new(win));
-        self.passwd_label = Some(Rc::new(password));
         self.password_type = Some(Rc::new(rbgs_array));
         self.url_tb = Some(Rc::new(url_tb));
         self.notes_tb = Some(Rc::new(notes_tb));
+        self.username_tb = Some(Rc::new(username_tb));
+        self.password_tb = Some(Rc::new(password_tb));
+
 
         let pt: PasswordType = GWCApp::get_pass_type(
             &<Option<Rc<GtkPasswdArray>> as Clone>::clone(&self.password_type)
@@ -141,7 +153,7 @@ impl GWCApp {
         );
         GWCApp::set_password(
             &self.window.clone().unwrap(),
-            &self.passwd_label.clone().unwrap(),
+            &self.password_tb.clone().unwrap(),
             pt,
         );
 
@@ -163,16 +175,22 @@ impl GWCApp {
             grid.attach(url_tb.as_ref(), 1, 0, 55, 1);
         }
 
+        // add the username tb
+        if let Some(ref username_tb) = self.username_tb {
+            grid.attach(&username_label, 0, 1, 1, 1);
+            grid.attach(username_tb.as_ref(), 1, 1, 55, 1);
+        }
         // add the notes tb
         if let Some(ref notes_tb) = self.notes_tb {
-            grid.attach(&notes_label, 0, 1, 1, 1);
-            grid.attach(notes_tb.as_ref(), 1, 1, 55, 1);
+            grid.attach(&notes_label, 0, 2, 1, 1);
+            grid.attach(notes_tb.as_ref(), 1, 2, 55, 1);
         }
 
         // Create the password label
-        if let Some(ref lbl) = self.passwd_label {
-            // row_3.pack_start(lbl.as_ref(), false, false, 10);
-            grid.attach(lbl.as_ref(),1, 2, 25, 1)
+        if let Some(ref password_tb) = self.password_tb {
+            grid.attach(&password_label, 0, 3, 1, 1);
+            grid.attach(password_tb.as_ref(),1, 3, 25, 1);
+
         }
 
         if let Some(ref w) = self.window {
@@ -218,7 +236,7 @@ impl GWCApp {
         menu_bar.append(&help);
 
         // This connects the new_passwd menu item with the set_password method
-        if let Some(ref label) = self.passwd_label {
+        if let Some(ref label) = self.password_tb {
             if let Some(ref win) = self.window {
                 // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
                 let pt: PasswordType = GWCApp::get_pass_type(
@@ -308,7 +326,7 @@ impl GWCApp {
         toolbar.insert(&quit_btn, 2);
 
         // This connects the new_passwd menu item with the set_password method
-        if let Some(ref label) = self.passwd_label {
+        if let Some(ref label) = self.password_tb {
             if let Some(ref win) = self.window {
                 // let pt: Vec<GtkPasswordTypes> = self.build_rbg();
                 let pt: PasswordType = GWCApp::get_pass_type(
