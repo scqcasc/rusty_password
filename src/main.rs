@@ -101,14 +101,22 @@ impl GWCApp {
 
     /// Responsible for initializing the application state, including the whole UI
     pub fn init(&mut self) {
+        let grid = gtk::Grid::new();
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        // let row_1 = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        // let row_2 = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let row_3 = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         let password = Label::new(None);
+        let url_label = Label::new(Some("URL   "));
+        let notes_label = Label::new(Some("Notes"));
+        
+
         let win = Window::new(WindowType::Toplevel);
         let rbgs: Vec<GtkPasswordTypes> = self.build_rbg();
         let rbgs_array: GtkPasswdArray = GtkPasswdArray { types: rbgs };
         let url_tb: Entry = Entry::new();
         let notes_tb: Entry = Entry::new();
-        url_tb.set_size_request(100, 25);
+    
         win.set_title("Rusty Password");
         win.set_position(gtk::WindowPosition::Center);
         win.set_size_request(500, 400);
@@ -149,21 +157,33 @@ impl GWCApp {
 
         // add the url tb
         if let Some(ref url_tb) = self.url_tb {
-            v_box.pack_start(url_tb.as_ref(), false, false, 10);
+            grid.attach(&url_label, 0, 0, 1, 1);
+            grid.attach(url_tb.as_ref(), 1, 0, 1, 1);
+
+            // row_1.pack_start(&url_label, false,false,10);
+            // row_1.pack_start(url_tb.as_ref(), false, true, 10);
         }
 
         // add the notes tb
         if let Some(ref notes_tb) = self.notes_tb {
-            v_box.pack_start(notes_tb.as_ref(), false, false, 10);
+            grid.attach(&notes_label, 0, 1, 1, 1);
+            grid.attach(notes_tb.as_ref(), 1, 1, 1, 1);
+
+            // row_2.pack_start(&notes_label, false,false,10);
+            // row_2.pack_start(notes_tb.as_ref(), false, true, 10);
         }
 
         // Create the password label
         if let Some(ref lbl) = self.passwd_label {
-            v_box.pack_start(lbl.as_ref(), false, false, 10);
+            row_3.pack_start(lbl.as_ref(), false, false, 10);
         }
 
         if let Some(ref w) = self.window {
             w.add(&v_box);
+            v_box.add(&grid);
+            // v_box.add(&row_2);
+            v_box.add(&row_3);
+
         }
     }
 
