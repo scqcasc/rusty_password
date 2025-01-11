@@ -2,7 +2,7 @@ use gtk::glib::Propagation;
 use gtk::{prelude::*, SpinButton};
 use gtk::{
     AboutDialog, IconSize, Image, Label, Menu, MenuBar, MenuItem, SeparatorToolItem, ToolButton,
-    Toolbar, ToolbarStyle, Window, WindowType, Entry, Adjustment
+    Toolbar, ToolbarStyle, Window, WindowType, Entry, Adjustment, CheckButton
 };
 use std::borrow::Borrow;
 use std::rc::Rc;
@@ -49,6 +49,11 @@ pub struct GWCApp {
     //pass_size_spin
     password_size_spin: Option<Rc<SpinButton>>,
 
+    // encryption_key_tb
+    encryption_key_tb: Option<Rc<Entry>>,
+
+    
+
 }
 
 
@@ -63,6 +68,7 @@ impl GWCApp {
             username_tb: None,
             password_tb: None,
             password_size_spin: None,
+            encryption_key_tb: None,
         }
     }
 
@@ -111,6 +117,7 @@ impl GWCApp {
         let notes_label = Label::new(Some("Notes"));
         let username_label = Label::new(Some("Username"));
         let password_size_label = Label::new(Some("Password Size"));
+        let encypt_key_label = Label::new(Some("Encryption Key"));
         
         // Widgets
         let win = Window::new(WindowType::Toplevel);
@@ -122,6 +129,23 @@ impl GWCApp {
         let password_tb: Entry = Entry::new();
         let adjustment: Adjustment = gtk::Adjustment::new (15.0, 0.0, 100.0, 1.0, 5.0, 0.0);
         let password_size_spin: SpinButton = SpinButton::new(Some(&adjustment),1.0, 0);
+        let encryption_key_tb: Entry = Entry::new();
+        let toggle_visibility_cb = CheckButton::with_label("Show passwords");
+
+        encryption_key_tb.set_visibility(false);
+        password_tb.set_visibility(false);
+
+        // this toggles visibility of password fields
+        {
+            let encryption_key_tb = encryption_key_tb.clone();
+            let password_tb = password_tb.clone();
+
+            toggle_visibility_cb.connect_toggled(move |cb| {
+                encryption_key_tb.set_visibility(cb.is_active());
+                password_tb.set_visibility(cb.is_active());
+
+            });
+        }
 
         // main win properties
         win.set_title("Rusty Password");
@@ -140,6 +164,7 @@ impl GWCApp {
         self.username_tb = Some(Rc::new(username_tb));
         self.password_tb = Some(Rc::new(password_tb));
         self.password_size_spin = Some(Rc::new(password_size_spin));
+        self.encryption_key_tb = Some(Rc::new(encryption_key_tb));
 
 
         let pt: PasswordType = GWCApp::get_pass_type(
@@ -165,11 +190,19 @@ impl GWCApp {
         // Create the complexity radio buttons
         let radio_container: gtk::Box = self.init_extra_tools();
         tool_grid.attach(&radio_container, 0,1,1,1);
+        tool_grid.attach(&toggle_visibility_cb, 3, 1,10,1);
+
         
         // add the password size spinner
         if let Some(ref password_size_spin) = self.password_size_spin {
             tool_grid.attach(&password_size_label, 1, 1, 1, 1);
             tool_grid.attach(password_size_spin.as_ref(), 2, 1, 1, 1);
+        }
+
+        // add the encryption_key_tb
+        if let Some(ref encryption_key_tb) = self.encryption_key_tb {
+            tool_grid.attach(&encypt_key_label, 1, 2, 1, 1);
+            tool_grid.attach(encryption_key_tb.as_ref(), 2, 2,25,1);
         }
 
         // add the url tb
